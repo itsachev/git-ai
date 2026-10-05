@@ -56,6 +56,11 @@ h2 { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); margin-
 /* git's progress line, e.g. "Receiving objects:  42% (420/1000)". */
 .clone .progress { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.8rem ui-monospace, monospace; }
 .clone .error { margin: 0; overflow-wrap: anywhere; }
+.github { margin-top: 1rem; }
+.github p { margin: 0 0 0.5rem; }
+.github .device { padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.user-code { display: block; margin-bottom: 0.75rem; font: 600 clamp(1.4rem, 6vw, 2rem) ui-monospace, monospace; letter-spacing: 0.15em; user-select: all; }
+.github .error { margin: 0.5rem 0 0; overflow-wrap: anywhere; }
 .recent { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.25rem; }
 .recent button { width: 100%; text-align: left; display: grid; }
 .recent small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -60,6 +60,9 @@ pub fn reply(id: u32, answer: Option<String>) {
 }
 
 fn ask(app: &AppHandle, prompt: String) -> Option<String> {
+    if let Some(answer) = crate::github::askpass_answer(&prompt) {
+        return Some(answer);
+    }
     static NEXT: AtomicU32 = AtomicU32::new(0);
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();

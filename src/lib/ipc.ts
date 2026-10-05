@@ -8,6 +8,7 @@ import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
 import type { Side } from "../bindings/Side";
+import type { DeviceCode } from "../bindings/DeviceCode";
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");
@@ -71,3 +72,10 @@ export const workFile = (path: string, file: string) => invoke<string | null>("w
 export const openFile = (path: string, file: string) => invoke<void>("open_file", { path, file });
 /** Answers an "askpass" prompt; null cancels (git then fails). */
 export const askpassReply = (id: number, answer: string | null) => invoke<void>("askpass_reply", { id, answer });
+// GitHub sign-in (OAuth device flow). The token stays in the OS keychain; git gets it via askpass.
+export const githubStart = () => invoke<DeviceCode>("github_start");
+/** Resolves with the login once the user approves `code` on GitHub; code "expired" / "denied" otherwise. */
+export const githubFinish = (code: DeviceCode) => invoke<string>("github_finish", { code });
+/** null = signed out. */
+export const githubUser = () => invoke<string | null>("github_user");
+export const githubSignOut = () => invoke<void>("github_sign_out");

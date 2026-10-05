@@ -2,6 +2,7 @@ pub mod askpass;
 mod commands;
 mod errors;
 mod git;
+mod github;
 mod oplog;
 mod watch;
 
@@ -48,6 +49,10 @@ pub fn run() {
             commands::resolve,
             commands::work_file,
             commands::open_file,
+            commands::github_start,
+            commands::github_finish,
+            commands::github_user,
+            commands::github_sign_out,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
