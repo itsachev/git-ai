@@ -16,6 +16,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            #[cfg(desktop)]
+            fit_to_work_area(app);
             Ok(askpass::start(app.handle().clone())?)
         })
         .manage(watch::RepoWatcher::default())
@@ -61,4 +63,21 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// The configured 1280x800 is logical; with display scaling it can exceed the
+/// screen and slide under the taskbar. Shrink to 90% of the work area if so.
+#[cfg(desktop)]
+fn fit_to_work_area(app: &tauri::App) {
+    use tauri::Manager;
+    let Some(win) = app.get_webview_window("main") else { return };
+    let (Ok(Some(mon)), Ok(size)) = (win.current_monitor(), win.outer_size()) else { return };
+    let area = mon.work_area();
+    let w = size.width.min(area.size.width * 9 / 10);
+    let h = size.height.min(area.size.height * 9 / 10);
+    if (w, h) != (size.width, size.height) {
+        // set_size takes the inner size; the frame difference is small enough to ignore.
+        let _ = win.set_size(tauri::PhysicalSize::new(w, h));
+        let _ = win.center();
+    }
 }
