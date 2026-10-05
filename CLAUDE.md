@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Pre-scaffold: no code yet. The plan and the step log live in `progress.md`. Read it first, and append an entry for every implementation step. Once the Tauri scaffold exists, add build, test and lint commands here.
+Tauri scaffold in place (create-tauri-app react-ts template). The plan and the step log live in `progress.md`. Read it first, and append an entry for every implementation step.
+
+## Commands
+
+- `npm install`: install frontend deps.
+- `npm run tauri dev`: run the app in a native window with hot reload (first Rust build takes ~2 min). Plain `npm run dev` (http://localhost:1420) has no Tauri backend, so IPC calls fail there.
+- `npm run tauri build`: release build. Output: `src-tauri/target/release/gitai.exe` plus MSI/NSIS installers under `src-tauri/target/release/bundle/`.
+- `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests; also regenerates `src/bindings/*.ts` (commit them).
+- The exe name comes from `mainBinaryName` in `src-tauri/tauri.conf.json`. Keep it `gitai`.
 
 ## What this is
 
@@ -25,7 +33,7 @@ git-ai is a cross-platform desktop Git GUI (Sourcetree-like). It is local-first 
 - **Credentials.** Git operations go through git's own helpers (GCM, ssh-agent), with `GIT_ASKPASS` pointing back at the app. Only provider OAuth tokens go in the OS keychain (`keyring`).
 - **Undo.** Before any destructive operation:
   - Record the affected refs in `.git/git-ai/oplog.jsonl`.
-  - Before a discard, snapshot the changes with `git stash create` into `refs/git-ai/backup/<id>`.
+  - Before a discard, snapshot the working-tree content of the affected paths into `refs/git-ai/backup/<id>` (`oplog::backup`: throwaway `GIT_INDEX_FILE` + `commit-tree`, because `git stash create` can't take paths or untracked files).
   - Undo restores the recorded refs with `git update-ref`.
 - **Types.** The Rust structs are the source of truth. Generate the TypeScript types with `ts-rs`; don't hand-write duplicates.
 - **UI data flow.** The `notify` file watcher emits a repo-changed event, which marks TanStack Query data stale, and only the open views fetch again.

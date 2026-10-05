@@ -9,3 +9,5 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+dist-ssr/
+*.local
