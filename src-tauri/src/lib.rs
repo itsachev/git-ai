@@ -12,7 +12,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .setup(|app| Ok(askpass::start(app.handle().clone())?))
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            Ok(askpass::start(app.handle().clone())?)
+        })
         .manage(watch::RepoWatcher::default())
         .manage(git::graph::GraphCache::default())
         .invoke_handler(tauri::generate_handler![

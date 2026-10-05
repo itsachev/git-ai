@@ -139,8 +139,18 @@
   - Verified: `npm run build` OK. Not yet clicked through in `tauri dev`.
   - Skipped: rebinding shortcuts, palette on the welcome screen (open/clone/recent), Ctrl+Z for undo (clashes with text fields), checkout of remote branches from the palette.
 
+- Week 12: auto-update (2026-10-05).
+  - Remote `origin` = `https://github.com/itsachev/git-ai` (pushed `main`).
+  - New deps: `tauri-plugin-updater` (registered in `setup`, desktop only), `tauri-plugin-process` (relaunch); JS `@tauri-apps/plugin-updater`, `@tauri-apps/plugin-process`. Capabilities `updater:default`, `process:allow-restart`.
+  - `tauri.conf.json` `plugins.updater`: minisign pubkey + endpoint `https://github.com/itsachev/git-ai/releases/latest/download/latest.json`. Signing key generated without password at `~/.tauri/gitai.key` (NOT in the repo; losing it means shipped apps can never update again, back it up).
+  - `.github/workflows/release.yml`: on tag `v*`, `tauri-action` builds Windows, Linux, macOS arm64 + x64 into a draft release with `latest.json`. `createUpdaterArtifacts` is turned on only there via `--config`, so local `npm run tauri build` needs no private key. Needs repo secret `TAURI_SIGNING_PRIVATE_KEY` (contents of `~/.tauri/gitai.key`). Release = bump version in `tauri.conf.json` (+ `Cargo.toml`, `package.json`), tag, push tag, publish the draft.
+  - UI: `src/features/update/Update.tsx` `UpdateBanner` at the App root (both screens): checks once at startup, failures ignored (offline/dev/no release). Shows "git-ai X is available" + Install & restart / Later, download percent, error inline. Fixed bottom-right, wraps on narrow windows.
+  - Verified: `npm run build` OK, 27 tests pass. Not tried end to end: needs two published releases.
+  - Skipped: code signing of installers (Windows Authenticode, macOS notarization: unsigned macOS builds get Gatekeeper warnings), periodic re-check, release notes in the banner, update channel setting.
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
 - Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
-- Week 12: auto-update (`tauri-plugin-updater`, signed release artifacts).
+- Add secret `TAURI_SIGNING_PRIVATE_KEY`, cut v0.1.0 then v0.1.1 and check that 0.1.0 offers the update.
+- Installer code signing (Authenticode, Apple notarization).
