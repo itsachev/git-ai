@@ -181,6 +181,7 @@
 - All push buttons (2026-10-05): one dark top-lit gradient with white text in both themes (`button` uses `--tool*` tokens, defined once in `:root`; `--btn`/`--btn-edge` removed). Transparent row buttons (`.recent`, `.files .row`, `.views`, `.icon-btn`) keep inheriting text color. Primary buttons stay blue.
 - Bold labels (2026-10-05): one `font-weight: 700` rule at the end of `src/App.css` for column headers, section/list headings, sidebar and history summaries, commit-info terms, clone form labels. Graph header cells no longer pick up the `.c-oid` mono font from their column classes. Nested branch-folder summaries stay 500 mono.
 - Release v0.1.0 (2026-10-05): repo secret `TAURI_SIGNING_PRIVATE_KEY` added on GitHub; tag `v0.1.0` pushed to start `release.yml`. Next: publish the draft, install it, then cut v0.1.1 to test the update banner.
+- Release v0.1.1 (2026-10-05): version bumped in `package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`; tag `v0.1.1` pushed. v0.1.0 published and installed. Test: publish the v0.1.1 draft, open the installed 0.1.0, expect the update banner.
 
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
