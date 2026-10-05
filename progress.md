@@ -169,6 +169,19 @@
   - Button on the home brand row and in the repo toolbar; palette lists "Theme: …".
   - Verified: `tsc` + `npm run build` OK. Not yet clicked in `tauri dev`.
 
+- macOS look (2026-10-05, frontend only): replaces the acid-lime "instrument panel" palette.
+  - `src/App.css` tokens: macOS window/content/sidebar surfaces (`--rail`, `--pick`), hairline rgba separators, system blue accent (#007aff / #0a84ff dark), Apple system greens/oranges/reds. SF Pro / SF Mono first in the font stacks, Segoe/Cascadia as fallback on Windows.
+  - Controls: push buttons with hairline shadow instead of borders, gradient default (primary) button, darken on press (no scale), default cursor, soft accent focus halo, inset text fields, grey rounded search wells, thin overlay scrollbars.
+  - Lists: Finder-style sidebar (grey pill selection, accent icon, sentence-case section headers; all uppercase headers gone). File lists, commit table and palette rows use accent-fill selection with white text (selected HEAD ref chip inverted). Fetch/Pull/Push is one segmented control.
+  - Palette is Spotlight-like (frosted `backdrop-filter`, 1.55rem light input, no backdrop dim); update toast is a frosted notification. Graph lanes use macOS system colors (`CommitGraph.tsx` `COLORS`).
+  - Verified: `npm run build` OK; headless Edge screenshots of home in light and dark. Repo views not re-screenshotted (needs the IPC mock harness), not clicked in `tauri dev`.
+  - Skipped: native vibrancy (`windowEffects` sidebar/mica + transparent window), faked traffic lights (wrong on Windows/Linux), unfocused-grey selection.
+- Sidebar header fix (2026-10-05): repo name and branch chip overlapped. `src/App.css`: `.repo-id` gets `gap: 0.2rem`, repo name and `.branch-chip` get line-height 1.3.
+- Toolbar buttons (2026-10-05): Fetch/Pull/Push and Commands get top-lit gradient backgrounds per theme (`--tool`, `--tool-hover`, `--tool-lit`, `--tool-edge` in `src/App.css`). Pull/Push show behind/ahead as accent `.count` pills (`Remote.tsx`), only when > 0.
+- All push buttons (2026-10-05): one dark top-lit gradient with white text in both themes (`button` uses `--tool*` tokens, defined once in `:root`; `--btn`/`--btn-edge` removed). Transparent row buttons (`.recent`, `.files .row`, `.views`, `.icon-btn`) keep inheriting text color. Primary buttons stay blue.
+- Bold labels (2026-10-05): one `font-weight: 700` rule at the end of `src/App.css` for column headers, section/list headings, sidebar and history summaries, commit-info terms, clone form labels. Graph header cells no longer pick up the `.c-oid` mono font from their column classes. Nested branch-folder summaries stay 500 mono.
+- Release v0.1.0 (2026-10-05): repo secret `TAURI_SIGNING_PRIVATE_KEY` added on GitHub; tag `v0.1.0` pushed to start `release.yml`. Next: publish the draft, install it, then cut v0.1.1 to test the update banner.
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
 - Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
