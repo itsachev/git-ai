@@ -5,6 +5,7 @@ import { checkout, createBranch, deleteBranch, deleteRemoteBranch, deleteTag, me
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, useRun } from "../status/Changes";
+import { Icon } from "../../lib/icons";
 
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
 
@@ -16,8 +17,8 @@ export function Sidebar({ path }: { path: string }) {
   const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
   const toggle = (what: "branch" | "stash") => (e: React.MouseEvent) => { e.preventDefault(); setCreating((c) => (c === what ? null : what)); };
 
-  if (error) return <aside className="sidebar error" role="alert">{errorText(error)}</aside>;
-  if (!data) return <aside className="sidebar" />;
+  if (error) return <div className="sidebar error" role="alert">{errorText(error)}</div>;
+  if (!data) return <div className="sidebar" />;
   const f = filter.trim().toLowerCase();
   const match = (items: RefItem[]) => items.filter((r) => r.name.toLowerCase().includes(f));
   const local = match(data.local);
@@ -56,14 +57,14 @@ export function Sidebar({ path }: { path: string }) {
   }
 
   return (
-    <aside className="sidebar" aria-label="Branches">
-      <input type="search" className="filter" placeholder="Filter branches" aria-label="Filter branches"
-        value={filter} onChange={(e) => setFilter(e.target.value)} />
+    <section className="sidebar" aria-label="Branches">
+      <label className="search"><Icon name="search" /><input type="search" placeholder="Filter branches" aria-label="Filter branches"
+        value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
       {opError && <p className="error" role="alert">{opError}</p>}
       <details open>
         <summary>
-          Branches ({data.local.length})
-          <button className="small" onClick={toggle("branch")} aria-expanded={creating === "branch"} title="New branch">+ New</button>
+          <Icon name="branch" />Branches <span className="count">{data.local.length}</span>
+          <button className="icon-btn" onClick={toggle("branch")} aria-expanded={creating === "branch"} aria-label="New branch" title="New branch"><Icon name="add" /></button>
         </summary>
         {creating === "branch" && <NameForm label="Branch name" check="Check out" button="Create" onCancel={() => setCreating(null)}
           onSubmit={async (name, co) => { if (await run(() => createBranch(path, name, co))) setCreating(null); }} />}
@@ -78,7 +79,7 @@ export function Sidebar({ path }: { path: string }) {
         </ul>
       </details>
       <details open>
-        <summary>Remotes ({data.remote.length})</summary>
+        <summary><Icon name="remote" />Remotes <span className="count">{data.remote.length}</span></summary>
         {[...remotes].map(([remote, items]) => (
           <details key={remote} open className="nested">
             <summary>{remote}</summary>
@@ -92,7 +93,7 @@ export function Sidebar({ path }: { path: string }) {
         ))}
       </details>
       <details>
-        <summary>Tags ({data.tags.length})</summary>
+        <summary><Icon name="tag" />Tags <span className="count">{data.tags.length}</span></summary>
         <ul className="refs">
           {match(data.tags).map((t) => (
             <Row key={t.name} item={t} actions={[["Push", () => run(() => pushTag(path, t.name))], ["Delete", async () => {
@@ -104,8 +105,8 @@ export function Sidebar({ path }: { path: string }) {
       </details>
       <details>
         <summary>
-          Stashes ({data.stashes.length})
-          <button className="small" onClick={toggle("stash")} aria-expanded={creating === "stash"} title="Stash all changes">+ Stash</button>
+          <Icon name="stash" />Stashes <span className="count">{data.stashes.length}</span>
+          <button className="icon-btn" onClick={toggle("stash")} aria-expanded={creating === "stash"} aria-label="Stash all changes" title="Stash all changes"><Icon name="add" /></button>
         </summary>
         {creating === "stash" && <NameForm label="Stash message (optional)" button="Stash" optional onCancel={() => setCreating(null)}
           onSubmit={async (msg) => { if (await run(() => stashSave(path, msg))) setCreating(null); }} />}
@@ -119,7 +120,7 @@ export function Sidebar({ path }: { path: string }) {
           ))}
         </ul>
       </details>
-    </aside>
+    </section>
   );
 }
 
@@ -131,7 +132,7 @@ function Row({ item, label = item.name, cur, onOpen, actions = [] }: RowProps) {
   return (
     <li className={cur ? "cur" : undefined}>
       <span className="name" title={title} onDoubleClick={onOpen}>
-        {cur && <span aria-label="current branch">●</span>}
+        {cur && <span className="dot" aria-label="current branch" />}
         <span>{label}</span>
         {item.ahead > 0 && <small className="ab" title={`${item.ahead} to push`}>↑{item.ahead}</small>}
         {item.behind > 0 && <small className="ab" title={`${item.behind} to pull`}>↓{item.behind}</small>}

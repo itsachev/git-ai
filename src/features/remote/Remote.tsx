@@ -7,6 +7,7 @@ import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
 import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { refsQuery } from "../refs/Sidebar";
+import { Icon, type IconName } from "../../lib/icons";
 
 export type Sync = ReturnType<typeof useSync>;
 
@@ -39,8 +40,10 @@ export function SyncButtons({ sync }: { sync: Sync }) {
   return (
     <span className="sync">
       {sync.ops.map((o) => (
-        <button key={o.label} disabled={!!sync.busy} onClick={o.go}>
-          {sync.busy === o.doing ? o.doing : o.label} {o.count && <small className="ab">{o.count}</small>}
+        <button key={o.label} disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing} title={o.label}>
+          <Icon name={o.label.toLowerCase() as IconName} />
+          <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
+          {o.count && <small className="ab">{o.count}</small>}
         </button>
       ))}
     </span>

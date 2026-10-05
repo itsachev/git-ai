@@ -6,6 +6,7 @@ import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
+import { Icon } from "../../lib/icons";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
@@ -60,6 +61,7 @@ export function Changes({ path }: { path: string }) {
       <div className="side">
         {data.operation && (
           <div className="banner" role="status">
+            <Icon name="warn" />
             <span>
               {data.operation[0].toUpperCase() + data.operation.slice(1)} in progress.{" "}
               {data.conflicted.length ? "Resolve the conflicts, then commit." : "Commit to finish it."}
@@ -70,11 +72,9 @@ export function Changes({ path }: { path: string }) {
             }}>Abort</button>
           </div>
         )}
-        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation}
-          onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
-        {opError && <p className="error" role="alert">{opError}</p>}
+        <div className="lists">
         {empty ? (
-          <p className="muted">Nothing to commit, working tree clean.</p>
+          <p className="empty"><Icon name="changes" />Nothing to commit, working tree clean.</p>
         ) : (
           <>
             <FileList {...list} title="Conflicts" files={data.conflicted} staged={false}
@@ -86,6 +86,10 @@ export function Changes({ path }: { path: string }) {
           </>
         )}
         <History path={path} run={run} />
+        </div>
+        {opError && <p className="error" role="alert">{opError}</p>}
+        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation}
+          onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
       </div>
       {conflicted ? <Conflict path={path} file={sel.file} run={run} /> : <Diff path={path} sel={shown ? sel : null} run={run} />}
     </div>
@@ -156,7 +160,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, sel, onSe
   return (
     <section>
       <div className="list-head">
-        <h2>{title} ({files.length})</h2>
+        <h2>{title} <span className="count">{files.length}</span></h2>
         {onDiscard && <button className="small" onClick={() => onDiscard(files)}>Discard all</button>}
         <button className="small" onClick={() => onAction(files)}>{action} all</button>
       </div>
@@ -282,8 +286,9 @@ function Diff({ path, sel, run }: DiffProps) {
         )}
       </div>
       <pre aria-label={`Diff of ${file}`}>
-        {all.slice(start).map((l, k) => {
+        {lineNumbers(all, start).map(([o, n], k) => {
           const i = start + k;
+          const l = all[i];
           if (l.startsWith("@@"))
             return (
               <div key={i} className="hunk">
@@ -293,14 +298,14 @@ function Diff({ path, sel, run }: DiffProps) {
                 {l}
               </div>
             );
-          if (!isChange(i)) return <div key={i}>{l || " "}</div>;
+          if (!isChange(i)) return <div key={i}><Gutter o={o} n={n} />{l || " "}</div>;
           const on = picked.has(i);
           return (
             <div key={i} role="checkbox" aria-checked={on}
               className={`${l[0] === "+" ? "add" : "del"} pick${on ? " on" : ""}`}
               onMouseDown={(e) => e.shiftKey && e.preventDefault()} // no text selection on Shift+click
               onClick={(e) => toggle(i, e.shiftKey)}>
-              {l}
+              <Gutter o={o} n={n} />{l}
             </div>
           );
         })}
@@ -309,12 +314,27 @@ function Diff({ path, sel, run }: DiffProps) {
   );
 }
 
+/** Old/new line numbers for each diff line from `start` (the first "@@ -a,b +c,d @@"); "" where a side has none. */
+export function lineNumbers(lines: string[], start: number) {
+  let o = 0, n = 0;
+  return lines.slice(start).map((l): [number | "", number | ""] => {
+    const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l);
+    if (h) { o = +h[1]; n = +h[2]; return ["", ""]; }
+    if (l[0] === "+") return ["", n++];
+    if (l[0] === "-") return [o++, ""];
+    if (l[0] === "\\") return ["", ""]; // "\ No newline at end of file"
+    return [o++, n++];
+  });
+}
+
+export const Gutter = ({ o, n }: { o: number | ""; n: number | "" }) => <span className="ln" aria-hidden="true"><span>{o}</span><span>{n}</span></span>;
+
 function History({ path, run }: { path: string; run: Run }) {
   const { data } = useQuery(opLogQuery(path));
   if (!data?.length) return null;
   return (
     <details className="history">
-      <summary>Undo history ({data.length})</summary>
+      <summary><Icon name="undo" />Undo history <span className="count">{data.length}</span></summary>
       <ul className="files">
         {data.map((e) => (
           <li key={e.id}>

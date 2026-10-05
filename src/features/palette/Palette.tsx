@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "../../lib/icons";
 
 /** `keys` like "Ctrl+Shift+F": also a global shortcut. Ctrl means Cmd on macOS too. */
 export type Command = { label: string; keys?: string; run: () => void };
@@ -65,15 +66,19 @@ export function Palette({ commands }: { commands: Command[] }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} title={`Command palette (${show("Ctrl+K")})`}>Commands</button>
+      <button className="palette-trigger" onClick={() => setOpen(true)} title={`Command palette (${show("Ctrl+K")})`}>
+        <Icon name="command" />
+        <span className="btn-label">Commands</span>
+        <kbd>{show("Ctrl+K")}</kbd>
+      </button>
       {/* No padding on the dialog, so a click on the dialog itself is a click on the backdrop. */}
       <dialog ref={dialog} className="palette" onCancel={(e) => { e.preventDefault(); setOpen(false); }}
         onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
         {open && (
           <>
-            <input role="combobox" aria-expanded aria-controls="cmd-list" aria-label="Command" placeholder="Type a command"
+            <label className="palette-field"><Icon name="search" /><input role="combobox" aria-expanded aria-controls="cmd-list" aria-label="Command" placeholder="Type a command"
               aria-activedescendant={at >= 0 ? `cmd-${at}` : undefined} spellCheck={false} autoComplete="off"
-              value={q} onChange={(e) => { setQ(e.target.value); setI(0); }} onKeyDown={onKeyDown} />
+              value={q} onChange={(e) => { setQ(e.target.value); setI(0); }} onKeyDown={onKeyDown} /></label>
             <ul id="cmd-list" role="listbox" aria-label="Commands">
               {shown.map((c, k) => (
                 <li key={c.label} id={`cmd-${k}`} role="option" aria-selected={k === at}

@@ -23,6 +23,8 @@
   - Weekly token allowance per tier (e.g. 250k to 2M+ tokens).
   - Custom model configuration (provider, model, parameters).
   - Bring Your Own Key (BYOK). BYOK keys go in the OS keychain (`keyring`), never in settings.
+- **Dev-phase model:** Gemini 3.5 Flash Lite for all AI features during development.
+- **Gemini key storage:** OS keychain, service `git-ai`, user `gemini` (same as the GitHub token), set from an in-app field. Dev fallback: `GEMINI_API_KEY` env var, read before the keychain. Never in the repo, settings or docs.
 - Open questions: hosted proxy for tier tokens (metering, abuse limits); what diff content is sent and how users opt in; size limits for large diffs (reuse the 1 MB / binary skip).
 
 ## Log
@@ -148,9 +150,29 @@
   - Verified: `npm run build` OK, 27 tests pass. Not tried end to end: needs two published releases.
   - Skipped: code signing of installers (Windows Authenticode, macOS notarization: unsigned macOS builds get Gatekeeper warnings), periodic re-check, release notes in the banner, update channel setting.
 
+- Planning (2026-10-05): MVP code complete. Next order agreed: harden the MVP (click-through in `tauri dev`, 100k-commit graph speed, v0.1.0 → v0.1.1 update test), then v1 starting with AI commit messages (BYOK, Gemini 3.5 Flash Lite in dev), interactive rebase, blame + file history, GitHub PRs. Dev Gemini key received; kept out of the repo (see "AI features").
+
+- UI redesign (2026-10-05, frontend only): "instrument panel" direction.
+  - Tokens in `src/App.css` (rewritten): graphite surfaces, one acid-lime signal (`--accent` fill, `--accent-ink` text on it, `--accent-fg` as text/outline) for HEAD, the selection and primary actions. Light + dark. Native type (Segoe Variable / SF, Cascadia / JetBrains Mono), no web fonts, so it works offline. 13 px base; `--ctl` control height grows to 2.75rem on `pointer: coarse`.
+  - Icons: `src/lib/icons.tsx`, Solar linear set (CC BY 4.0) + mdi:github inlined from the Iconify API; no icon dependency, no network.
+  - Home: two columns from 60rem (brand mark, headline, Open/Clone tiles, GitHub | Recent with a filter shown at > 3 repos), stacked below. Recent names now split on `\` too (Windows paths showed the full path).
+  - Repo view: full-height left rail (back, repo + branch, File Status / History nav with change count, refs sidebar). Toolbar: view title, segmented Fetch/Pull/Push with icons (spinning icon while busy), command-palette pill with its shortcut. Below 48rem the rail is an off-canvas drawer with a scrim (`visibility: hidden` when closed, so it is not tabbable) and toolbar labels become screen-reader only.
+  - File Status: lists scroll, commit box pinned under them; per-file buttons show on hover/focus/selection (always on touch). Diffs (both views) get old/new line-number gutters (`lineNumbers`, `Gutter` in `Changes.tsx`), sticky while scrolling sideways.
+  - History: commit subject as a heading, body below, then actions, metadata, files. Graph lane colors retuned for both themes; canvas reads `--panel` for the hollow HEAD dot.
+  - Motion is CSS only: view fade, drawer slide, dialog pop, form rise, all off under `prefers-reduced-motion`. No GSAP / smooth scroll / WebGL: smooth scroll would fight the virtualized graph.
+  - Verified: `npm run build` OK. Screenshots (headless Edge, IPC faked with `@tauri-apps/api/mocks` in a throwaway harness) of home, File Status, History, light/dark, 320/390 px and the drawer. Not yet clicked through in `tauri dev`.
+
+- Theme switch (2026-10-05): System / Light / Dark instead of OS-only dark.
+  - `src/App.css`: dark tokens moved from `@media (prefers-color-scheme: dark)` to `:root[data-theme="dark"]`, plus `color-scheme` so scrollbars and native controls follow.
+  - `index.html` inline script sets `data-theme` before first paint (no light flash). `src/lib/theme.tsx`: `useTheme` (state in `App`, layout effect sets the attribute before the graph canvas reads `--panel`, follows OS changes in System mode, `getCurrentWindow().setTheme` themes the native title bar), `ThemeButton` (cycles, Solar sun/moon/monitor icons), `themeCommands` for the palette.
+  - Choice is kept in `localStorage`, not `tauri-plugin-store`: the pre-paint script must read it synchronously. Capability `core:window:allow-set-theme` added.
+  - Button on the home brand row and in the repo toolbar; palette lists "Theme: …".
+  - Verified: `tsc` + `npm run build` OK. Not yet clicked in `tauri dev`.
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
 - Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
 - Add secret `TAURI_SIGNING_PRIVATE_KEY`, cut v0.1.0 then v0.1.1 and check that 0.1.0 offers the update.
 - Installer code signing (Authenticode, Apple notarization).
+- v1 start: AI commit message from the staged diff (Gemini 3.5 Flash Lite, key from keychain / `GEMINI_API_KEY`, skip binary + >1 MB files).
