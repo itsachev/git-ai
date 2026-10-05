@@ -124,3 +124,33 @@ pub fn delete_branch(path: String, name: String, force: bool) -> Result<(), AppE
 pub fn file_diff(path: String, file: String, staged: bool) -> Result<Option<String>, AppError> {
     read::file_diff(Path::new(&path), &file, staged)
 }
+
+#[tauri::command]
+pub fn merge(path: String, rev: String, cherry_pick: bool) -> Result<(), AppError> {
+    cli::merge(Path::new(&path), &rev, cherry_pick)
+}
+
+#[tauri::command]
+pub fn abort(path: String) -> Result<(), AppError> {
+    cli::abort(Path::new(&path))
+}
+
+#[tauri::command]
+pub fn create_tag(path: String, name: String, target: String, message: String) -> Result<(), AppError> {
+    cli::create_tag(Path::new(&path), &name, &target, &message)
+}
+
+#[tauri::command]
+pub fn delete_tag(path: String, name: String) -> Result<(), AppError> {
+    cli::delete_tag(Path::new(&path), &name)
+}
+
+#[tauri::command]
+pub fn stash_save(path: String, message: String) -> Result<(), AppError> {
+    cli::stash_save(Path::new(&path), &message)
+}
+
+#[tauri::command]
+pub fn stash(path: String, op: cli::StashOp, index: usize, oid: String) -> Result<(), AppError> {
+    cli::stash(Path::new(&path), op, index, &oid)
+}

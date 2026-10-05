@@ -27,6 +27,20 @@ pub fn open(path: &Path) -> Result<RepoInfo, AppError> {
     Ok(RepoInfo { path: root, name, branch })
 }
 
+/// The op that stopped halfway (conflicts) and waits for commit or abort: "merge", "cherry-pick",
+/// "revert" or "rebase". None when nothing is in progress.
+pub fn operation(repo: &Path) -> Result<Option<String>, AppError> {
+    use git2::RepositoryState::*;
+    Ok(match git2::Repository::discover(repo)?.state() {
+        Merge => Some("merge"),
+        CherryPick | CherryPickSequence => Some("cherry-pick"),
+        Revert | RevertSequence => Some("revert"),
+        Rebase | RebaseInteractive | RebaseMerge => Some("rebase"),
+        _ => None,
+    }
+    .map(String::from))
+}
+
 /// Unified diff of one file: staged (HEAD → index) or unstaged (index → working tree, untracked included).
 /// None when the file is binary or over 1 MB (libgit2 treats blobs above `max_size` as binary).
 pub fn file_diff(repo: &Path, file: &str, staged: bool) -> Result<Option<String>, AppError> {

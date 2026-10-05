@@ -17,7 +17,8 @@ const LOG: &str = "oplog.jsonl";
 pub struct OpEntry {
     /// Unix time in ms, also the backup ref name.
     pub id: String,
-    /// "discard", "amend", "delete branch" or "undo".
+    /// "discard", "amend", "merge", "cherry-pick", "abort <op>", "delete branch", "delete tag",
+    /// "drop stash", or "undo <op>" for the undo of an op.
     pub op: String,
     /// HEAD (or `ref_name`) before the op; None = the ref didn't exist.
     pub head: Option<String>,
@@ -118,14 +119,19 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
         .filter_map(|l| serde_json::from_str::<OpEntry>(l).ok())
         .find(|e| e.id == id)
         .ok_or_else(|| AppError::new("not_found", "That operation is no longer in the undo history."))?;
+    let op = format!("undo {}", e.op);
     let mut u = if let Some(backup) = &e.backup {
-        let u = snapshot(repo, "undo", &e.paths)?;
+        let u = snapshot(repo, &op, &e.paths)?;
         let args: Vec<&str> = ["restore", "--source", backup, "--worktree", "--"]
             .into_iter()
             .chain(e.paths.iter().map(String::as_str))
             .collect();
         git(repo, &args)?;
         u
+    } else if let ("drop stash", Some(oid)) = (e.op.as_str(), &e.head) {
+        let msg = git(repo, &["log", "-1", "--format=%s", oid])?;
+        git(repo, &["stash", "store", "-m", msg.trim(), oid])?;
+        OpEntry::new(&op, None, None)
     } else if e.head.is_some() || e.new_head.is_some() {
         // Compare-and-swap back to `head`: "" as the old value means "must not exist", -d deletes.
         let r = e.ref_name.as_deref().unwrap_or("HEAD");
@@ -138,7 +144,7 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
             let name = r.strip_prefix("refs/heads/").unwrap_or(r);
             AppError::new("moved", format!("{name} has changed since this operation (a newer commit, checkout or branch), so it can't be undone."))
         })?;
-        let mut u = OpEntry::new("undo", e.new_head.clone(), e.head.clone());
+        let mut u = OpEntry::new(&op, e.new_head.clone(), e.head.clone());
         u.ref_name = e.ref_name.clone();
         u
     } else {
@@ -163,17 +169,103 @@ mod tests {
     use crate::git::cli::{self, git};
     use std::fs;
 
-    /// Stage, unstage, commit, discard (with backup) on a throwaway repo.
-    #[test]
-    fn write_ops_round_trip() {
-        let dir = std::env::temp_dir().join(format!("git-ai-test-{}", std::process::id()));
+    fn temp_repo(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("git-ai-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let p = dir.as_path();
-        git(p, &["init", "-q"]).unwrap();
+        git(p, &["init", "-q", "-b", "main"]).unwrap();
         git(p, &["config", "user.name", "t"]).unwrap();
         git(p, &["config", "user.email", "t@t"]).unwrap();
         git(p, &["config", "core.autocrlf", "false"]).unwrap();
+        dir
+    }
+
+    /// Merge (conflict, abort, finish), cherry-pick, tags and stashes, with undo.
+    #[test]
+    fn merge_tag_stash() {
+        let dir = temp_repo("merge");
+        let p = dir.as_path();
+        let commit = |file: &str, text: &str, msg: &str| {
+            fs::write(dir.join(file), text).unwrap();
+            cli::stage(p, &[file.to_string()]).unwrap();
+            cli::commit(p, msg, false).unwrap();
+        };
+        let top = || super::entries(p, 20).unwrap()[0].clone();
+        commit("a.txt", "base
+", "base");
+        cli::create_branch(p, "feat", true).unwrap();
+        commit("a.txt", "feat
+", "feat change");
+        commit("b.txt", "b
+", "add b");
+        let feat_b = cli::rev(p, "HEAD").unwrap();
+        cli::checkout(p, "main", false).unwrap();
+        commit("a.txt", "main
+", "main change");
+        let main = cli::rev(p, "HEAD").unwrap();
+
+        // Conflicting merge stays in progress; abort restores main and backs up the conflicted file.
+        assert_eq!(cli::merge(p, "feat", false).unwrap_err().code, "conflicts");
+        assert_eq!(cli::status(p).unwrap().operation.as_deref(), Some("merge"));
+        cli::abort(p).unwrap();
+        assert_eq!(cli::status(p).unwrap().operation, None);
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "main
+");
+        assert_eq!(top().op, "abort merge");
+
+        // Resolve and commit with git's message; undo moves main back.
+        cli::merge(p, "feat", false).unwrap_err();
+        commit("a.txt", "both
+", "");
+        assert_eq!(git(p, &["log", "-1", "--format=%s"]).unwrap().trim(), "Merge branch 'feat'");
+        assert_eq!(top().op, "merge");
+        super::undo(p, &top().id).unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), main);
+        assert_eq!(top().op, "undo merge");
+        git(p, &["reset", "-q", "--hard"]).unwrap();
+
+        // Clean cherry-pick is logged.
+        cli::merge(p, &feat_b, true).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("b.txt")).unwrap(), "b
+");
+        assert_eq!(top().op, "cherry-pick");
+
+        // Tags: annotated delete + undo brings back the same tag object.
+        cli::create_tag(p, "v1", &main, "release").unwrap();
+        let tag = cli::rev(p, "refs/tags/v1").unwrap();
+        cli::delete_tag(p, "v1").unwrap();
+        assert!(cli::rev(p, "refs/tags/v1").is_err());
+        super::undo(p, &top().id).unwrap();
+        assert_eq!(cli::rev(p, "refs/tags/v1").unwrap(), tag);
+
+        // Stash: save, stale index refused, drop + undo, pop.
+        fs::write(dir.join("a.txt"), "wip
+").unwrap();
+        fs::write(dir.join("new.txt"), "new
+").unwrap();
+        cli::stash_save(p, "wip").unwrap();
+        assert!(!dir.join("new.txt").exists());
+        let oid = cli::rev(p, "stash@{0}").unwrap();
+        assert_eq!(cli::stash(p, cli::StashOp::Drop, 0, "nope").unwrap_err().code, "stale");
+        cli::stash(p, cli::StashOp::Drop, 0, &oid).unwrap();
+        assert!(cli::rev(p, "stash@{0}").is_err());
+        super::undo(p, &top().id).unwrap();
+        assert_eq!(cli::rev(p, "stash@{0}").unwrap(), oid);
+        cli::stash(p, cli::StashOp::Pop, 0, &oid).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "wip
+");
+        assert_eq!(fs::read_to_string(dir.join("new.txt")).unwrap(), "new
+");
+        assert_eq!(top().op, "drop stash");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Stage, unstage, commit, discard (with backup) on a throwaway repo.
+    #[test]
+    fn write_ops_round_trip() {
+        let dir = temp_repo("ops");
+        let p = dir.as_path();
         let files = |names: &[&str]| names.iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
         fs::write(dir.join("a.txt"), "one\n").unwrap();

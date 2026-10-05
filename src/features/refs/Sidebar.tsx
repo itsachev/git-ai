@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { checkout, createBranch, deleteBranch, refs } from "../../lib/ipc";
+import { checkout, createBranch, deleteBranch, deleteTag, merge, refs, stash, stashSave } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, useRun } from "../status/Changes";
@@ -11,7 +11,8 @@ export function Sidebar({ path }: { path: string }) {
   const { data, error } = useQuery({ queryKey: ["refs", path], queryFn: () => refs(path) });
   const [run, opError] = useRun();
   const [filter, setFilter] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
+  const toggle = (what: "branch" | "stash") => (e: React.MouseEvent) => { e.preventDefault(); setCreating((c) => (c === what ? null : what)); };
 
   if (error) return <aside className="sidebar error" role="alert">{errorText(error)}</aside>;
   if (!data) return <aside className="sidebar" />;
@@ -31,6 +32,11 @@ export function Sidebar({ path }: { path: string }) {
     const short = name.slice(name.indexOf("/") + 1);
     return run(() => (localNames.has(short) ? checkout(path, short, false) : checkout(path, name, true)));
   };
+  const mergeIn = (name: string) => run(() => merge(path, name, false));
+  async function dropStash(i: number, s: RefItem) {
+    if (await ask(`Drop stash "${s.name}"? Undo history (File Status) can restore it.`, { title: "Drop stash", kind: "warning" }))
+      run(() => stash(path, "Drop", i, s.oid));
+  }
   async function remove(name: string) {
     if (!(await ask(`Delete branch ${name}? Undo history (File Status) can restore it.`, { title: "Delete branch", kind: "warning" }))) return;
     run(async () => {
@@ -51,17 +57,16 @@ export function Sidebar({ path }: { path: string }) {
       <details open>
         <summary>
           Branches ({data.local.length})
-          <button className="small" onClick={(e) => { e.preventDefault(); setCreating((c) => !c); }}
-            aria-expanded={creating} title="New branch">+ New</button>
+          <button className="small" onClick={toggle("branch")} aria-expanded={creating === "branch"} title="New branch">+ New</button>
         </summary>
-        {creating && <NewBranch onCancel={() => setCreating(false)}
-          onCreate={async (name, co) => { if (await run(() => createBranch(path, name, co))) setCreating(false); }} />}
+        {creating === "branch" && <NameForm label="Branch name" check="Check out" button="Create" onCancel={() => setCreating(null)}
+          onSubmit={async (name, co) => { if (await run(() => createBranch(path, name, co))) setCreating(null); }} />}
         <ul className="refs">
           {local.map((b) => {
             const cur = b.name === data.head;
             return (
-              <Row key={b.name} item={b} cur={cur} onCheckout={cur ? undefined : () => run(() => checkout(path, b.name, false))}
-                onDelete={cur ? undefined : () => remove(b.name)} />
+              <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => checkout(path, b.name, false))}
+                actions={cur ? [] : [["Checkout", () => run(() => checkout(path, b.name, false))], ["Merge", () => mergeIn(b.name)], ["Delete", () => remove(b.name)]]} />
             );
           })}
         </ul>
@@ -73,7 +78,8 @@ export function Sidebar({ path }: { path: string }) {
             <summary>{remote}</summary>
             <ul className="refs">
               {items.map((r) => (
-                <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onCheckout={() => checkoutRemote(r.name)} />
+                <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={() => checkoutRemote(r.name)}
+                  actions={[["Checkout", () => checkoutRemote(r.name)], ["Merge", () => mergeIn(r.name)]]} />
               ))}
             </ul>
           </details>
@@ -81,47 +87,80 @@ export function Sidebar({ path }: { path: string }) {
       </details>
       <details>
         <summary>Tags ({data.tags.length})</summary>
-        <ul className="refs">{match(data.tags).map((t) => <Row key={t.name} item={t} />)}</ul>
+        <ul className="refs">
+          {match(data.tags).map((t) => (
+            <Row key={t.name} item={t} actions={[["Delete", async () => {
+              if (await ask(`Delete tag ${t.name}? Undo history (File Status) can restore it.`, { title: "Delete tag", kind: "warning" }))
+                run(() => deleteTag(path, t.name));
+            }]]} />
+          ))}
+        </ul>
       </details>
       <details>
-        <summary>Stashes ({data.stashes.length})</summary>
-        <ul className="refs">{data.stashes.map((s, i) => <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} />)}</ul>
+        <summary>
+          Stashes ({data.stashes.length})
+          <button className="small" onClick={toggle("stash")} aria-expanded={creating === "stash"} title="Stash all changes">+ Stash</button>
+        </summary>
+        {creating === "stash" && <NameForm label="Stash message (optional)" button="Stash" optional onCancel={() => setCreating(null)}
+          onSubmit={async (msg) => { if (await run(() => stashSave(path, msg))) setCreating(null); }} />}
+        <ul className="refs">
+          {data.stashes.map((s, i) => (
+            <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} actions={[
+              ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
+              ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
+              ["Drop", () => dropStash(i, s)],
+            ]} />
+          ))}
+        </ul>
       </details>
     </aside>
   );
 }
 
-type RowProps = { item: RefItem; label?: string; cur?: boolean; onCheckout?: () => void; onDelete?: () => void };
+/** `onOpen` runs on double-click; `actions` are [label, handler] buttons shown on hover/focus. */
+type RowProps = { item: RefItem; label?: string; cur?: boolean; onOpen?: () => void; actions?: [string, () => void][] };
 
-function Row({ item, label = item.name, cur, onCheckout, onDelete }: RowProps) {
+function Row({ item, label = item.name, cur, onOpen, actions = [] }: RowProps) {
   const title = item.upstream ? `${item.name} (tracks ${item.upstream})` : item.name;
   return (
     <li className={cur ? "cur" : undefined}>
-      <span className="name" title={title} onDoubleClick={onCheckout}>
+      <span className="name" title={title} onDoubleClick={onOpen}>
         {cur && <span aria-label="current branch">●</span>}
         <span>{label}</span>
         {item.ahead > 0 && <small className="ab" title={`${item.ahead} to push`}>↑{item.ahead}</small>}
         {item.behind > 0 && <small className="ab" title={`${item.behind} to pull`}>↓{item.behind}</small>}
       </span>
-      {(onCheckout || onDelete) && (
+      {actions.length > 0 && (
         <span className="acts">
-          {onCheckout && <button className="small" onClick={onCheckout} aria-label={`Check out ${item.name}`}>Checkout</button>}
-          {onDelete && <button className="small" onClick={onDelete} aria-label={`Delete ${item.name}`}>Delete</button>}
+          {actions.map(([a, fn]) => <button key={a} className="small" onClick={fn} aria-label={`${a} ${item.name}`}>{a}</button>)}
         </span>
       )}
     </li>
   );
 }
 
-function NewBranch({ onCreate, onCancel }: { onCreate: (name: string, checkout: boolean) => void; onCancel: () => void }) {
+type NameFormProps = {
+  label: string;
+  button: string;
+  /** Checkbox label; its value is passed to `onSubmit`. */
+  check?: string;
+  /** Allow submitting an empty name. */
+  optional?: boolean;
+  onSubmit: (name: string, checked: boolean) => void;
+  onCancel: () => void;
+};
+
+/** Small inline form: one text field, optional checkbox, Esc cancels. */
+export function NameForm({ label, button, check, optional, onSubmit, onCancel }: NameFormProps) {
   const [name, setName] = useState("");
-  const [co, setCo] = useState(true);
+  const [on, setOn] = useState(true);
+  const ok = optional || !!name.trim();
   return (
-    <form className="new-branch" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onCreate(name.trim(), co); }}
+    <form className="new-branch" onSubmit={(e) => { e.preventDefault(); if (ok) onSubmit(name.trim(), on); }}
       onKeyDown={(e) => e.key === "Escape" && onCancel()}>
-      <input autoFocus aria-label="New branch name" placeholder="Branch name" value={name} onChange={(e) => setName(e.target.value)} />
-      <label className="check"><input type="checkbox" checked={co} onChange={(e) => setCo(e.target.checked)} />Check out</label>
-      <button className="small primary" disabled={!name.trim()}>Create</button>
+      <input autoFocus aria-label={label} placeholder={label} value={name} onChange={(e) => setName(e.target.value)} />
+      {check && <label className="check"><input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />{check}</label>}
+      <button className="small primary" disabled={!ok}>{button}</button>
     </form>
   );
 }

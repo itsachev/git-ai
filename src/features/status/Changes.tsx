@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { applyLines, commit, discard, fileDiff, headMessage, opLog, repoStatus, stage, undo, unstage } from "../../lib/ipc";
+import { abortOp, applyLines, commit, discard, fileDiff, headMessage, opLog, repoStatus, stage, undo, unstage } from "../../lib/ipc";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
@@ -57,7 +57,20 @@ export function Changes({ path }: { path: string }) {
   return (
     <div className="changes">
       <div className="side">
-        <CommitBox path={path} canCommit={data.staged.length > 0} onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
+        {data.operation && (
+          <div className="banner" role="status">
+            <span>
+              {data.operation[0].toUpperCase() + data.operation.slice(1)} in progress.{" "}
+              {data.conflicted.length ? "Resolve the conflicts, then commit." : "Commit to finish it."}
+            </span>
+            <button className="small" onClick={async () => {
+              if (await ask(`Abort the ${data.operation}? Changed files are backed up first (Undo history).`, { title: "Abort", kind: "warning" }))
+                run(() => abortOp(path));
+            }}>Abort</button>
+          </div>
+        )}
+        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation}
+          onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
         {opError && <p className="error" role="alert">{opError}</p>}
         {empty ? (
           <p className="muted">Nothing to commit, working tree clean.</p>
@@ -78,22 +91,25 @@ export function Changes({ path }: { path: string }) {
   );
 }
 
-type CommitProps = { path: string; canCommit: boolean; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+/** `finishing`: a merge/cherry-pick is in progress; committing finishes it, an empty message uses git's. */
+type CommitProps = { path: string; canCommit: boolean; finishing: boolean; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
 
-function CommitBox({ path, canCommit, onCommit }: CommitProps) {
+function CommitBox({ path, canCommit, finishing, onCommit }: CommitProps) {
   const [msg, setMsg] = useState("");
   const [amend, setAmend] = useState(false);
   const [busy, setBusy] = useState(false);
   const head = useQuery({ queryKey: ["head", path], queryFn: () => headMessage(path) }).data;
   // Amend may just reword, so it doesn't need staged changes.
-  const ready = (canCommit || amend) && msg.trim() !== "" && !busy;
+  // A merge commit may have nothing staged (all conflicts resolved to "ours").
+  const ready = amend ? msg.trim() !== "" : finishing || (canCommit && msg.trim() !== "");
+  const ok = ready && !busy;
   function toggleAmend(on: boolean) {
     setAmend(on);
     if (on && !msg.trim() && head) setMsg(head);
     if (!on && msg === head) setMsg("");
   }
   async function submit() {
-    if (!ready) return;
+    if (!ok) return;
     setBusy(true);
     if (await onCommit(msg, amend)) {
       setMsg("");
@@ -105,7 +121,7 @@ function CommitBox({ path, canCommit, onCommit }: CommitProps) {
     <form className="commit" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <textarea
         aria-label="Commit message"
-        placeholder="Commit message (Ctrl+Enter to commit)"
+        placeholder={finishing ? "Leave empty to use git's message (Ctrl+Enter to commit)" : "Commit message (Ctrl+Enter to commit)"}
         value={msg}
         rows={3}
         onChange={(e) => setMsg(e.target.value)}
@@ -113,10 +129,10 @@ function CommitBox({ path, canCommit, onCommit }: CommitProps) {
       />
       <div className="commit-row">
         <label className="check">
-          <input type="checkbox" checked={amend} disabled={!head} onChange={(e) => toggleAmend(e.target.checked)} />
+          <input type="checkbox" checked={amend} disabled={!head || finishing} onChange={(e) => toggleAmend(e.target.checked)} />
           Amend last commit
         </label>
-        <button className="primary" disabled={!ready}>{busy ? "Committing…" : amend ? "Amend" : "Commit"}</button>
+        <button className="primary" disabled={!ok}>{busy ? "Committing…" : amend ? "Amend" : "Commit"}</button>
       </div>
     </form>
   );
@@ -279,14 +295,21 @@ function History({ path, run }: { path: string; run: Run }) {
   );
 }
 
-function opLabel(e: OpEntry) {
+function opLabel(e: OpEntry): string {
+  if (e.op.startsWith("undo ")) return `Undo: ${opLabel({ ...e, op: e.op.slice(5) })}`;
   const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
-  if (e.op === "discard") return `Discard ${what}`;
-  if (e.op === "amend") return "Amend commit";
-  const branch = e.ref_name?.replace("refs/heads/", "");
-  if (e.op === "delete branch") return `Delete branch ${branch}`;
-  if (e.backup) return `Undo: restore ${what}`;
-  return branch ? `Undo: ${e.head ? "delete" : "restore"} branch ${branch}` : "Undo amend";
+  const name = e.ref_name?.replace(/^refs\/(heads|tags)\//, "");
+  const labels: Record<string, string> = {
+    discard: `Discard ${what}`,
+    amend: "Amend commit",
+    merge: "Merge",
+    "cherry-pick": "Cherry-pick",
+    "delete branch": `Delete branch ${name}`,
+    "delete tag": `Delete tag ${name}`,
+    "drop stash": "Drop stash",
+  };
+  if (e.op.startsWith("abort ")) return `Abort ${e.op.slice(6)} (backup of ${what})`;
+  return labels[e.op] ?? e.op;
 }
 
 // Two letters = conflict; "?" = untracked (shown like an add).

@@ -186,15 +186,19 @@ button.small { padding: 0.15rem 0.5rem; min-height: 1.75rem; font-size: 0.8rem; 
 .sidebar .nested { padding-left: 0.75rem; }
 .sidebar .nested summary { margin-top: 0; text-transform: none; font-size: 0.85rem; }
 .refs { list-style: none; padding: 0; margin: 0; }
-.refs li { display: flex; align-items: center; gap: 0.25rem; border-radius: 4px; padding-right: 0.25rem; }
+.refs li { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; border-radius: 4px; padding-right: 0.25rem; }
 .refs li:hover, .refs li:focus-within { background: var(--surface); }
 .refs .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.35rem; min-height: 2rem; padding: 0 0.4rem; white-space: nowrap; }
 .refs .name > span:not([aria-label]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .refs li.cur .name { font-weight: 600; }
 .refs .ab { flex-shrink: 0; color: var(--muted); font-size: 0.75rem; }
-/* Opacity, not display: the buttons must stay keyboard focusable. */
-.refs .acts { display: flex; gap: 0.25rem; opacity: 0; }
+/* Opacity, not display: the buttons must stay keyboard focusable. With a mouse they overlay the
+   right end of the name so it keeps the full width; on touch they sit in flow and wrap below it. */
+.refs .acts { display: flex; gap: 0.25rem; opacity: 0; position: absolute; right: 0.25rem; padding-left: 0.5rem; background: var(--surface); }
 .refs li:hover .acts, .refs li:focus-within .acts { opacity: 1; }
-@media (hover: none) { .refs .acts { opacity: 1; } }
+@media (hover: none) { .refs .acts { opacity: 1; position: static; margin-left: auto; background: none; } }
+.banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem; border: 1px solid var(--accent); border-radius: 6px; background: var(--surface); font-size: 0.9rem; }
+.commit-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
 .new-branch { display: grid; gap: 0.4rem; margin-bottom: 0.5rem; }
 .new-branch button { justify-self: end; }

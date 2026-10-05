@@ -9,4 +9,8 @@ branch: string | null, staged: Array<FileChange>,
 /**
  * Unstaged changes plus untracked files (kind "?").
  */
-unstaged: Array<FileChange>, conflicted: Array<FileChange>, };
+unstaged: Array<FileChange>, conflicted: Array<FileChange>, 
+/**
+ * Merge/cherry-pick/... waiting for commit or abort, see `read::operation`.
+ */
+operation: string | null, };
