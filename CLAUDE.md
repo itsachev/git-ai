@@ -43,6 +43,10 @@ git-ai is a cross-platform desktop Git GUI (Sourcetree-like). It is local-first 
   - Must stay fast on repos with 100k+ commits.
 - **Large files.** No inline diff for binary files or files over 1 MB. LFS pointer files are shown as files.
 
+## UI reference
+
+`sources/*.png` are Sourcetree screenshots to model the UI on: `home_screen.png` (local repo list with search, Clone/Add/Create) and `selected_repo.png` (toolbar, sidebar with File Status/History and branches, commit table with graph/description/date/author/hash, commit details + file list + diff below). Match their layout and information density, adapted to narrow windows.
+
 ## Planned layout
 
 - `src-tauri/src/`: `git/{read,cli,graph}.rs`, `commands.rs` (the IPC surface), `oplog.rs`, `errors.rs` (maps git stderr to an error code plus a beginner-friendly explanation).

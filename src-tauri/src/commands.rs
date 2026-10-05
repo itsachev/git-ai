@@ -1,11 +1,11 @@
 //! IPC surface.
 use crate::errors::AppError;
-use crate::git::{cli, read};
+use crate::git::{cli, graph, read};
 use crate::oplog;
 use crate::watch;
 use serde_json::{json, Value};
 use std::path::Path;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
 
 const STORE: &str = "settings.json";
@@ -77,6 +77,27 @@ pub fn op_log(path: String) -> Result<Vec<oplog::OpEntry>, AppError> {
 #[tauri::command]
 pub fn undo(path: String, id: String) -> Result<(), AppError> {
     oplog::undo(Path::new(&path), &id)
+}
+
+/// Async so the first layout of a big repo runs off the main thread.
+#[tauri::command]
+pub async fn graph_rows(
+    cache: State<'_, graph::GraphCache>,
+    path: String,
+    offset: usize,
+    limit: usize,
+) -> Result<graph::GraphPage, AppError> {
+    graph::rows(&cache, Path::new(&path), offset, limit)
+}
+
+#[tauri::command]
+pub async fn commit_details(path: String, oid: String) -> Result<read::CommitDetails, AppError> {
+    read::commit_details(Path::new(&path), &oid)
+}
+
+#[tauri::command]
+pub async fn commit_file_diff(path: String, oid: String, file: String) -> Result<Option<String>, AppError> {
+    read::commit_file_diff(Path::new(&path), &oid, &file)
 }
 
 #[tauri::command]

@@ -12,7 +12,7 @@ export const statusQuery = (path: string) => ({ queryKey: ["status", path], quer
 type Selection = { file: string; staged: boolean };
 type Run = (op: () => Promise<unknown>) => Promise<boolean>;
 
-const errorText = (e: unknown) => (e as AppError).message ?? String(e);
+export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
 const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
 const confirmDiscard = (what: string) =>
@@ -283,4 +283,4 @@ function opLabel(e: OpEntry) {
 }
 
 // Two letters = conflict; "?" = untracked (shown like an add).
-const kindClass = (k: string) => (k.length > 1 ? "k-X" : k === "?" ? "k-A" : `k-${k}`);
+export const kindClass = (k: string) => (k.length > 1 ? "k-X" : k === "?" ? "k-A" : `k-${k}`);

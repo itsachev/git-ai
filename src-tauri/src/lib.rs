@@ -11,6 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(watch::RepoWatcher::default())
+        .manage(git::graph::GraphCache::default())
         .invoke_handler(tauri::generate_handler![
             commands::open_repo, commands::recent_repos, commands::repo_status,
             commands::stage,
@@ -22,6 +23,9 @@ pub fn run() {
             commands::apply_lines,
             commands::op_log,
             commands::undo,
+            commands::graph_rows,
+            commands::commit_details,
+            commands::commit_file_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
