@@ -183,6 +183,7 @@
 - Release v0.1.0 (2026-10-05): repo secret `TAURI_SIGNING_PRIVATE_KEY` added on GitHub; tag `v0.1.0` pushed to start `release.yml`. Next: publish the draft, install it, then cut v0.1.1 to test the update banner.
 - Release v0.1.1 (2026-10-05): version bumped in `package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`; tag `v0.1.1` pushed. v0.1.0 published and installed. Test: publish the v0.1.1 draft, open the installed 0.1.0, expect the update banner.
 - Auto-update verified (2026-10-05): installed 0.1.0 showed the 0.1.1 banner, Install & restart came back as 0.1.1. Week 12 done end to end.
+- Initial window size (2026-10-05): 1280x800 logical overflowed the screen under display scaling (bottom hidden behind the taskbar). `fit_to_work_area` in `src-tauri/src/lib.rs` shrinks the window to at most 90% of the monitor work area at startup and centers it; `center: true` in `tauri.conf.json`.
 
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
