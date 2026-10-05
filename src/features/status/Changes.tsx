@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { abortOp, applyLines, commit, discard, fileDiff, headMessage, opLog, repoStatus, stage, undo, unstage } from "../../lib/ipc";
+import { abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, undo, unstage, workFile } from "../../lib/ipc";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
@@ -86,7 +86,7 @@ export function Changes({ path }: { path: string }) {
         )}
         <History path={path} run={run} />
       </div>
-      <Diff path={path} sel={shown ? sel : null} editable={!conflicted} run={run} />
+      {conflicted ? <Conflict path={path} file={sel.file} run={run} /> : <Diff path={path} sel={shown ? sel : null} run={run} />}
     </div>
   );
 }
@@ -182,9 +182,44 @@ function FileList({ title, files, staged, action, onAction, onDiscard, sel, onSe
   );
 }
 
-type DiffProps = { path: string; sel: Selection | null; editable: boolean; run: Run };
+/** A conflicted file with its markers, plus whole-file resolutions. Edits in between happen in an editor. */
+function Conflict({ path, file, run }: { path: string; file: string; run: Run }) {
+  const { data, error } = useQuery({ queryKey: ["work", path, file], queryFn: () => workFile(path, file) });
+  let side: "" | "ours" | "base" | "theirs" = "";
+  return (
+    <section className="diff">
+      <div className="diff-bar">
+        <span>Conflict in <strong>{file}</strong></span>
+        <button className="small" onClick={() => run(() => resolve(path, [file], "Ours"))}
+          title="Keep the current branch's version (backed up first)">Take ours</button>
+        <button className="small" onClick={() => run(() => resolve(path, [file], "Theirs"))}
+          title="Keep the incoming version (backed up first)">Take theirs</button>
+        <button className="small" onClick={() => run(() => openFile(path, file))}>Open file</button>
+        <button className="small" onClick={() => run(() => stage(path, [file]))}>Mark resolved</button>
+      </div>
+      <p className="muted legend">
+        <span className="ours">Ours</span> = current branch, <span className="theirs">theirs</span> = incoming.
+        Edit the file to combine them, then Mark resolved.
+      </p>
+      {error ? <p className="error" role="alert">{errorText(error)}</p>
+        : data === null ? <p className="muted">Binary file or larger than 1 MB, take a side or open it.</p>
+        : data !== undefined && (
+          <pre aria-label={`Conflicts in ${file}`}>
+            {data.replace(/\n$/, "").split("\n").map((l, i) => {
+              // Marker lines switch the region; diff3 style adds a "|||||||" base section.
+              const marker = /^(<{7}|\|{7}|={7}|>{7})( |$)/.exec(l)?.[1][0];
+              if (marker) side = marker === "<" ? "ours" : marker === "|" ? "base" : marker === "=" ? "theirs" : "";
+              return <div key={i} className={marker ? "marker" : side}>{l || " "}</div>;
+            })}
+          </pre>
+        )}
+    </section>
+  );
+}
 
-function Diff({ path, sel, editable, run }: DiffProps) {
+type DiffProps = { path: string; sel: Selection | null; run: Run };
+
+function Diff({ path, sel, run }: DiffProps) {
   const { data, error } = useQuery({
     queryKey: ["diff", path, sel?.file, sel?.staged],
     queryFn: () => fileDiff(path, sel!.file, sel!.staged),
@@ -231,34 +266,32 @@ function Diff({ path, sel, editable, run }: DiffProps) {
   // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
   return (
     <section className="diff">
-      {editable && (
-        <div className="diff-bar">
-          {picked.size ? (
-            <>
-              <span>{picked.size} line{picked.size > 1 ? "s" : ""} selected</span>
-              {ops.map(([op, label]) => (
-                <button key={op} className="small" onClick={() => apply(op, [...picked], "the selected lines")}>{label} lines</button>
-              ))}
-              <button className="small" onClick={() => setPicked(new Set())}>Clear</button>
-            </>
-          ) : (
-            <span className="muted">Click changed lines to select them, Shift+click for a range.</span>
-          )}
-        </div>
-      )}
+      <div className="diff-bar">
+        {picked.size ? (
+          <>
+            <span>{picked.size} line{picked.size > 1 ? "s" : ""} selected</span>
+            {ops.map(([op, label]) => (
+              <button key={op} className="small" onClick={() => apply(op, [...picked], "the selected lines")}>{label} lines</button>
+            ))}
+            <button className="small" onClick={() => setPicked(new Set())}>Clear</button>
+          </>
+        ) : (
+          <span className="muted">Click changed lines to select them, Shift+click for a range.</span>
+        )}
+      </div>
       <pre aria-label={`Diff of ${file}`}>
         {all.slice(start).map((l, k) => {
           const i = start + k;
           if (l.startsWith("@@"))
             return (
               <div key={i} className="hunk">
-                {editable && ops.map(([op, label]) => (
+                {ops.map(([op, label]) => (
                   <button key={op} className="small" onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
                 ))}
                 {l}
               </div>
             );
-          if (!editable || !isChange(i)) return <div key={i}>{l || " "}</div>;
+          if (!isChange(i)) return <div key={i}>{l || " "}</div>;
           const on = picked.has(i);
           return (
             <div key={i} role="checkbox" aria-checked={on}
@@ -308,6 +341,7 @@ function opLabel(e: OpEntry): string {
     "delete tag": `Delete tag ${name}`,
     "drop stash": "Drop stash",
   };
+  if (e.op.startsWith("take ")) return `${e.op[0].toUpperCase()}${e.op.slice(1)} for ${what}`;
   if (e.op.startsWith("abort ")) return `Abort ${e.op.slice(6)} (backup of ${what})`;
   return labels[e.op] ?? e.op;
 }

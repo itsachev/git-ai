@@ -69,6 +69,12 @@ pub fn file_diff(repo: &Path, file: &str, staged: bool) -> Result<Option<String>
     Ok(text)
 }
 
+/// Working-tree text of `file` (shows a conflicted file with its markers). None when binary or over 1 MB.
+pub fn work_file(repo: &Path, file: &str) -> Result<Option<String>, AppError> {
+    let bytes = std::fs::read(repo.join(file)).map_err(|e| AppError::new("io", e.to_string()))?;
+    Ok((bytes.len() <= 1 << 20 && !bytes.contains(&0)).then(|| String::from_utf8_lossy(&bytes).into_owned()))
+}
+
 /// Message of the HEAD commit (prefills the amend box). None before the first commit.
 pub fn head_message(repo: &Path) -> Result<Option<String>, AppError> {
     let repo = git2::Repository::open(repo)?;

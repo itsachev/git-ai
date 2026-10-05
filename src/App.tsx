@@ -7,12 +7,14 @@ import type { AppError } from "./bindings/AppError";
 import { Changes, statusQuery } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar } from "./features/refs/Sidebar";
+import { AskpassDialog, CloneForm, SyncButtons } from "./features/remote/Remote";
 import "./App.css";
 
 function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [cloning, setCloning] = useState(false);
 
   useEffect(() => {
     recentRepos().then(setRecent);
@@ -33,12 +35,20 @@ function App() {
     if (dir) load(dir);
   }
 
-  if (repo) return <RepoView repo={repo} onClose={() => setRepo(null)} />;
+  async function cloned(info: RepoInfo) {
+    setCloning(false);
+    setRepo(info);
+    setRecent(await recentRepos());
+  }
 
-  return (
+  const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} /> : (
     <main className="page welcome">
       <h1>git-ai</h1>
-      <button className="primary" onClick={pick}>Open repository…</button>
+      <div className="welcome-actions">
+        <button className="primary" onClick={pick}>Open repository…</button>
+        <button aria-expanded={cloning} onClick={() => setCloning((v) => !v)}>Clone…</button>
+      </div>
+      {cloning && <CloneForm onCloned={cloned} />}
       {error && <p className="error" role="alert">{error}</p>}
       {recent.length > 0 && (
         <section>
@@ -57,6 +67,13 @@ function App() {
       )}
     </main>
   );
+  // One askpass dialog for both screens: clone runs from the welcome screen.
+  return (
+    <>
+      {body}
+      <AskpassDialog />
+    </>
+  );
 }
 
 function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
@@ -73,6 +90,7 @@ function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
         <button onClick={onClose}>← Repos</button>
         <h1 title={repo.path}>{repo.name}</h1>
         <span className="branch">{branch ?? "detached HEAD"}</span>
+        <SyncButtons path={repo.path} />
         <button className="side-toggle" aria-expanded={side} onClick={() => setSide((v) => !v)}>Branches</button>
         <nav className="tabs" role="tablist">
           {tabs.map(([id, label]) => (

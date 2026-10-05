@@ -1,3 +1,4 @@
+pub mod askpass;
 mod commands;
 mod errors;
 mod git;
@@ -10,6 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .setup(|app| Ok(askpass::start(app.handle().clone())?))
         .manage(watch::RepoWatcher::default())
         .manage(git::graph::GraphCache::default())
         .invoke_handler(tauri::generate_handler![
@@ -36,6 +38,16 @@ pub fn run() {
             commands::delete_tag,
             commands::stash_save,
             commands::stash,
+            commands::fetch,
+            commands::pull,
+            commands::push,
+            commands::push_tag,
+            commands::delete_remote_branch,
+            commands::askpass_reply,
+            commands::clone_repo,
+            commands::resolve,
+            commands::work_file,
+            commands::open_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
