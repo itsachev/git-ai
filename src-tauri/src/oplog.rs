@@ -18,7 +18,7 @@ pub struct OpEntry {
     /// Unix time in ms, also the backup ref name.
     pub id: String,
     /// "discard", "amend", "merge", "cherry-pick", "abort <op>", "delete branch", "delete tag",
-    /// "drop stash", or "undo <op>" for the undo of an op.
+    /// "drop stash", "pull", "delete remote branch", or "undo <op>" for the undo of an op.
     pub op: String,
     /// HEAD (or `ref_name`) before the op; None = the ref didn't exist.
     pub head: Option<String>,
@@ -62,7 +62,7 @@ pub fn backup(repo: &Path, op: &str, paths: &[String]) -> Result<String, AppErro
 fn snapshot(repo: &Path, op: &str, paths: &[String]) -> Result<OpEntry, AppError> {
     let index = git_ai_dir(repo)?.join("backup.index");
     let _ = fs::remove_file(&index);
-    let env = [("GIT_INDEX_FILE", index.as_path())];
+    let env = [("GIT_INDEX_FILE", index.as_os_str())];
     let head = rev(repo, "HEAD").ok();
     if let Some(head) = &head {
         git_env(repo, &["read-tree", head], &env)?;
@@ -131,6 +131,10 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
     } else if let ("drop stash", Some(oid)) = (e.op.as_str(), &e.head) {
         let msg = git(repo, &["log", "-1", "--format=%s", oid])?;
         git(repo, &["stash", "store", "-m", msg.trim(), oid])?;
+        OpEntry::new(&op, None, None)
+    } else if let ("delete remote branch", Some(oid), Some(r)) = (e.op.as_str(), &e.head, &e.ref_name) {
+        crate::git::cli::restore_remote_branch(repo, r.strip_prefix("refs/remotes/").unwrap_or(r), oid)?;
+        // Not undoable itself (no refs to swap back); delete the branch again from the sidebar instead.
         OpEntry::new(&op, None, None)
     } else if e.head.is_some() || e.new_head.is_some() {
         // Compare-and-swap back to `head`: "" as the old value means "must not exist", -d deletes.
@@ -259,6 +263,127 @@ mod tests {
 ");
         assert_eq!(top().op, "drop stash");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Push (sets upstream), fetch, rejected push, pull, tag push and remote branch delete + undo,
+    /// against a local bare remote.
+    #[test]
+    fn remote_ops() {
+        let tmp = std::env::temp_dir();
+        let bare = tmp.join(format!("git-ai-test-bare-{}", std::process::id()));
+        let b = tmp.join(format!("git-ai-test-rb-{}", std::process::id()));
+        for d in [&bare, &b] {
+            let _ = fs::remove_dir_all(d);
+        }
+        let (bare_s, b_s) = (bare.to_str().unwrap(), b.to_str().unwrap());
+        let here = std::path::Path::new(".");
+        git(here, &["init", "-q", "--bare", "-b", "main", bare_s]).unwrap();
+        let a = temp_repo("ra");
+        let a = a.as_path();
+        let commit = |repo: &std::path::Path, file: &str, msg: &str| {
+            fs::write(repo.join(file), msg).unwrap();
+            cli::stage(repo, &[file.to_string()]).unwrap();
+            cli::commit(repo, msg, false).unwrap();
+        };
+        let top = || super::entries(a, 20).unwrap()[0].clone();
+
+        assert_eq!(cli::push(a).unwrap_err().code, "no_remote");
+        git(a, &["remote", "add", "origin", bare_s]).unwrap();
+        commit(a, "a.txt", "one");
+        cli::push(a).unwrap();
+        assert_eq!(git(a, &["config", "branch.main.merge"]).unwrap().trim(), "refs/heads/main");
+
+        // A second clone pushes first, so a's push is rejected until it pulls (a merge, undoable).
+        git(here, &["clone", "-q", bare_s, b_s]).unwrap();
+        for kv in [["user.name", "t"], ["user.email", "t@t"], ["core.autocrlf", "false"]] {
+            git(&b, &["config", kv[0], kv[1]]).unwrap();
+        }
+        commit(&b, "b.txt", "from b");
+        cli::push(&b).unwrap();
+        commit(a, "c.txt", "from a");
+        let before = cli::rev(a, "HEAD").unwrap();
+        assert_eq!(cli::push(a).unwrap_err().code, "rejected");
+        cli::fetch(a).unwrap();
+        assert_eq!(cli::rev(a, "origin/main").unwrap(), cli::rev(&b, "HEAD").unwrap());
+        cli::pull(a).unwrap();
+        assert_eq!(fs::read_to_string(a.join("b.txt")).unwrap(), "from b");
+        assert_eq!(top().op, "pull");
+        super::undo(a, &top().id).unwrap();
+        assert_eq!(cli::rev(a, "HEAD").unwrap(), before);
+        git(a, &["reset", "-q", "--hard"]).unwrap();
+        cli::pull(a).unwrap();
+        cli::push(a).unwrap();
+
+        // Tag push.
+        cli::create_tag(a, "v1", "HEAD", "").unwrap();
+        cli::push_tag(a, "v1").unwrap();
+        assert_eq!(cli::rev(&bare, "refs/tags/v1").unwrap(), cli::rev(a, "HEAD").unwrap());
+
+        // Remote branch delete; undo pushes it back; that undo itself can't be undone.
+        git(a, &["push", "-q", "origin", "main:refs/heads/feat"]).unwrap();
+        let tip = cli::rev(a, "origin/feat").unwrap();
+        assert_eq!(cli::delete_remote_branch(a, "nope/feat").unwrap_err().code, "no_remote");
+        cli::delete_remote_branch(a, "origin/feat").unwrap();
+        assert!(cli::rev(&bare, "refs/heads/feat").is_err());
+        assert!(cli::rev(a, "refs/remotes/origin/feat").is_err());
+        assert_eq!(top().op, "delete remote branch");
+        super::undo(a, &top().id).unwrap();
+        assert_eq!(cli::rev(&bare, "refs/heads/feat").unwrap(), tip);
+        assert_eq!(top().op, "undo delete remote branch");
+        assert_eq!(super::undo(a, &top().id).unwrap_err().code, "not_undoable");
+        for d in [&bare, &b, &a.to_path_buf()] {
+            let _ = fs::remove_dir_all(d);
+        }
+    }
+
+    /// Clone with progress, then conflicts resolved by taking a side (edit/edit and edit/delete).
+    #[test]
+    fn clone_and_resolve() {
+        let src = temp_repo("clsrc");
+        let s = src.as_path();
+        let commit = |file: &str, text: Option<&str>, msg: &str| {
+            match text {
+                Some(t) => fs::write(src.join(file), t).unwrap(),
+                None => fs::remove_file(src.join(file)).unwrap(),
+            }
+            cli::stage(s, &[file.to_string()]).unwrap();
+            cli::commit(s, msg, false).unwrap();
+        };
+        commit("a.txt", Some("base\n"), "base");
+        commit("b.txt", Some("base\n"), "add b");
+
+        let dest = std::env::temp_dir().join(format!("git-ai-test-cldst-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dest);
+        let mut lines = Vec::new();
+        cli::clone(s.to_str().unwrap(), &dest, |l| lines.push(l.to_string())).unwrap();
+        assert_eq!(fs::read_to_string(dest.join("b.txt")).unwrap().trim_end(), "base"); // global autocrlf may add CR
+        assert!(!lines.is_empty(), "no progress lines");
+        assert_eq!(cli::clone(s.to_str().unwrap(), &dest, |_| {}).unwrap_err().code, "git"); // dest not empty
+        assert_eq!(cli::clone("-x", &dest, |_| {}).unwrap_err().code, "bad_url");
+
+        // feat edits a.txt and deletes b.txt; main edits both.
+        cli::create_branch(s, "feat", true).unwrap();
+        commit("a.txt", Some("feat\n"), "feat a");
+        commit("b.txt", None, "feat rm b");
+        cli::checkout(s, "main", false).unwrap();
+        commit("a.txt", Some("main\n"), "main a");
+        commit("b.txt", Some("main\n"), "main b");
+        cli::merge(s, "feat", false).unwrap_err();
+        let kinds: Vec<_> = cli::status(s).unwrap().conflicted.into_iter().map(|f| (f.path, f.kind)).collect();
+        assert_eq!(kinds, [("a.txt".into(), "UU".into()), ("b.txt".into(), "UD".into())]);
+        assert!(crate::git::read::work_file(s, "a.txt").unwrap().unwrap().contains("<<<<<<<"));
+
+        cli::resolve(s, &["a.txt".into()], cli::Side::Theirs).unwrap();
+        assert_eq!(fs::read_to_string(src.join("a.txt")).unwrap(), "feat\n");
+        assert_eq!(super::entries(s, 20).unwrap()[0].op, "take theirs");
+        cli::resolve(s, &["b.txt".into()], cli::Side::Theirs).unwrap(); // theirs deleted it
+        assert!(!src.join("b.txt").exists());
+        let st = cli::status(s).unwrap();
+        assert!(st.conflicted.is_empty());
+        cli::commit(s, "", false).unwrap();
+        for d in [&src, &dest] {
+            let _ = fs::remove_dir_all(d);
+        }
     }
 
     /// Stage, unstage, commit, discard (with backup) on a throwaway repo.

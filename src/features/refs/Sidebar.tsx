@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { checkout, createBranch, deleteBranch, deleteTag, merge, refs, stash, stashSave } from "../../lib/ipc";
+import { checkout, createBranch, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, refs, stash, stashSave } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, useRun } from "../status/Changes";
 
+export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
+
 /** Branches, remotes, tags and stashes (Sourcetree's left sidebar). Double-click a branch to check it out. */
 export function Sidebar({ path }: { path: string }) {
-  const { data, error } = useQuery({ queryKey: ["refs", path], queryFn: () => refs(path) });
+  const { data, error } = useQuery(refsQuery(path));
   const [run, opError] = useRun();
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
@@ -36,6 +38,10 @@ export function Sidebar({ path }: { path: string }) {
   async function dropStash(i: number, s: RefItem) {
     if (await ask(`Drop stash "${s.name}"? Undo history (File Status) can restore it.`, { title: "Drop stash", kind: "warning" }))
       run(() => stash(path, "Drop", i, s.oid));
+  }
+  async function removeRemote(name: string) {
+    if (await ask(`Delete branch ${name} on the remote? Undo history (File Status) can push it back.`, { title: "Delete remote branch", kind: "warning" }))
+      run(() => deleteRemoteBranch(path, name));
   }
   async function remove(name: string) {
     if (!(await ask(`Delete branch ${name}? Undo history (File Status) can restore it.`, { title: "Delete branch", kind: "warning" }))) return;
@@ -79,7 +85,7 @@ export function Sidebar({ path }: { path: string }) {
             <ul className="refs">
               {items.map((r) => (
                 <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={() => checkoutRemote(r.name)}
-                  actions={[["Checkout", () => checkoutRemote(r.name)], ["Merge", () => mergeIn(r.name)]]} />
+                  actions={[["Checkout", () => checkoutRemote(r.name)], ["Merge", () => mergeIn(r.name)], ["Delete", () => removeRemote(r.name)]]} />
               ))}
             </ul>
           </details>
@@ -89,7 +95,7 @@ export function Sidebar({ path }: { path: string }) {
         <summary>Tags ({data.tags.length})</summary>
         <ul className="refs">
           {match(data.tags).map((t) => (
-            <Row key={t.name} item={t} actions={[["Delete", async () => {
+            <Row key={t.name} item={t} actions={[["Push", () => run(() => pushTag(path, t.name))], ["Delete", async () => {
               if (await ask(`Delete tag ${t.name}? Undo history (File Status) can restore it.`, { title: "Delete tag", kind: "warning" }))
                 run(() => deleteTag(path, t.name));
             }]]} />

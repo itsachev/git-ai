@@ -7,6 +7,7 @@ import type { GraphPage } from "../bindings/GraphPage";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
+import type { Side } from "../bindings/Side";
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");
@@ -51,3 +52,22 @@ export const deleteTag = (path: string, name: string) => invoke<void>("delete_ta
 export const stashSave = (path: string, message: string) => invoke<void>("stash_save", { path, message });
 /** `oid` must still be stash@{index}, else code "stale". */
 export const stash = (path: string, op: StashOp, index: number, oid: string) => invoke<void>("stash", { path, op, index, oid });
+// Network ops. git may ask for credentials meanwhile through the "askpass" event (see AskpassDialog).
+export const fetchAll = (path: string) => invoke<void>("fetch", { path });
+/** Merges the upstream (no rebase); code "conflicts" = stopped halfway. Undoable. */
+export const pull = (path: string) => invoke<void>("pull", { path });
+/** Pushes the current branch; without an upstream it goes to origin and becomes the upstream. Code "rejected" = pull first. */
+export const push = (path: string) => invoke<void>("push", { path });
+export const pushTag = (path: string, name: string) => invoke<void>("push_tag", { path, name });
+/** `name` is the remote branch, e.g. "origin/feat". Undo pushes it back. */
+export const deleteRemoteBranch = (path: string, name: string) => invoke<void>("delete_remote_branch", { path, name });
+/** Clones `url` into `dest` (missing or empty folder) and opens it. Progress comes as "clone-progress" events (git's lines). */
+export const cloneRepo = (url: string, dest: string) => invoke<RepoInfo>("clone_repo", { url, dest });
+/** Takes one side of each conflicted file whole (backed up first, undoable) and marks it resolved. */
+export const resolve = (path: string, paths: string[], side: Side) => invoke<void>("resolve", { path, paths, side });
+/** Working-tree text of a file; null = binary or over 1 MB. */
+export const workFile = (path: string, file: string) => invoke<string | null>("work_file", { path, file });
+/** Opens a repo file in its default app. */
+export const openFile = (path: string, file: string) => invoke<void>("open_file", { path, file });
+/** Answers an "askpass" prompt; null cancels (git then fails). */
+export const askpassReply = (id: number, answer: string | null) => invoke<void>("askpass_reply", { id, answer });

@@ -44,6 +44,18 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .error { color: var(--danger); }
 h2 { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); margin-top: 2rem; }
 
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.clone { display: grid; gap: 0.6rem; margin-top: 1rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.clone label { display: grid; gap: 0.2rem; font-size: 0.85rem; color: var(--muted); }
+.clone input {
+  font: inherit; color: var(--fg); background: var(--bg); width: 100%; min-width: 0; min-height: 2.25rem;
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem;
+}
+.clone input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pick-dir { display: flex; gap: 0.4rem; }
+/* git's progress line, e.g. "Receiving objects:  42% (420/1000)". */
+.clone .progress { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.8rem ui-monospace, monospace; }
+.clone .error { margin: 0; overflow-wrap: anywhere; }
 .recent { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.25rem; }
 .recent button { width: 100%; text-align: left; display: grid; }
 .recent small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -94,6 +106,13 @@ button.small { padding: 0.15rem 0.5rem; min-height: 1.75rem; font-size: 0.8rem; 
 .diff .add { background: color-mix(in srgb, #16a34a 18%, transparent); }
 .diff .del { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 .diff .hunk { color: var(--muted); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* Conflict view: regions between the markers. */
+.diff .ours, .legend .ours { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.diff .theirs, .legend .theirs { background: color-mix(in srgb, #16a34a 18%, transparent); }
+.diff .base { background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.diff .marker { color: var(--muted); font-weight: 600; }
+.legend { font-size: 0.8rem; margin: 0 0 0.4rem; }
+.legend span { padding: 0 0.25rem; border-radius: 3px; }
 .commit-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .check { display: flex; align-items: center; gap: 0.4rem; min-height: 2.25rem; cursor: pointer; }
 .check input { width: 1.1rem; height: 1.1rem; accent-color: var(--accent); }
@@ -202,3 +221,20 @@ button.small { padding: 0.15rem 0.5rem; min-height: 1.75rem; font-size: 0.8rem; 
 .commit-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
 .new-branch { display: grid; gap: 0.4rem; margin-bottom: 0.5rem; }
 .new-branch button { justify-self: end; }
+
+/* Fetch/Pull/Push in the header; their error takes its own line. */
+.sync { display: flex; gap: 0.25rem; }
+.sync .ab { color: inherit; }
+.bar > .error { flex-basis: 100%; margin: 0; }
+dialog.askpass {
+  color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  width: min(28rem, calc(100vw - 2rem)); padding: 1rem;
+}
+dialog.askpass::backdrop { background: rgb(0 0 0 / 0.4); }
+.askpass p { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.askpass input {
+  font: inherit; color: inherit; background: var(--bg); width: 100%; min-height: 2.25rem;
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem;
+}
+.askpass input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }

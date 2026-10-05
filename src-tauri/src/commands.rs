@@ -5,7 +5,7 @@ use crate::oplog;
 use crate::watch;
 use serde_json::{json, Value};
 use std::path::Path;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_store::StoreExt;
 
 const STORE: &str = "settings.json";
@@ -74,8 +74,9 @@ pub fn op_log(path: String) -> Result<Vec<oplog::OpEntry>, AppError> {
     oplog::entries(Path::new(&path), 20)
 }
 
+/// Async: undoing a remote branch delete pushes.
 #[tauri::command]
-pub fn undo(path: String, id: String) -> Result<(), AppError> {
+pub async fn undo(path: String, id: String) -> Result<(), AppError> {
     oplog::undo(Path::new(&path), &id)
 }
 
@@ -153,4 +154,68 @@ pub fn stash_save(path: String, message: String) -> Result<(), AppError> {
 #[tauri::command]
 pub fn stash(path: String, op: cli::StashOp, index: usize, oid: String) -> Result<(), AppError> {
     cli::stash(Path::new(&path), op, index, &oid)
+}
+
+// Network ops are async (off the main thread) so the UI, and with it askpass prompts, keep working.
+
+#[tauri::command]
+pub async fn fetch(path: String) -> Result<(), AppError> {
+    cli::fetch(Path::new(&path))
+}
+
+#[tauri::command]
+pub async fn pull(path: String) -> Result<(), AppError> {
+    cli::pull(Path::new(&path))
+}
+
+#[tauri::command]
+pub async fn push(path: String) -> Result<(), AppError> {
+    cli::push(Path::new(&path))
+}
+
+#[tauri::command]
+pub async fn push_tag(path: String, name: String) -> Result<(), AppError> {
+    cli::push_tag(Path::new(&path), &name)
+}
+
+#[tauri::command]
+pub async fn delete_remote_branch(path: String, name: String) -> Result<(), AppError> {
+    cli::delete_remote_branch(Path::new(&path), &name)
+}
+
+/// Clones into `dest`, emitting git's progress lines as "clone-progress", then opens it like `open_repo`.
+#[tauri::command]
+pub async fn clone_repo(app: AppHandle, url: String, dest: String) -> Result<read::RepoInfo, AppError> {
+    cli::clone(&url, Path::new(&dest), |line| {
+        let _ = app.emit("clone-progress", line);
+    })?;
+    open_repo(app, dest)
+}
+
+#[tauri::command]
+pub fn resolve(path: String, paths: Vec<String>, side: cli::Side) -> Result<(), AppError> {
+    cli::resolve(Path::new(&path), &paths, side)
+}
+
+#[tauri::command]
+pub fn work_file(path: String, file: String) -> Result<Option<String>, AppError> {
+    read::work_file(Path::new(&path), &file)
+}
+
+/// Opens a repo file in its default app (e.g. to resolve a conflict in an editor).
+#[tauri::command]
+pub fn open_file(app: AppHandle, path: String, file: String) -> Result<(), AppError> {
+    use tauri_plugin_opener::OpenerExt;
+    // Only paths inside the repo; `file` comes from the status list.
+    let rel = Path::new(&file);
+    if rel.is_absolute() || rel.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return Err(AppError::new("bad_path", format!("'{file}' is not inside the repository.")));
+    }
+    let full = Path::new(&path).join(rel);
+    app.opener().open_path(full.to_string_lossy(), None::<&str>).map_err(|e| AppError::new("open", e.to_string()))
+}
+
+#[tauri::command]
+pub fn askpass_reply(id: u32, answer: Option<String>) {
+    crate::askpass::reply(id, answer)
 }
