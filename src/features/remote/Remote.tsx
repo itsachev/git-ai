@@ -16,7 +16,7 @@ export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const [busy, setBusy] = useState<string | null>(null);
-  const op = (label: string, doing: string, fn: () => Promise<unknown>, count = "") => ({
+  const op = (label: string, doing: string, fn: () => Promise<unknown>, count = 0) => ({
     label, doing, count,
     go: async () => {
       if (busy) return;
@@ -29,8 +29,8 @@ export function useSync(path: string, run: Run) {
     busy,
     ops: [
       op("Fetch", "Fetching…", () => fetchAll(path)),
-      op("Pull", "Pulling…", () => pull(path), cur?.behind ? `↓${cur.behind}` : ""),
-      op("Push", "Pushing…", () => push(path), cur?.ahead ? `↑${cur.ahead}` : ""),
+      op("Pull", "Pulling…", () => pull(path), cur?.behind ?? 0),
+      op("Push", "Pushing…", () => push(path), cur?.ahead ?? 0),
     ],
   };
 }
@@ -43,7 +43,7 @@ export function SyncButtons({ sync }: { sync: Sync }) {
         <button key={o.label} disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing} title={o.label}>
           <Icon name={o.label.toLowerCase() as IconName} />
           <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
-          {o.count && <small className="ab">{o.count}</small>}
+          {o.count > 0 && <span className="count" title={`${o.count} to ${o.label.toLowerCase()}`}>{o.count}</span>}
         </button>
       ))}
     </span>

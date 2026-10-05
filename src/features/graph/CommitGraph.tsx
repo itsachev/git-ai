@@ -9,7 +9,8 @@ const PAGE = 500;
 const LANE = 14;
 const MAX_LANES = 16; // wider graphs are clipped
 // Mid-tone lanes that hold contrast on both the light and the dark panel.
-const COLORS = ["#8fbf1f", "#2f9fd8", "#e0508a", "#e09a1a", "#8b6cf0", "#17b3a3", "#ef6a3a", "#7d8796"];
+// macOS system colors: blue, green, orange, purple, pink, teal, brown, grey.
+const COLORS = ["#0a84ff", "#30b14f", "#ff9500", "#af52de", "#ff2d55", "#30b0c7", "#a2845e", "#8e8e93"];
 const color = (lane: number) => COLORS[lane % COLORS.length];
 const x = (lane: number) => LANE / 2 + 3 + lane * LANE;
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
