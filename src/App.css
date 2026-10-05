@@ -166,3 +166,35 @@ button.small { padding: 0.15rem 0.5rem; min-height: 1.75rem; font-size: 0.8rem; 
   .history-bottom .diff { position: static; }
 }
 
+/* Sidebar: branches/remotes/tags/stashes. Beside the body from 48rem; below that it replaces the body when toggled. */
+.repo-main { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); gap: 0.75rem; }
+.sidebar { display: none; min-height: 0; overflow: auto; font-size: 0.9rem; }
+.repo-main.show-side .sidebar { display: block; }
+.repo-main.show-side .repo-body { display: none; }
+@media (min-width: 48rem) {
+  .repo-main { grid-template-columns: 14rem minmax(0, 1fr); }
+  .sidebar, .repo-main.show-side .repo-body { display: block; }
+  .side-toggle { display: none; }
+}
+.sidebar input:not([type="checkbox"]) {
+  font: inherit; color: inherit; background: var(--surface); width: 100%; min-height: 2.25rem;
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem;
+}
+.sidebar input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sidebar summary { cursor: pointer; display: flex; align-items: center; gap: 0.4rem; min-height: 2.25rem; margin-top: 0.5rem; font-size: 0.8rem; text-transform: uppercase; color: var(--muted); }
+.sidebar summary button { margin-left: auto; text-transform: none; }
+.sidebar .nested { padding-left: 0.75rem; }
+.sidebar .nested summary { margin-top: 0; text-transform: none; font-size: 0.85rem; }
+.refs { list-style: none; padding: 0; margin: 0; }
+.refs li { display: flex; align-items: center; gap: 0.25rem; border-radius: 4px; padding-right: 0.25rem; }
+.refs li:hover, .refs li:focus-within { background: var(--surface); }
+.refs .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.35rem; min-height: 2rem; padding: 0 0.4rem; white-space: nowrap; }
+.refs .name > span:not([aria-label]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.refs li.cur .name { font-weight: 600; }
+.refs .ab { flex-shrink: 0; color: var(--muted); font-size: 0.75rem; }
+/* Opacity, not display: the buttons must stay keyboard focusable. */
+.refs .acts { display: flex; gap: 0.25rem; opacity: 0; }
+.refs li:hover .acts, .refs li:focus-within .acts { opacity: 1; }
+@media (hover: none) { .refs .acts { opacity: 1; } }
+.new-branch { display: grid; gap: 0.4rem; margin-bottom: 0.5rem; }
+.new-branch button { justify-self: end; }

@@ -26,6 +26,10 @@ pub fn run() {
             commands::graph_rows,
             commands::commit_details,
             commands::commit_file_diff,
+            commands::refs,
+            commands::checkout,
+            commands::create_branch,
+            commands::delete_branch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

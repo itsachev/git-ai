@@ -9,17 +9,21 @@ export type OpEntry = {
  */
 id: string, 
 /**
- * "discard", "amend" or "undo".
+ * "discard", "amend", "delete branch" or "undo".
  */
 op: string, 
 /**
- * HEAD before the op.
+ * HEAD (or `ref_name`) before the op; None = the ref didn't exist.
  */
 head: string | null, 
 /**
- * HEAD after the op, when the op moved it. Undo moves it back.
+ * HEAD (or `ref_name`) after the op, when the op moved it; None = deleted. Undo moves it back.
  */
-new_head: string | null, paths: Array<string>, 
+new_head: string | null, 
+/**
+ * The ref `head`/`new_head` belong to, when not HEAD (e.g. "refs/heads/feature").
+ */
+ref_name: string | null, paths: Array<string>, 
 /**
  * Working-tree snapshot of `paths` taken before the op. Undo restores it.
  */

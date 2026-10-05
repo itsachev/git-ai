@@ -101,6 +101,26 @@ pub async fn commit_file_diff(path: String, oid: String, file: String) -> Result
 }
 
 #[tauri::command]
+pub fn refs(path: String) -> Result<read::Refs, AppError> {
+    read::refs(Path::new(&path))
+}
+
+#[tauri::command]
+pub fn checkout(path: String, name: String, track: bool) -> Result<(), AppError> {
+    cli::checkout(Path::new(&path), &name, track)
+}
+
+#[tauri::command]
+pub fn create_branch(path: String, name: String, checkout: bool) -> Result<(), AppError> {
+    cli::create_branch(Path::new(&path), &name, checkout)
+}
+
+#[tauri::command]
+pub fn delete_branch(path: String, name: String, force: bool) -> Result<(), AppError> {
+    cli::delete_branch(Path::new(&path), &name, force)
+}
+
+#[tauri::command]
 pub fn file_diff(path: String, file: String, staged: bool) -> Result<Option<String>, AppError> {
     read::file_diff(Path::new(&path), &file, staged)
 }
