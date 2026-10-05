@@ -182,11 +182,11 @@
 - Bold labels (2026-10-05): one `font-weight: 700` rule at the end of `src/App.css` for column headers, section/list headings, sidebar and history summaries, commit-info terms, clone form labels. Graph header cells no longer pick up the `.c-oid` mono font from their column classes. Nested branch-folder summaries stay 500 mono.
 - Release v0.1.0 (2026-10-05): repo secret `TAURI_SIGNING_PRIVATE_KEY` added on GitHub; tag `v0.1.0` pushed to start `release.yml`. Next: publish the draft, install it, then cut v0.1.1 to test the update banner.
 - Release v0.1.1 (2026-10-05): version bumped in `package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`; tag `v0.1.1` pushed. v0.1.0 published and installed. Test: publish the v0.1.1 draft, open the installed 0.1.0, expect the update banner.
+- Auto-update verified (2026-10-05): installed 0.1.0 showed the 0.1.1 banner, Install & restart came back as 0.1.1. Week 12 done end to end.
 
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
 - Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
-- Add secret `TAURI_SIGNING_PRIVATE_KEY`, cut v0.1.0 then v0.1.1 and check that 0.1.0 offers the update.
 - Installer code signing (Authenticode, Apple notarization).
 - v1 start: AI commit message from the staged diff (Gemini 3.5 Flash Lite, key from keychain / `GEMINI_API_KEY`, skip binary + >1 MB files).
