@@ -22,5 +22,8 @@
 - Picked stack (Tauri + Rust + React), architecture, data model, folder layout, libraries, risks, 12-week roadmap, monetization.
 - Drafted commit-graph lane algorithm + canvas renderer (in plan, not yet in repo, untested).
 - Added `CLAUDE.md` (architecture rules, planned layout; commands to be added after scaffold).
-- Initialized git repo (`main` branch), added `.gitignore` (node, dist, Rust target, env, OS/IDE files), initial commit.
-- **Next:** Week 1 — Tauri scaffold, CI on 3 OSes, safe git runner, open repo, recent repos.
+- Initialized git repo (`main` branch), added `.gitignore` (node, dist, Rust target, env, OS/IDE files), initial commit `dd3f5dd`.
+- Global `core.autocrlf` was converting LF→CRLF on Windows. Added `.gitattributes` (`* text=auto eol=lf`) so every OS checks out LF; renormalized.
+
+## Next
+- Week 1: Tauri scaffold, CI on 3 OSes, safe git runner, open repo, recent repos.
