@@ -54,6 +54,13 @@ pub fn file_diff(repo: &Path, file: &str, staged: bool) -> Result<Option<String>
     Ok(text)
 }
 
+/// Message of the HEAD commit (prefills the amend box). None before the first commit.
+pub fn head_message(repo: &Path) -> Result<Option<String>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let msg = repo.head().ok().and_then(|h| h.peel_to_commit().ok()).map(|c| String::from_utf8_lossy(c.message_bytes()).trim_end().to_string());
+    Ok(msg)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

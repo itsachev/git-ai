@@ -1,17 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { commit, discard, fileDiff, repoStatus, stage, unstage } from "../../lib/ipc";
+import { applyLines, commit, discard, fileDiff, headMessage, opLog, repoStatus, stage, undo, unstage } from "../../lib/ipc";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
+import type { LineOp } from "../../bindings/LineOp";
+import type { OpEntry } from "../../bindings/OpEntry";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 
 type Selection = { file: string; staged: boolean };
+type Run = (op: () => Promise<unknown>) => Promise<boolean>;
 
 const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
 const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
+const confirmDiscard = (what: string) =>
+  ask(`Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, { title: "Discard changes", kind: "warning" });
 
 export function Changes({ path }: { path: string }) {
   const qc = useQueryClient();
@@ -33,13 +38,8 @@ export function Changes({ path }: { path: string }) {
     }
   }
 
-  async function confirmDiscard(files: FileChange[]) {
-    const what = files.length === 1 ? files[0].path : `${files.length} files`;
-    const ok = await ask(`Discard changes to ${what}? A backup is kept under refs/git-ai/backup.`, {
-      title: "Discard changes",
-      kind: "warning",
-    });
-    if (ok) run(() => discard(path, pathsOf(files)));
+  async function discardFiles(files: FileChange[]) {
+    if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`)) run(() => discard(path, pathsOf(files)));
   }
 
   if (error) return <p className="error" role="alert">{errorText(error)}</p>;
@@ -47,12 +47,13 @@ export function Changes({ path }: { path: string }) {
   const empty = !data.staged.length && !data.unstaged.length && !data.conflicted.length;
   // Drop the selection once the file leaves its list (e.g. after staging it).
   const shown = sel && (sel.staged ? data.staged : [...data.unstaged, ...data.conflicted]).some((f) => f.path === sel.file);
+  const conflicted = !!sel && !sel.staged && data.conflicted.some((f) => f.path === sel.file);
 
   const list = { sel, onSelect: setSel };
   return (
     <div className="changes">
       <div className="side">
-        <CommitBox canCommit={data.staged.length > 0} onCommit={(msg) => run(() => commit(path, msg))} />
+        <CommitBox path={path} canCommit={data.staged.length > 0} onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
         {opError && <p className="error" role="alert">{opError}</p>}
         {empty ? (
           <p className="muted">Nothing to commit, working tree clean.</p>
@@ -63,23 +64,37 @@ export function Changes({ path }: { path: string }) {
             <FileList {...list} title="Staged" files={data.staged} staged
               action="Unstage" onAction={(fs) => run(() => unstage(path, pathsOf(fs)))} />
             <FileList {...list} title="Changes" files={data.unstaged} staged={false}
-              action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={confirmDiscard} />
+              action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} />
           </>
         )}
+        <History path={path} run={run} />
       </div>
-      <Diff path={path} sel={shown ? sel : null} />
+      <Diff path={path} sel={shown ? sel : null} editable={!conflicted} run={run} />
     </div>
   );
 }
 
-function CommitBox({ canCommit, onCommit }: { canCommit: boolean; onCommit: (msg: string) => Promise<boolean> }) {
+type CommitProps = { path: string; canCommit: boolean; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+
+function CommitBox({ path, canCommit, onCommit }: CommitProps) {
   const [msg, setMsg] = useState("");
+  const [amend, setAmend] = useState(false);
   const [busy, setBusy] = useState(false);
-  const ready = canCommit && msg.trim() !== "" && !busy;
+  const head = useQuery({ queryKey: ["head", path], queryFn: () => headMessage(path) }).data;
+  // Amend may just reword, so it doesn't need staged changes.
+  const ready = (canCommit || amend) && msg.trim() !== "" && !busy;
+  function toggleAmend(on: boolean) {
+    setAmend(on);
+    if (on && !msg.trim() && head) setMsg(head);
+    if (!on && msg === head) setMsg("");
+  }
   async function submit() {
     if (!ready) return;
     setBusy(true);
-    if (await onCommit(msg)) setMsg("");
+    if (await onCommit(msg, amend)) {
+      setMsg("");
+      setAmend(false);
+    }
     setBusy(false);
   }
   return (
@@ -92,7 +107,13 @@ function CommitBox({ canCommit, onCommit }: { canCommit: boolean; onCommit: (msg
         onChange={(e) => setMsg(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
       />
-      <button className="primary" disabled={!ready}>{busy ? "Committing…" : "Commit"}</button>
+      <div className="commit-row">
+        <label className="check">
+          <input type="checkbox" checked={amend} disabled={!head} onChange={(e) => toggleAmend(e.target.checked)} />
+          Amend last commit
+        </label>
+        <button className="primary" disabled={!ready}>{busy ? "Committing…" : amend ? "Amend" : "Commit"}</button>
+      </div>
     </form>
   );
 }
@@ -141,30 +162,124 @@ function FileList({ title, files, staged, action, onAction, onDiscard, sel, onSe
   );
 }
 
-function Diff({ path, sel }: { path: string; sel: Selection | null }) {
+type DiffProps = { path: string; sel: Selection | null; editable: boolean; run: Run };
+
+function Diff({ path, sel, editable, run }: DiffProps) {
   const { data, error } = useQuery({
     queryKey: ["diff", path, sel?.file, sel?.staged],
     queryFn: () => fileDiff(path, sel!.file, sel!.staged),
     enabled: !!sel,
   });
+  // Picked +/- lines, as indices into the diff text's lines (what `applyLines` expects).
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [anchor, setAnchor] = useState<number | null>(null);
+  useEffect(() => {
+    setPicked(new Set());
+    setAnchor(null);
+  }, [data, sel?.file, sel?.staged]);
+
   if (!sel) return <section className="diff muted">Select a file to see its changes.</section>;
   if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
   if (data === undefined) return <section className="diff" />;
   if (data === null) return <section className="diff muted">Binary file or larger than 1 MB, no inline diff.</section>;
+  const all = data.replace(/\n$/, "").split("\n");
   // Skip the "diff --git / index / --- / +++" header; hunks start at the first "@@".
-  const start = data.indexOf("\n@@");
+  const start = all.findIndex((l) => l.startsWith("@@"));
   if (start < 0) return <section className="diff muted">No content changes.</section>;
+
+  const file = sel.file;
+  const isChange = (i: number) => all[i][0] === "+" || all[i][0] === "-";
+  const ops: [LineOp, string][] = sel.staged ? [["Unstage", "Unstage"]] : [["Stage", "Stage"], ["Discard", "Discard"]];
+  async function apply(op: LineOp, lines: number[], what: string) {
+    if (op === "Discard" && !(await confirmDiscard(`${what} in ${file}`))) return;
+    run(() => applyLines(path, file, op, lines));
+  }
+  function hunkLines(h: number) {
+    const out = [];
+    for (let i = h + 1; i < all.length && !all[i].startsWith("@@"); i++) if (isChange(i)) out.push(i);
+    return out;
+  }
+  function toggle(i: number, range: boolean) {
+    const next = new Set(picked);
+    const on = !picked.has(i);
+    const [a, b] = range && anchor !== null ? [Math.min(anchor, i), Math.max(anchor, i)] : [i, i];
+    for (let j = a; j <= b; j++) if (isChange(j)) on ? next.add(j) : next.delete(j);
+    setPicked(next);
+    setAnchor(i);
+  }
+
   // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
-  const lines = data.slice(start + 1).replace(/\n$/, "").split("\n");
   return (
     <section className="diff">
-      <pre aria-label={`Diff of ${sel.file}`}>
-        {lines.map((l, i) => (
-          <div key={i} className={l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}>{l || " "}</div>
-        ))}
+      {editable && (
+        <div className="diff-bar">
+          {picked.size ? (
+            <>
+              <span>{picked.size} line{picked.size > 1 ? "s" : ""} selected</span>
+              {ops.map(([op, label]) => (
+                <button key={op} className="small" onClick={() => apply(op, [...picked], "the selected lines")}>{label} lines</button>
+              ))}
+              <button className="small" onClick={() => setPicked(new Set())}>Clear</button>
+            </>
+          ) : (
+            <span className="muted">Click changed lines to select them, Shift+click for a range.</span>
+          )}
+        </div>
+      )}
+      <pre aria-label={`Diff of ${file}`}>
+        {all.slice(start).map((l, k) => {
+          const i = start + k;
+          if (l.startsWith("@@"))
+            return (
+              <div key={i} className="hunk">
+                {editable && ops.map(([op, label]) => (
+                  <button key={op} className="small" onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
+                ))}
+                {l}
+              </div>
+            );
+          if (!editable || !isChange(i)) return <div key={i}>{l || " "}</div>;
+          const on = picked.has(i);
+          return (
+            <div key={i} role="checkbox" aria-checked={on}
+              className={`${l[0] === "+" ? "add" : "del"} pick${on ? " on" : ""}`}
+              onMouseDown={(e) => e.shiftKey && e.preventDefault()} // no text selection on Shift+click
+              onClick={(e) => toggle(i, e.shiftKey)}>
+              {l}
+            </div>
+          );
+        })}
       </pre>
     </section>
   );
+}
+
+function History({ path, run }: { path: string; run: Run }) {
+  const { data } = useQuery({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
+  if (!data?.length) return null;
+  return (
+    <details className="history">
+      <summary>Undo history ({data.length})</summary>
+      <ul className="files">
+        {data.map((e) => (
+          <li key={e.id}>
+            <span className="path">
+              <strong>{opLabel(e)}</strong>
+              <small>{new Date(Number(e.id)).toLocaleString()}</small>
+            </span>
+            <button className="small" onClick={() => run(() => undo(path, e.id))}>Undo</button>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function opLabel(e: OpEntry) {
+  const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
+  if (e.op === "discard") return `Discard ${what}`;
+  if (e.op === "amend") return "Amend commit";
+  return e.backup ? `Undo: restore ${what}` : "Undo amend";
 }
 
 // Two letters = conflict; "?" = untracked (shown like an add).

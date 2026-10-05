@@ -57,5 +57,14 @@
   - Verified: `cargo test` (9 pass), `npm run build` OK. Not yet clicked through in `tauri dev`.
   - Skipped: hunk/line staging, amend (needs an oplog entry), rename detection in diffs, diff virtualization.
 
+- Week 4: undo, hunk/line staging, amend.
+  - `oplog.rs`: typed `OpEntry { id, op, head, new_head, paths, backup, undoes }` (ts-rs), `record`, `entries` (newest first, undone entries hidden), `undo(id)`. Undo of a backup entry snapshots the current content of the paths first, then `restore --source <backup> --worktree --` (also deletes paths missing from the backup). Undo of a HEAD move (amend) is a compare-and-swap `update-ref HEAD <old> <new>`, so it refuses once HEAD moved. Undo is itself logged as op "undo", so it can be undone too. Snapshot skips paths that are neither on disk nor in HEAD (`git add` would fail on them).
+  - `cli.rs`: `git_input` pipes stdin. `commit(.., amend)` logs HEAD before/after. `apply_lines(file, op, lines)` with `LineOp::{Stage, Unstage, Discard}`: rebuilds the file diff, `select_lines` keeps the picked +/- lines and turns the rest into context or drops them (rule flips for reverse application), then `git apply --recount [--cached] [-R] -`. Discard backs up the file first. `lines` index into the `file_diff` text lines.
+  - `read.rs`: `head_message` (prefills the amend box).
+  - Commands `head_message`, `apply_lines`, `op_log`, `undo`; `commit` takes `amend`.
+  - UI: "Amend last commit" checkbox (prefills HEAD message, allows reword with nothing staged). Diff: per-hunk Stage/Discard or Unstage buttons, click/Shift+click line selection with a bar for the selected lines; disabled for conflicted files. Discards (file, hunk, lines) ask first. Collapsible "Undo history" list under the file lists.
+  - Tests: round trip extended with undo discard, amend + undo, stage/unstage/discard of single lines. 11 pass, `npm run build` OK. Not yet clicked through in `tauri dev`.
+  - Known gaps: line selection is mouse-only (hunk buttons are keyboard reachable); picking only some lines of a deleted file (stage) or of a newly added file (unstage, discard) fails in `git apply` because the patch keeps the delete/new-file header (whole hunk works); op ids are ms timestamps (two ops in one ms would collide).
+
 ## Next
-- Week 4: undo for discard (restore paths from the backup ref, UI entry from the op log), hunk/line staging, amend with oplog. Commands are sync (run on the main thread); make them async if slow hooks freeze the UI.
+- Week 5: commit graph (`graph.rs` lane layout, `graph_rows` paged command, canvas `CommitGraph.tsx`), commit details view. Commands are sync (run on the main thread); make them async if slow hooks freeze the UI.
