@@ -1,6 +1,7 @@
 //! IPC surface.
 use crate::errors::AppError;
 use crate::git::{cli, read};
+use crate::oplog;
 use crate::watch;
 use serde_json::{json, Value};
 use std::path::Path;
@@ -54,8 +55,28 @@ pub fn discard(path: String, paths: Vec<String>) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub fn commit(path: String, message: String) -> Result<(), AppError> {
-    cli::commit(Path::new(&path), &message)
+pub fn commit(path: String, message: String, amend: bool) -> Result<(), AppError> {
+    cli::commit(Path::new(&path), &message, amend)
+}
+
+#[tauri::command]
+pub fn head_message(path: String) -> Result<Option<String>, AppError> {
+    read::head_message(Path::new(&path))
+}
+
+#[tauri::command]
+pub fn apply_lines(path: String, file: String, op: cli::LineOp, lines: Vec<usize>) -> Result<(), AppError> {
+    cli::apply_lines(Path::new(&path), &file, op, &lines)
+}
+
+#[tauri::command]
+pub fn op_log(path: String) -> Result<Vec<oplog::OpEntry>, AppError> {
+    oplog::entries(Path::new(&path), 20)
+}
+
+#[tauri::command]
+pub fn undo(path: String, id: String) -> Result<(), AppError> {
+    oplog::undo(Path::new(&path), &id)
 }
 
 #[tauri::command]
