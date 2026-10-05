@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { commitDetails, commitFileDiff, createTag, merge } from "../../lib/ipc";
-import { errorText, kindClass, useRun } from "../status/Changes";
+import { Gutter, errorText, kindClass, lineNumbers, useRun } from "../status/Changes";
 import { NameForm } from "../refs/Sidebar";
 import { CommitGraph, type Picked } from "./CommitGraph";
 
@@ -15,6 +15,9 @@ export function History({ path }: { path: string }) {
   const d = details.data;
   // Keep the picked file only while the commit has it, else show the first file.
   const shown = d?.files.find((f) => f.path === file)?.path ?? d?.files[0]?.path ?? null;
+  const nl = d?.message.indexOf("\n") ?? -1;
+  const subject = nl < 0 ? d?.message : d?.message.slice(0, nl);
+  const body = nl < 0 ? "" : d?.message.slice(nl + 1).trim();
 
   return (
     <div className="history-view">
@@ -24,6 +27,8 @@ export function History({ path }: { path: string }) {
           {details.error ? <p className="error" role="alert">{errorText(details.error)}</p> : null}
           {d && (
             <>
+              <h2 className="subject">{subject}</h2>
+              {body && <p className="message">{body}</p>}
               <div className="commit-actions">
                 <button className="small" onClick={() => run(() => merge(path, d.oid, true))}>Cherry-pick</button>
                 <button className="small" onClick={() => run(() => merge(path, d.oid, false))}>Merge into current</button>
@@ -39,8 +44,7 @@ export function History({ path }: { path: string }) {
                 <dt>Date</dt><dd>{new Date(d.time * 1000).toLocaleString()}</dd>
                 {d.committer !== d.author && <><dt>Committer</dt><dd>{d.committer}</dd></>}
               </dl>
-              <p className="message">{d.message}</p>
-              <h2>{d.files.length} file{d.files.length === 1 ? "" : "s"}</h2>
+              <h3>{d.files.length} file{d.files.length === 1 ? "" : "s"}</h3>
               <ul className="files">
                 {d.files.map((f) => {
                   const slash = f.path.lastIndexOf("/");
@@ -81,9 +85,11 @@ function CommitDiff({ path, oid, file }: { path: string; oid: string; file: stri
   return (
     <section className="diff">
       <pre aria-label={`Diff of ${file}`}>
-        {all.slice(start).map((l, k) => (
-          <div key={k} className={l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}>{l || " "}</div>
-        ))}
+        {lineNumbers(all, start).map(([o, n], k) => {
+          const l = all[start + k];
+          if (l.startsWith("@@")) return <div key={k} className="hunk">{l}</div>;
+          return <div key={k} className={l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}><Gutter o={o} n={n} />{l || " "}</div>;
+        })}
       </pre>
     </section>
   );

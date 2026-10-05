@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
 import { checkout, openRepo, recentRepos, stage, undo, unstage } from "./lib/ipc";
+import { Icon } from "./lib/icons";
+import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
 import { Changes, opLabel, opLogQuery, pathsOf, statusQuery, useRun } from "./features/status/Changes";
@@ -13,11 +15,25 @@ import { Palette, type Command } from "./features/palette/Palette";
 import { UpdateBanner } from "./features/update/Update";
 import "./App.css";
 
+/** Brand mark: a trunk with one branch forking off; the live commit in the signal color. */
+function Mark() {
+  return (
+    <svg className="mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 5v14M7 16c0-5 10-3 10-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="7" cy="19" r="2.5" fill="currentColor" />
+      <circle cx="7" cy="5" r="2.5" fill="currentColor" />
+      <circle cx="17" cy="6" r="3" fill="var(--accent)" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [theme, setTheme] = useTheme();
 
   useEffect(() => {
     recentRepos().then(setRecent);
@@ -44,31 +60,55 @@ function App() {
     setRecent(await recentRepos());
   }
 
-  const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} /> : (
-    <main className="page welcome">
-      <h1>git-ai</h1>
-      <div className="welcome-actions">
-        <button className="primary" onClick={pick}>Open repository…</button>
-        <button aria-expanded={cloning} onClick={() => setCloning((v) => !v)}>Clone…</button>
-      </div>
-      {cloning && <CloneForm onCloned={cloned} />}
-      <GitHubAccount />
-      {error && <p className="error" role="alert">{error}</p>}
-      {recent.length > 0 && (
-        <section>
-          <h2>Recent</h2>
-          <ul className="recent">
-            {recent.map((p) => (
-              <li key={p}>
-                <button onClick={() => load(p)} title={p}>
-                  <strong>{p.split(/[\/]/).pop()}</strong>
+  const f = filter.trim().toLowerCase();
+  const shown = recent.filter((p) => p.toLowerCase().includes(f));
+  const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} theme={theme} setTheme={setTheme} /> : (
+    <main className="home">
+      <section className="home-intro">
+        <p className="brand"><Mark /> git-ai <ThemeButton theme={theme} onChange={setTheme} /></p>
+        <h1>Git, in plain sight.</h1>
+        <p className="lede">Local-first. Discards, branch deletes and merges are recorded, so each one can be undone.</p>
+        <div className="tiles">
+          <button className="tile primary" onClick={pick}>
+            <Icon name="open" />
+            <span><strong>Open repository</strong><small>A folder that contains .git</small></span>
+          </button>
+          <button className="tile" aria-expanded={cloning} onClick={() => setCloning((v) => !v)}>
+            <Icon name="clone" />
+            <span><strong>Clone</strong><small>From a URL</small></span>
+          </button>
+        </div>
+        {cloning && <CloneForm onCloned={cloned} />}
+        {error && <p className="error" role="alert">{error}</p>}
+        <GitHubAccount />
+      </section>
+      <section className="home-recent" aria-labelledby="recent-title">
+        <div className="section-head">
+          <h2 id="recent-title">Recent</h2>
+          {recent.length > 0 && <span className="count">{recent.length}</span>}
+        </div>
+        {recent.length > 3 && (
+          <label className="search">
+            <Icon name="search" />
+            <input type="search" placeholder="Filter repositories" aria-label="Filter repositories" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          </label>
+        )}
+        {!recent.length && <p className="empty">Repositories you open or clone show up here.</p>}
+        {recent.length > 0 && !shown.length && <p className="empty">No repository matches “{filter}”.</p>}
+        <ul className="recent">
+          {shown.map((p) => (
+            <li key={p}>
+              <button onClick={() => load(p)} title={p}>
+                <Icon name="folder" />
+                <span>
+                  <strong>{p.split(/[\\/]/).pop()}</strong>
                   <small>{p}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
   // One askpass dialog for both screens: clone runs from the welcome screen.
@@ -83,7 +123,9 @@ function App() {
 
 const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+Shift+L", Push: "Ctrl+Shift+U" };
 
-function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
+type RepoProps = { repo: RepoInfo; onClose: () => void; theme: Theme; setTheme: (t: Theme) => void };
+
+function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const path = repo.path;
   // Branch comes from live status so checkouts made elsewhere show up.
   const status = useQuery(statusQuery(path)).data;
@@ -91,11 +133,12 @@ function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
   const log = useQuery(opLogQuery(path)).data;
   const branch = status ? status.branch : repo.branch;
   const [tab, setTab] = useState<"status" | "history">("status");
-  // Narrow windows show the sidebar instead of the body; wide ones show both.
+  // Narrow windows show the rail as a drawer over the body; wide ones show both.
   const [side, setSide] = useState(false);
   const [run, error] = useRun();
   const sync = useSync(path, run);
-  const tabs = [["status", "File Status"], ["history", "History"]] as const;
+  const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
+  const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
 
   const show = (t: typeof tab) => { setTab(t); setSide(false); };
   const commands: Command[] = [
@@ -112,29 +155,42 @@ function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
   if (log?.[0]) commands.push({ label: `Undo: ${opLabel(log[0])}`, run: () => run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
     if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, run: () => run(() => checkout(path, b.name, false)) });
-  commands.push({ label: "Close repository", run: onClose });
+  commands.push(...themeCommands(theme, setTheme), { label: "Close repository", run: onClose });
 
   return (
-    <main className="page repo">
-      <header className="bar">
-        <button onClick={onClose}>← Repos</button>
-        <h1 title={path}>{repo.name}</h1>
-        <span className="branch">{branch ?? "detached HEAD"}</span>
-        <SyncButtons sync={sync} />
-        <Palette commands={commands} />
-        <button className="side-toggle" aria-expanded={side} onClick={() => setSide((v) => !v)}>Branches</button>
-        <nav className="tabs" role="tablist">
-          {tabs.map(([id, label]) => (
-            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+    <div className={`shell${side ? " show-side" : ""}`}>
+      <aside className="rail" aria-label="Repository">
+        <div className="rail-head">
+          <button className="icon-btn" onClick={onClose} aria-label="Back to repositories" title="Back to repositories"><Icon name="back" /></button>
+          <div className="repo-id">
+            <strong title={path}>{repo.name}</strong>
+            <span className="branch-chip" title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
+          </div>
+        </div>
+        <nav className="views" aria-label="Views">
+          {views.map(([id, label, icon]) => (
+            <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => show(id)}>
+              <Icon name={icon} />
+              <span>{label}</span>
+              {id === "status" && changed > 0 && <span className="count" aria-label={`${changed} changed files`}>{changed}</span>}
+            </button>
           ))}
         </nav>
-        {error && <p className="error" role="alert">{error}</p>}
-      </header>
-      <div className={`repo-main${side ? " show-side" : ""}`}>
-        <Sidebar path={repo.path} />
-        <div className="repo-body">{tab === "status" ? <Changes path={repo.path} /> : <History path={repo.path} />}</div>
-      </div>
-    </main>
+        <Sidebar path={path} />
+      </aside>
+      <div className="scrim" aria-hidden="true" onClick={() => setSide(false)} />
+      <main className="stage">
+        <header className="toolbar">
+          <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
+          <h1>{tab === "status" ? "File Status" : "History"}</h1>
+          <SyncButtons sync={sync} />
+          <Palette commands={commands} />
+          <ThemeButton theme={theme} onChange={setTheme} />
+        </header>
+        {error && <p className="error strip" role="alert"><Icon name="warn" />{error}</p>}
+        <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
+      </main>
+    </div>
   );
 }
 

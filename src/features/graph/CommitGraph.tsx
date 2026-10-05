@@ -8,7 +8,8 @@ const ROW = 24; // px, fixed so row i sits at i * ROW
 const PAGE = 500;
 const LANE = 14;
 const MAX_LANES = 16; // wider graphs are clipped
-const COLORS = ["#2563eb", "#16a34a", "#db2777", "#ca8a04", "#7c3aed", "#0891b2", "#ea580c", "#64748b"];
+// Mid-tone lanes that hold contrast on both the light and the dark panel.
+const COLORS = ["#8fbf1f", "#2f9fd8", "#e0508a", "#e09a1a", "#8b6cf0", "#17b3a3", "#ef6a3a", "#7d8796"];
 const color = (lane: number) => COLORS[lane % COLORS.length];
 const x = (lane: number) => LANE / 2 + 3 + lane * LANE;
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -79,7 +80,7 @@ export function CommitGraph({ path, sel, onSelect }: Props) {
         ctx.stroke();
       }
     }
-    const bg = getComputedStyle(c).getPropertyValue("--surface");
+    const bg = getComputedStyle(c).getPropertyValue("--panel");
     for (const [i, r] of visible) {
       const y = (i - first) * ROW + ROW / 2;
       ctx.beginPath();
