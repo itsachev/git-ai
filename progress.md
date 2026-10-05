@@ -94,7 +94,16 @@
   - Tests: oplog round trip extended (create+switch, commit, unmerged delete refused, force delete, undo, undo of undo, bad name, refs listing). 18 pass, `npm run build` OK. Not yet clicked through in `tauri dev`.
   - Skipped: branch from a picked commit, rename, delete remote branches/tags, stash apply/drop (week 7), click a ref to jump to its commit in the graph.
 
+- Week 7: merge, cherry-pick, tags, stash.
+  - `read.rs`: `operation()` (git2 `state()`: "merge" / "cherry-pick" / "revert" / "rebase"), added to `Status.operation`.
+  - `cli.rs`: `merge(rev, cherry_pick)` (`merge --no-edit` / `cherry-pick`); when git stops halfway the error is code `conflicts` and the op stays in progress. `commit()` while an op is in progress finishes it (empty message → `--no-edit`, git's prepared message). `abort()` backs up all changed files (`oplog::backup`, op "abort merge") then runs `git <op> --abort`. `create_tag` (annotated when a message is given), `delete_tag` (logs the tag object oid). `stash_save` (`push -u`), `stash(op, index, oid)` for Apply/Pop/Drop: refuses with `stale` when `stash@{index}` is no longer `oid`; a stash that disappears is logged as "drop stash".
+  - Undo: merge, cherry-pick and the finishing commit log HEAD before/after (`log_head_move`), so undo is a soft reset (the merged changes stay staged, discard them if wanted). Tag delete undoes via the generic ref CAS. "drop stash" undo runs `git stash store` with the stash's own subject. Undo entries are now named `undo <op>` (old entries say just "undo"), labels render as "Undo: <label>".
+  - Commands `merge`, `abort`, `create_tag`, `delete_tag`, `stash_save`, `stash` + IPC wrappers, `StashOp` binding.
+  - UI: File Status shows a banner "Merge in progress…" with Abort (asks first); commit box allows an empty message then. Sidebar rows take a generic `actions` list: branches Checkout/Merge/Delete, remote branches Checkout/Merge, tags Delete, stashes Apply/Pop/Drop (drop asks), "+ Stash" form. The inline form is now `NameForm` (shared with History). Row actions overlay the right end of the name on hover (name keeps full width), sit in flow and wrap on touch. History: Cherry-pick / Merge into current / Tag… on the selected commit.
+  - Tests: new `merge_tag_stash` (conflicting merge + abort with backup, finish with git's message, undo merge, cherry-pick, annotated tag delete + undo, stash save/stale/drop/undo/pop). 20 pass, `npm run build` OK. Not yet clicked through in `tauri dev`.
+  - Skipped: cherry-pick of merge commits (`-m`), conflict editor (only "Mark resolved" via stage), stash apply `--index`, tag push, revert/rebase start (abort covers them if begun elsewhere).
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
-- Click through weeks 2–6 in `tauri dev`.
-- Week 7: merge, cherry-pick, tags (create/delete), stash (save/apply/pop/drop).
+- Click through weeks 2–7 in `tauri dev`.
+- Week 8: fetch/pull/push (with `GIT_ASKPASS`), remote branch delete, tag push.

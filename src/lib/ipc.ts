@@ -6,6 +6,7 @@ import type { OpEntry } from "../bindings/OpEntry";
 import type { GraphPage } from "../bindings/GraphPage";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
+import type { StashOp } from "../bindings/StashOp";
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");
@@ -38,3 +39,15 @@ export const checkout = (path: string, name: string, track: boolean) => invoke<v
 export const createBranch = (path: string, name: string, checkout: boolean) => invoke<void>("create_branch", { path, name, checkout });
 /** Fails with code "not_merged" unless `force`. Undoable via the op log. */
 export const deleteBranch = (path: string, name: string, force: boolean) => invoke<void>("delete_branch", { path, name, force });
+/** Merges `rev` into the current branch, or with `cherryPick` applies that one commit. Code "conflicts" = stopped halfway. */
+export const merge = (path: string, rev: string, cherryPick: boolean) => invoke<void>("merge", { path, rev, cherryPick });
+/** Aborts the in-progress merge/cherry-pick (changed files backed up first). */
+export const abortOp = (path: string) => invoke<void>("abort", { path });
+/** Annotated when `message` isn't empty. */
+export const createTag = (path: string, name: string, target: string, message: string) =>
+  invoke<void>("create_tag", { path, name, target, message });
+export const deleteTag = (path: string, name: string) => invoke<void>("delete_tag", { path, name });
+/** Stashes all changes, untracked files included. */
+export const stashSave = (path: string, message: string) => invoke<void>("stash_save", { path, message });
+/** `oid` must still be stash@{index}, else code "stale". */
+export const stash = (path: string, op: StashOp, index: number, oid: string) => invoke<void>("stash", { path, op, index, oid });
