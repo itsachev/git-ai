@@ -121,7 +121,18 @@
   - Undo of a take-side restores the file content but not the conflict state in the index (the file stays resolved; stage it again after editing).
   - Skipped: clone cancel, shallow/branch/recursive clone options, per-hunk conflict picking (v2: 3-way merge editor), resolve several files at once in the UI.
 
+- Week 10: GitHub sign-in (OAuth device flow), token in the OS keychain.
+  - New deps: `ureq` 3 (`json`, rustls) for HTTPS, `keyring` 3 (`apple-native`, `windows-native`, `sync-secret-service`).
+  - `src-tauri/src/github.rs`: `start` (POST `login/device/code`, scope `repo`), `finish` (polls `login/oauth/access_token` every `interval` s, +5 s on `slow_down`; codes `expired` / `denied`; stores the token under keychain service `git-ai`, user `github`), `user` (GET `api.github.com/user`; a 401 forgets the token), `sign_out`. Client id comes from `GITAI_GITHUB_CLIENT_ID` (runtime env, else baked in at build); missing = code `github_not_configured`.
+  - askpass: `ask()` first tries `github::askpass_answer`: git's "Username/Password for 'https://github.com…'" prompts get `x-access-token` / the token when signed in, else the dialog as before. Only reached when no credential helper (GCM) answers.
+  - Commands `github_start`, `github_finish`, `github_user` (async), `github_sign_out` + IPC wrappers, `DeviceCode` binding.
+  - UI: `src/features/github/GitHub.tsx` on the welcome screen: "Sign in to GitHub", then the code in large type, "Copy code & open GitHub" (clipboard + `openUrl`), Cancel, "Waiting for approval…"; signed in shows `@login` + Sign out. Hidden when the user check fails (offline).
+  - Tests: `github::prompts` (host matching: github.com only, rejects `github.com.evil.io`, `github.com@evil.io`, http, ssh passphrase). 27 pass, `npm run build` OK. Not tried against GitHub: needs an OAuth app with device flow enabled.
+  - A revoked-but-cached token makes HTTPS git fail with an auth error until the next `github_user` check (on app start) forgets it, or Sign out.
+  - Skipped: GitLab/Bitbucket (v1), account in the repo header, cancelling the backend poll (it stops at code expiry, ~15 min).
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
 - Click through weeks 2–9 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line.
-- Week 10: GitHub OAuth (device flow, token in `keyring`).
+- Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
+- Week 11: keyboard shortcuts + command palette.

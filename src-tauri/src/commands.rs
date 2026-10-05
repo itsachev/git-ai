@@ -219,3 +219,25 @@ pub fn open_file(app: AppHandle, path: String, file: String) -> Result<(), AppEr
 pub fn askpass_reply(id: u32, answer: Option<String>) {
     crate::askpass::reply(id, answer)
 }
+
+// GitHub sign-in (device flow); async because each call goes over the network.
+#[tauri::command]
+pub async fn github_start() -> Result<crate::github::DeviceCode, AppError> {
+    crate::github::start()
+}
+
+/// Waits until the user approves the code in the browser (or it expires); returns the login.
+#[tauri::command]
+pub async fn github_finish(code: crate::github::DeviceCode) -> Result<String, AppError> {
+    crate::github::finish(&code)
+}
+
+#[tauri::command]
+pub async fn github_user() -> Result<Option<String>, AppError> {
+    crate::github::user()
+}
+
+#[tauri::command]
+pub fn github_sign_out() -> Result<(), AppError> {
+    crate::github::sign_out()
+}

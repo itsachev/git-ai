@@ -8,6 +8,7 @@ import { Changes, statusQuery } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar } from "./features/refs/Sidebar";
 import { AskpassDialog, CloneForm, SyncButtons } from "./features/remote/Remote";
+import { GitHubAccount } from "./features/github/GitHub";
 import "./App.css";
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
         <button aria-expanded={cloning} onClick={() => setCloning((v) => !v)}>Clone…</button>
       </div>
       {cloning && <CloneForm onCloned={cloned} />}
+      <GitHubAccount />
       {error && <p className="error" role="alert">{error}</p>}
       {recent.length > 0 && (
         <section>
