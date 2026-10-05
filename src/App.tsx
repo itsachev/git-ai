@@ -5,6 +5,7 @@ import { openRepo, recentRepos } from "./lib/ipc";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
 import { Changes, statusQuery } from "./features/status/Changes";
+import { History } from "./features/graph/History";
 import "./App.css";
 
 function App() {
@@ -61,14 +62,21 @@ function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
   // Branch comes from live status so checkouts made elsewhere show up.
   const status = useQuery(statusQuery(repo.path)).data;
   const branch = status ? status.branch : repo.branch;
+  const [tab, setTab] = useState<"status" | "history">("status");
+  const tabs = [["status", "File Status"], ["history", "History"]] as const;
   return (
-    <main className="page">
+    <main className="page repo">
       <header className="bar">
         <button onClick={onClose}>← Repos</button>
         <h1 title={repo.path}>{repo.name}</h1>
         <span className="branch">{branch ?? "detached HEAD"}</span>
+        <nav className="tabs" role="tablist">
+          {tabs.map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+          ))}
+        </nav>
       </header>
-      <Changes path={repo.path} />
+      <div className="repo-body">{tab === "status" ? <Changes path={repo.path} /> : <History path={repo.path} />}</div>
     </main>
   );
 }

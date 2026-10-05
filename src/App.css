@@ -113,3 +113,56 @@ button.small { padding: 0.15rem 0.5rem; min-height: 1.75rem; font-size: 0.8rem; 
   .diff { position: sticky; top: 1rem; }
   .diff pre { max-height: calc(100vh - 9rem); } /* leaves room for .diff-bar */
 }
+
+/* Repo view: header + one body filling the window; History needs the fixed height. */
+.page.repo { height: 100vh; display: flex; flex-direction: column; gap: 0.75rem; }
+.repo-body { flex: 1; min-height: 0; overflow: auto; }
+.repo-body > .changes { margin-top: 0; }
+.tabs { margin-left: auto; display: flex; gap: 0.25rem; }
+.tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mono { font-family: ui-monospace, monospace; }
+
+/* History: commit table on top, details + diff below. */
+.history-view { height: 100%; display: grid; grid-template-rows: minmax(8rem, 1fr) minmax(10rem, 1fr); gap: 0.75rem; }
+.graph {
+  --graph-cols: minmax(0, 1fr) 9.5rem 8rem 4.5rem;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+.graph-head, .grow { display: grid; align-items: center; column-gap: 0.75rem; white-space: nowrap; }
+.graph-head { font-size: 0.75rem; color: var(--muted); padding: 0.25rem 0; border-bottom: 1px solid var(--border); overflow-y: hidden; scrollbar-gutter: stable; }
+.graph-head > span:first-child { padding-left: 0.5rem; }
+.graph-body { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+.graph-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.grow { position: absolute; left: 0; right: 0; font-size: 0.85rem; cursor: default; }
+.grow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.grow:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.grow.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.grow.head .sum { font-weight: 600; }
+.desc { display: flex; align-items: center; gap: 0.35rem; }
+.sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ref { flex-shrink: 0; font-size: 0.75rem; line-height: 1.3; padding: 0 0.35rem; border: 1px solid var(--accent); border-radius: 3px; color: var(--accent); }
+.c-date, .c-author, .c-oid { color: var(--muted); }
+.c-oid { font-family: ui-monospace, monospace; }
+@media (max-width: 48rem) {
+  .graph { --graph-cols: minmax(0, 1fr) 4.5rem; }
+  .c-date, .c-author { display: none; }
+}
+@media (max-width: 30rem) {
+  .graph { --graph-cols: minmax(0, 1fr); }
+  .c-oid { display: none; }
+}
+.history-bottom { display: grid; gap: 0.75rem; min-height: 0; overflow: auto; align-content: start; }
+.history-bottom .diff pre { max-height: none; }
+.commit-info { min-width: 0; font-size: 0.85rem; }
+.commit-info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.75rem; margin: 0; }
+.commit-info dt { font-weight: 600; }
+.commit-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.commit-info .message { white-space: pre-wrap; overflow-wrap: anywhere; }
+.commit-info h2 { margin-top: 1rem; }
+@media (min-width: 52rem) {
+  .history-bottom { grid-template-columns: minmax(18rem, 28rem) 1fr; overflow: hidden; align-content: stretch; }
+  .history-bottom > * { min-height: 0; overflow: auto; }
+  .history-bottom .diff { position: static; }
+}
+

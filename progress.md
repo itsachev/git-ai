@@ -13,8 +13,17 @@
 
 ## Phases
 - **MVP (wk 1–12):** clone/open/recent, staging (file/hunk/line), commit/amend, discard+undo, graph, branches, merge/cherry-pick/tags/stash, fetch/pull/push, basic conflict UI, GitHub OAuth, shortcuts + palette, auto-update.
-- **v1:** interactive rebase, drag-drop branches, blame, file history, LFS, submodules, terminal, GitHub PRs, AI commit messages (BYO key), GitLab/Bitbucket OAuth.
+- **v1:** interactive rebase, drag-drop branches, blame, file history, LFS, submodules, terminal, GitHub PRs, AI features (see below), GitLab/Bitbucket OAuth.
 - **v2:** 3-way merge editor, Azure/GitLab PRs, worktrees, sparse/partial clone UI, signing UI, plugins, paid team features.
+
+## AI features (planned, v1)
+- **AI commit & PR generator:** generate commit messages from the staged diff, plus PR titles, PR descriptions and release changelogs (from a commit range or between tags).
+- **AI code explanations:** explain a commit, the changes on a branch (vs. its base) and a stash.
+- **AI tokens & model choice:**
+  - Weekly token allowance per tier (e.g. 250k to 2M+ tokens).
+  - Custom model configuration (provider, model, parameters).
+  - Bring Your Own Key (BYOK). BYOK keys go in the OS keychain (`keyring`), never in settings.
+- Open questions: hosted proxy for tier tokens (metering, abuse limits); what diff content is sent and how users opt in; size limits for large diffs (reuse the 1 MB / binary skip).
 
 ## Log
 ### 2026-10-05
@@ -66,5 +75,16 @@
   - Tests: round trip extended with undo discard, amend + undo, stage/unstage/discard of single lines. 11 pass, `npm run build` OK. Not yet clicked through in `tauri dev`.
   - Known gaps: line selection is mouse-only (hunk buttons are keyboard reachable); picking only some lines of a deleted file (stage) or of a newly added file (unstage, discard) fails in `git apply` because the patch keeps the delete/new-file header (whole hunk works); op ids are ms timestamps (two ops in one ms would collide).
 
+- Week 5: commit graph + History view (modeled on `sources/selected_repo.png`, Sourcetree).
+  - Added `sources/` UI reference screenshots (Sourcetree home + repo History view); CLAUDE.md points at them.
+  - `src-tauri/src/git/graph.rs`: revwalk over branches, remote branches, tags (peeled) and HEAD, `TOPOLOGICAL | TIME`. `layout()` assigns lanes: each lane waits for an oid and remembers which previous-row lanes feed it, so merges/forks come out as `(from_col, to_col)` edges; trailing free lanes are dropped. Layout cached in managed `GraphCache` keyed by repo + sorted tip oids, so it is recomputed only when a ref moves (not for refs/git-ai backups). `rows(offset, limit)` adds summary, author, time, ref names, head flag per page.
+  - `read.rs`: `commit_details` (parents, author/committer, message, files vs first parent with rename detection) and `commit_file_diff` (1 MB/binary → None).
+  - Commands `graph_rows`, `commit_details`, `commit_file_diff` are async (off the main thread).
+  - UI: header tabs File Status / History; repo view now fills the window. `src/features/graph/CommitGraph.tsx`: virtualized table (24 px rows, pages of 500 via `useQueries`, page 0 always loaded for the total), one canvas drawn only for the visible rows (bezier for lane changes, hollow dot = HEAD), graph width capped at 16 lanes. Columns Graph/Description (ref badges)/Date/Author/Commit; date+author hide below 48rem, hash below 30rem. Arrow/Page keys move the selection; first commit auto-selected. `History.tsx`: details + file list left, read-only diff right (stacked below 52rem).
+  - Tests: lane layout (linear, merge, two tips), temp repo (details, rename detection, commit diff, graph page). 16 pass, `npm run build` OK. Not yet clicked through in `tauri dev`; 100k-commit speed not measured yet.
+  - Skipped: branch/tag badge colors (names only), clicking parents to jump, filters (all branches / remote toggle / date vs ancestor order), search.
+- Planning: added the AI feature set (commit/PR/changelog generation, code explanations, token tiers + model choice + BYOK) to the plan under "AI features"; v1 phase now points there.
+
 ## Next
-- Week 5: commit graph (`graph.rs` lane layout, `graph_rows` paged command, canvas `CommitGraph.tsx`), commit details view. Commands are sync (run on the main thread); make them async if slow hooks freeze the UI.
+- Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
+- Week 6: branches sidebar (local/remote/tags/stashes like Sourcetree), checkout, create/delete branch.

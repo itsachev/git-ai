@@ -1,0 +1,79 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { commitDetails, commitFileDiff } from "../../lib/ipc";
+import { errorText, kindClass } from "../status/Changes";
+import { CommitGraph, type Picked } from "./CommitGraph";
+
+/** Commit graph on top; the picked commit's details, files and file diff below. */
+export function History({ path }: { path: string }) {
+  const [sel, setSel] = useState<Picked | null>(null);
+  const [file, setFile] = useState<string | null>(null);
+  const details = useQuery({ queryKey: ["commit", path, sel?.oid], queryFn: () => commitDetails(path, sel!.oid), enabled: !!sel });
+  const d = details.data;
+  // Keep the picked file only while the commit has it, else show the first file.
+  const shown = d?.files.find((f) => f.path === file)?.path ?? d?.files[0]?.path ?? null;
+
+  return (
+    <div className="history-view">
+      <CommitGraph path={path} sel={sel} onSelect={setSel} />
+      <div className="history-bottom">
+        <section className="commit-info">
+          {details.error ? <p className="error" role="alert">{errorText(details.error)}</p> : null}
+          {d && (
+            <>
+              <dl>
+                <dt>Commit</dt><dd className="mono">{d.oid}</dd>
+                <dt>Parents</dt><dd className="mono">{d.parents.map((p) => p.slice(0, 7)).join(", ") || "none"}</dd>
+                <dt>Author</dt><dd>{d.author}</dd>
+                <dt>Date</dt><dd>{new Date(d.time * 1000).toLocaleString()}</dd>
+                {d.committer !== d.author && <><dt>Committer</dt><dd>{d.committer}</dd></>}
+              </dl>
+              <p className="message">{d.message}</p>
+              <h2>{d.files.length} file{d.files.length === 1 ? "" : "s"}</h2>
+              <ul className="files">
+                {d.files.map((f) => {
+                  const slash = f.path.lastIndexOf("/");
+                  const on = f.path === shown;
+                  return (
+                    <li key={f.path} className={on ? "sel" : undefined}>
+                      <button className="row" aria-pressed={on} onClick={() => setFile(f.path)}
+                        title={f.orig_path ? `${f.orig_path} → ${f.path}` : f.path}>
+                        <span className={`kind ${kindClass(f.kind)}`}>{f.kind}</span>
+                        <span className="path">
+                          <strong>{f.path.slice(slash + 1)}</strong>
+                          {slash > 0 && <small>{f.path.slice(0, slash)}</small>}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </section>
+        {d && shown && <CommitDiff path={path} oid={d.oid} file={shown} />}
+      </div>
+    </div>
+  );
+}
+
+function CommitDiff({ path, oid, file }: { path: string; oid: string; file: string }) {
+  // A commit never changes, so its diffs never need a refetch.
+  const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file], queryFn: () => commitFileDiff(path, oid, file) });
+  if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
+  if (data === undefined) return <section className="diff" />;
+  if (data === null) return <section className="diff muted">Binary file or larger than 1 MB, no inline diff.</section>;
+  const all = data.replace(/\n$/, "").split("\n");
+  const start = all.findIndex((l) => l.startsWith("@@"));
+  if (start < 0) return <section className="diff muted">No content changes.</section>;
+  // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
+  return (
+    <section className="diff">
+      <pre aria-label={`Diff of ${file}`}>
+        {all.slice(start).map((l, k) => (
+          <div key={k} className={l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}>{l || " "}</div>
+        ))}
+      </pre>
+    </section>
+  );
+}
