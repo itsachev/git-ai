@@ -260,3 +260,11 @@ dialog.palette::backdrop { background: rgb(0 0 0 / 0.4); }
 .palette li[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .palette li.muted { cursor: default; }
 .palette kbd { flex-shrink: 0; font: 0.75rem ui-monospace, monospace; color: var(--muted); }
+
+.update {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 10; max-width: calc(100vw - 2rem);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+}
+.update button { min-height: 2.25rem; }

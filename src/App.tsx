@@ -10,6 +10,7 @@ import { Sidebar, refsQuery } from "./features/refs/Sidebar";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Palette, type Command } from "./features/palette/Palette";
+import { UpdateBanner } from "./features/update/Update";
 import "./App.css";
 
 function App() {
@@ -75,6 +76,7 @@ function App() {
     <>
       {body}
       <AskpassDialog />
+      <UpdateBanner />
     </>
   );
 }

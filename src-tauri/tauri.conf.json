@@ -34,5 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQwNTFFOTNFNTQzNDcxRTcKUldUbmNUUlVQdWxSMEJSNWVQSk55YnNhQ0pFejFSNTRuc3JyNVRIMmU4Y2F0RHplRDJNczNJMkoK",
+      "endpoints": [
+        "https://github.com/itsachev/git-ai/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
