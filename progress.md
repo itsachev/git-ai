@@ -85,6 +85,16 @@
   - Skipped: branch/tag badge colors (names only), clicking parents to jump, filters (all branches / remote toggle / date vs ancestor order), search.
 - Planning: added the AI feature set (commit/PR/changelog generation, code explanations, token tiers + model choice + BYOK) to the plan under "AI features"; v1 phase now points there.
 
+- Week 6: branches sidebar, checkout, create/delete branch.
+  - `read.rs`: `refs()` → `Refs { head, local, remote, tags, stashes }` of `RefItem { name, oid, upstream, ahead, behind }` (git2; ahead/behind via `graph_ahead_behind`, stashes via `stash_foreach`).
+  - `cli.rs`: `checkout(name, track)` (`switch`, or `switch --track origin/x` to create the local tracking branch), `create_branch(name, checkout)` (`switch -c` / `branch`), `delete_branch(name, force)` (`branch -d/-D`; "not fully merged" → code `not_merged`). `switch`/`branch` take no `--`, so names starting with `-` are rejected (`bad_name`).
+  - `oplog.rs`: `OpEntry.ref_name` (default HEAD). Branch delete logs the tip; undo is a compare-and-swap `update-ref <ref> <old> ""` (recreate) or `update-ref -d <ref> <new>` (delete), so undo-of-undo works too. Op ids are now strictly increasing per process (fixes the same-ms collision from week 4).
+  - Commands `refs`, `checkout`, `create_branch`, `delete_branch` + IPC wrappers. `useRun()` (op runner + error state) extracted from `Changes.tsx` and shared.
+  - UI `src/features/refs/Sidebar.tsx`: filter box, collapsible Branches (current ●, ahead ↑/behind ↓, "+ New" inline form with "Check out" option), Remotes grouped by remote, Tags, Stashes (list only). Double-click or the Checkout button checks out; a remote branch checks out its local namesake (created tracking if missing). Delete asks first, asks again to force when unmerged; Undo history shows branch deletes. Row buttons show on hover/focus (opacity, so still tabbable), always on touch. Sidebar is a 14rem column from 48rem; below that a "Branches" header button swaps it in for the body.
+  - Tests: oplog round trip extended (create+switch, commit, unmerged delete refused, force delete, undo, undo of undo, bad name, refs listing). 18 pass, `npm run build` OK. Not yet clicked through in `tauri dev`.
+  - Skipped: branch from a picked commit, rename, delete remote branches/tags, stash apply/drop (week 7), click a ref to jump to its commit in the graph.
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
-- Week 6: branches sidebar (local/remote/tags/stashes like Sourcetree), checkout, create/delete branch.
+- Click through weeks 2–6 in `tauri dev`.
+- Week 7: merge, cherry-pick, tags (create/delete), stash (save/apply/pop/drop).

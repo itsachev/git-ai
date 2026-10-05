@@ -136,6 +136,66 @@ fn commit_diff_all<'r>(repo: &'r git2::Repository, c: &git2::Commit) -> Result<g
     Ok(diff)
 }
 
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct RefItem {
+    /// Short name ("main", "origin/main", "v1.0"), or the message for a stash.
+    pub name: String,
+    pub oid: String,
+    /// Upstream short name of a local branch.
+    pub upstream: Option<String>,
+    /// Commits ahead of / behind the upstream.
+    pub ahead: u32,
+    pub behind: u32,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct Refs {
+    /// Current branch; None when HEAD is detached or unborn.
+    pub head: Option<String>,
+    pub local: Vec<RefItem>,
+    pub remote: Vec<RefItem>,
+    pub tags: Vec<RefItem>,
+    /// Newest first (stash@{0} first).
+    pub stashes: Vec<RefItem>,
+}
+
+/// Branches, remote branches, tags and stashes for the sidebar, each sorted by name.
+pub fn refs(repo: &Path) -> Result<Refs, AppError> {
+    let mut repo = git2::Repository::open(repo)?;
+    let head = repo.head().ok().filter(|h| h.is_branch()).and_then(|h| h.shorthand().ok().map(String::from));
+    let item = |name: String, oid: git2::Oid| RefItem { name, oid: oid.to_string(), upstream: None, ahead: 0, behind: 0 };
+    let (mut local, mut remote, mut tags) = (vec![], vec![], vec![]);
+    for r in repo.references()?.flatten() {
+        let (Ok(full), Ok(short)) = (r.name(), r.shorthand()) else { continue };
+        let Ok(c) = r.peel_to_commit() else { continue };
+        let mut it = item(short.to_string(), c.id());
+        if full.starts_with("refs/heads/") {
+            let up = git2::Branch::wrap(r).upstream().ok();
+            if let Some(up) = up.as_ref().and_then(|u| u.get().target()) {
+                (it.ahead, it.behind) = repo.graph_ahead_behind(c.id(), up).map(|(a, b)| (a as u32, b as u32)).unwrap_or_default();
+            }
+            it.upstream = up.and_then(|u| u.name().ok().flatten().map(String::from));
+            local.push(it);
+        } else if full.starts_with("refs/remotes/") && !full.ends_with("/HEAD") {
+            remote.push(it);
+        } else if full.starts_with("refs/tags/") {
+            tags.push(it);
+        }
+    }
+    for v in [&mut local, &mut remote, &mut tags] {
+        v.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+    let mut stashes = vec![];
+    // No stash ref yet is not an error.
+    let _ = repo.stash_foreach(|_, msg, oid| {
+        stashes.push(item(msg.to_string(), *oid));
+        true
+    });
+    Ok(Refs { head, local, remote, tags, stashes })
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use ts_rs::TS;
 
@@ -16,12 +17,15 @@ const LOG: &str = "oplog.jsonl";
 pub struct OpEntry {
     /// Unix time in ms, also the backup ref name.
     pub id: String,
-    /// "discard", "amend" or "undo".
+    /// "discard", "amend", "delete branch" or "undo".
     pub op: String,
-    /// HEAD before the op.
+    /// HEAD (or `ref_name`) before the op; None = the ref didn't exist.
     pub head: Option<String>,
-    /// HEAD after the op, when the op moved it. Undo moves it back.
+    /// HEAD (or `ref_name`) after the op, when the op moved it; None = deleted. Undo moves it back.
     pub new_head: Option<String>,
+    /// The ref `head`/`new_head` belong to, when not HEAD (e.g. "refs/heads/feature").
+    #[serde(default)]
+    pub ref_name: Option<String>,
     #[serde(default)]
     pub paths: Vec<String>,
     /// Working-tree snapshot of `paths` taken before the op. Undo restores it.
@@ -32,8 +36,14 @@ pub struct OpEntry {
 
 impl OpEntry {
     pub fn new(op: &str, head: Option<String>, new_head: Option<String>) -> Self {
-        let id = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string();
-        Self { id, op: op.into(), head, new_head, paths: vec![], backup: None, undoes: None }
+        // Strictly increasing so two ops in the same ms still get distinct ids.
+        // ponytail: unique per process only; two app instances on one repo could still collide.
+        static LAST: Mutex<u128> = Mutex::new(0);
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+        let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+        *last = now.max(*last + 1);
+        let id = last.to_string();
+        Self { id, op: op.into(), head, new_head, ref_name: None, paths: vec![], backup: None, undoes: None }
     }
 }
 
@@ -116,11 +126,21 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
             .collect();
         git(repo, &args)?;
         u
-    } else if let (Some(old), Some(new)) = (&e.head, &e.new_head) {
-        git(repo, &["update-ref", "-m", "git-ai: undo", "HEAD", old, new]).map_err(|_| {
-            AppError::new("moved", "HEAD has moved since this operation (a newer commit or checkout), so it can't be undone.")
+    } else if e.head.is_some() || e.new_head.is_some() {
+        // Compare-and-swap back to `head`: "" as the old value means "must not exist", -d deletes.
+        let r = e.ref_name.as_deref().unwrap_or("HEAD");
+        let res = match (&e.head, &e.new_head) {
+            (Some(old), new) => git(repo, &["update-ref", "-m", "git-ai: undo", r, old, new.as_deref().unwrap_or("")]),
+            (None, Some(new)) => git(repo, &["update-ref", "-m", "git-ai: undo", "-d", r, new]),
+            (None, None) => unreachable!(),
+        };
+        res.map_err(|_| {
+            let name = r.strip_prefix("refs/heads/").unwrap_or(r);
+            AppError::new("moved", format!("{name} has changed since this operation (a newer commit, checkout or branch), so it can't be undone."))
         })?;
-        OpEntry::new("undo", Some(new.clone()), Some(old.clone()))
+        let mut u = OpEntry::new("undo", e.new_head.clone(), e.head.clone());
+        u.ref_name = e.ref_name.clone();
+        u
     } else {
         return Err(AppError::new("not_undoable", "This operation can't be undone."));
     };
@@ -210,6 +230,27 @@ mod tests {
         // Unstaged diff is now +x +two +y (lines 5..8); discard +y only.
         cli::apply_lines(p, "a.txt", cli::LineOp::Discard, &[7]).unwrap();
         assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "x\ntwo\n");
+
+        // Branches: create + switch, commit on it, unmerged delete needs force, undo brings it back.
+        let base = git(p, &["branch", "--show-current"]).unwrap().trim().to_string();
+        cli::create_branch(p, "feat", true).unwrap();
+        cli::stage(p, &files(&["a.txt"])).unwrap();
+        cli::commit(p, "on feat", false).unwrap();
+        let tip = cli::rev(p, "feat").unwrap();
+        cli::checkout(p, &base, false).unwrap();
+        assert_eq!(cli::delete_branch(p, "feat", false).unwrap_err().code, "not_merged");
+        cli::delete_branch(p, "feat", true).unwrap();
+        assert!(cli::rev(p, "refs/heads/feat").is_err());
+        let del = super::entries(p, 20).unwrap()[0].clone();
+        super::undo(p, &del.id).unwrap();
+        assert_eq!(cli::rev(p, "refs/heads/feat").unwrap(), tip);
+        // Undo the undo: deleted again.
+        let undo = super::entries(p, 20).unwrap()[0].clone();
+        super::undo(p, &undo.id).unwrap();
+        assert!(cli::rev(p, "refs/heads/feat").is_err());
+        assert_eq!(cli::create_branch(p, "-x", false).unwrap_err().code, "bad_name");
+        let refs = crate::git::read::refs(p).unwrap();
+        assert_eq!((refs.head.as_deref(), refs.local.len()), (Some(base.as_str()), 1));
         let _ = fs::remove_dir_all(&dir);
     }
 }

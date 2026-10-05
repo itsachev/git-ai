@@ -6,6 +6,7 @@ import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
 import { Changes, statusQuery } from "./features/status/Changes";
 import { History } from "./features/graph/History";
+import { Sidebar } from "./features/refs/Sidebar";
 import "./App.css";
 
 function App() {
@@ -63,6 +64,8 @@ function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
   const status = useQuery(statusQuery(repo.path)).data;
   const branch = status ? status.branch : repo.branch;
   const [tab, setTab] = useState<"status" | "history">("status");
+  // Narrow windows show the sidebar instead of the body; wide ones show both.
+  const [side, setSide] = useState(false);
   const tabs = [["status", "File Status"], ["history", "History"]] as const;
   return (
     <main className="page repo">
@@ -70,13 +73,17 @@ function RepoView({ repo, onClose }: { repo: RepoInfo; onClose: () => void }) {
         <button onClick={onClose}>← Repos</button>
         <h1 title={repo.path}>{repo.name}</h1>
         <span className="branch">{branch ?? "detached HEAD"}</span>
+        <button className="side-toggle" aria-expanded={side} onClick={() => setSide((v) => !v)}>Branches</button>
         <nav className="tabs" role="tablist">
           {tabs.map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
           ))}
         </nav>
       </header>
-      <div className="repo-body">{tab === "status" ? <Changes path={repo.path} /> : <History path={repo.path} />}</div>
+      <div className={`repo-main${side ? " show-side" : ""}`}>
+        <Sidebar path={repo.path} />
+        <div className="repo-body">{tab === "status" ? <Changes path={repo.path} /> : <History path={repo.path} />}</div>
+      </div>
     </main>
   );
 }

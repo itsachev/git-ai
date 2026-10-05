@@ -18,25 +18,29 @@ const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.
 const confirmDiscard = (what: string) =>
   ask(`Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, { title: "Discard changes", kind: "warning" });
 
-export function Changes({ path }: { path: string }) {
+/** `run(op)` runs a git op, keeps its error, refreshes right away (the watcher would too, 300 ms later). */
+export function useRun() {
   const qc = useQueryClient();
-  const { data, error } = useQuery(statusQuery(path));
-  const [sel, setSel] = useState<Selection | null>(null);
-  const [opError, setOpError] = useState<string | null>(null);
-
-  /** Runs a git op, shows its error, refreshes right away (the watcher would too, 300 ms later). */
+  const [error, setError] = useState<string | null>(null);
   async function run(op: () => Promise<unknown>) {
-    setOpError(null);
+    setError(null);
     try {
       await op();
       return true;
     } catch (e) {
-      setOpError(errorText(e));
+      setError(errorText(e));
       return false;
     } finally {
       qc.invalidateQueries();
     }
   }
+  return [run, error] as const;
+}
+
+export function Changes({ path }: { path: string }) {
+  const { data, error } = useQuery(statusQuery(path));
+  const [sel, setSel] = useState<Selection | null>(null);
+  const [run, opError] = useRun();
 
   async function discardFiles(files: FileChange[]) {
     if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`)) run(() => discard(path, pathsOf(files)));
@@ -279,7 +283,10 @@ function opLabel(e: OpEntry) {
   const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
   if (e.op === "discard") return `Discard ${what}`;
   if (e.op === "amend") return "Amend commit";
-  return e.backup ? `Undo: restore ${what}` : "Undo amend";
+  const branch = e.ref_name?.replace("refs/heads/", "");
+  if (e.op === "delete branch") return `Delete branch ${branch}`;
+  if (e.backup) return `Undo: restore ${what}`;
+  return branch ? `Undo: ${e.head ? "delete" : "restore"} branch ${branch}` : "Undo amend";
 }
 
 // Two letters = conflict; "?" = untracked (shown like an add).

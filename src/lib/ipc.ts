@@ -5,6 +5,7 @@ import type { LineOp } from "../bindings/LineOp";
 import type { OpEntry } from "../bindings/OpEntry";
 import type { GraphPage } from "../bindings/GraphPage";
 import type { CommitDetails } from "../bindings/CommitDetails";
+import type { Refs } from "../bindings/Refs";
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");
@@ -31,3 +32,9 @@ export const commitDetails = (path: string, oid: string) => invoke<CommitDetails
 /** null = binary or over 1 MB. */
 export const commitFileDiff = (path: string, oid: string, file: string) =>
   invoke<string | null>("commit_file_diff", { path, oid, file });
+export const refs = (path: string) => invoke<Refs>("refs", { path });
+/** `track`: create a local branch tracking remote branch `name` ("origin/feat") and switch to it. */
+export const checkout = (path: string, name: string, track: boolean) => invoke<void>("checkout", { path, name, track });
+export const createBranch = (path: string, name: string, checkout: boolean) => invoke<void>("create_branch", { path, name, checkout });
+/** Fails with code "not_merged" unless `force`. Undoable via the op log. */
+export const deleteBranch = (path: string, name: string, force: boolean) => invoke<void>("delete_branch", { path, name, force });
