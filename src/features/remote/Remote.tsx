@@ -5,31 +5,45 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { askpassReply, cloneRepo, fetchAll, pull, push } from "../../lib/ipc";
 import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
 import type { RepoInfo } from "../../bindings/RepoInfo";
-import { errorText, useRun } from "../status/Changes";
+import { errorText, type Run } from "../status/Changes";
 import { refsQuery } from "../refs/Sidebar";
 
-/** Fetch / Pull / Push for the current branch (Sourcetree's toolbar), with its behind/ahead counts. */
-export function SyncButtons({ path }: { path: string }) {
+export type Sync = ReturnType<typeof useSync>;
+
+/** Fetch / Pull / Push for the current branch with its behind/ahead counts; one at a time. */
+export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
-  const [run, error] = useRun();
   const [busy, setBusy] = useState<string | null>(null);
-  const ops = [
-    ["Fetch", "Fetching…", () => fetchAll(path), ""],
-    ["Pull", "Pulling…", () => pull(path), cur?.behind ? `↓${cur.behind}` : ""],
-    ["Push", "Pushing…", () => push(path), cur?.ahead ? `↑${cur.ahead}` : ""],
-  ] as const;
+  const op = (label: string, doing: string, fn: () => Promise<unknown>, count = "") => ({
+    label, doing, count,
+    go: async () => {
+      if (busy) return;
+      setBusy(doing);
+      await run(fn);
+      setBusy(null);
+    },
+  });
+  return {
+    busy,
+    ops: [
+      op("Fetch", "Fetching…", () => fetchAll(path)),
+      op("Pull", "Pulling…", () => pull(path), cur?.behind ? `↓${cur.behind}` : ""),
+      op("Push", "Pushing…", () => push(path), cur?.ahead ? `↑${cur.ahead}` : ""),
+    ],
+  };
+}
+
+/** Sourcetree's toolbar buttons for `useSync`. */
+export function SyncButtons({ sync }: { sync: Sync }) {
   return (
-    <>
-      <span className="sync">
-        {ops.map(([label, doing, op, count]) => (
-          <button key={label} disabled={!!busy} onClick={async () => { setBusy(doing); await run(op); setBusy(null); }}>
-            {busy === doing ? doing : label} {count && <small className="ab">{count}</small>}
-          </button>
-        ))}
-      </span>
-      {error && <p className="error" role="alert">{error}</p>}
-    </>
+    <span className="sync">
+      {sync.ops.map((o) => (
+        <button key={o.label} disabled={!!sync.busy} onClick={o.go}>
+          {sync.busy === o.doing ? o.doing : o.label} {o.count && <small className="ab">{o.count}</small>}
+        </button>
+      ))}
+    </span>
   );
 }
 

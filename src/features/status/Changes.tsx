@@ -8,13 +8,14 @@ import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
+export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
 
 type Selection = { file: string; staged: boolean };
-type Run = (op: () => Promise<unknown>) => Promise<boolean>;
+export type Run = (op: () => Promise<unknown>) => Promise<boolean>;
 
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
-const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
+export const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
 const confirmDiscard = (what: string) =>
   ask(`Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, { title: "Discard changes", kind: "warning" });
 
@@ -120,6 +121,7 @@ function CommitBox({ path, canCommit, finishing, onCommit }: CommitProps) {
   return (
     <form className="commit" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <textarea
+        id="commit-msg"
         aria-label="Commit message"
         placeholder={finishing ? "Leave empty to use git's message (Ctrl+Enter to commit)" : "Commit message (Ctrl+Enter to commit)"}
         value={msg}
@@ -308,7 +310,7 @@ function Diff({ path, sel, run }: DiffProps) {
 }
 
 function History({ path, run }: { path: string; run: Run }) {
-  const { data } = useQuery({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
+  const { data } = useQuery(opLogQuery(path));
   if (!data?.length) return null;
   return (
     <details className="history">
@@ -328,7 +330,7 @@ function History({ path, run }: { path: string; run: Run }) {
   );
 }
 
-function opLabel(e: OpEntry): string {
+export function opLabel(e: OpEntry): string {
   if (e.op.startsWith("undo ")) return `Undo: ${opLabel({ ...e, op: e.op.slice(5) })}`;
   const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
   const name = e.ref_name?.replace(/^refs\/(heads|tags)\//, "");

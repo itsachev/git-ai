@@ -131,8 +131,16 @@
   - A revoked-but-cached token makes HTTPS git fail with an auth error until the next `github_user` check (on app start) forgets it, or Sign out.
   - Skipped: GitLab/Bitbucket (v1), account in the repo header, cancelling the backend poll (it stops at code expiry, ~15 min).
 
+- Week 11: keyboard shortcuts + command palette (frontend only).
+  - `src/features/palette/Palette.tsx`: `Command { label, keys?, run }`. A "Commands" header button, Ctrl+K or Ctrl+Shift+P opens a native `<dialog>`: text field (combobox), list filtered by every typed word, ↑/↓ wrap, Enter runs, Esc / backdrop click closes, shortcut shown on each row (⌘/⇧ on macOS). One window `keydown` listener runs a command's `keys` (Ctrl = Ctrl or Cmd), ignored while any dialog is open (askpass, the palette itself) and on key repeat.
+  - Commands (built in `RepoView`, `App.tsx`): File Status Ctrl+1, History Ctrl+2, Toggle branches Ctrl+B, Write commit message Ctrl+Shift+M (switches tab, focuses `#commit-msg`), Fetch Ctrl+Shift+F, Pull Ctrl+Shift+L, Push Ctrl+Shift+U, Stage all Ctrl+Shift+S, and without keys: Unstage all, Undo the latest op (label from `opLabel`), Checkout <local branch>, Close repository. Commands that don't apply (nothing to stage, no oplog) are left out.
+  - `Remote.tsx`: fetch/pull/push state moved into `useSync(path, run)` so the toolbar and the palette share the busy flag; `SyncButtons` only renders it. The op error now shows under the header from `RepoView`'s `useRun`.
+  - `Changes.tsx`: exports `Run`, `pathsOf`, `opLabel`, `opLogQuery` (shared query def for the undo list and the palette).
+  - Verified: `npm run build` OK. Not yet clicked through in `tauri dev`.
+  - Skipped: rebinding shortcuts, palette on the welcome screen (open/clone/recent), Ctrl+Z for undo (clashes with text fields), checkout of remote branches from the palette.
+
 ## Next
 - Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
-- Click through weeks 2–9 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line.
+- Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
-- Week 11: keyboard shortcuts + command palette.
+- Week 12: auto-update (`tauri-plugin-updater`, signed release artifacts).
