@@ -184,9 +184,10 @@
 - Release v0.1.1 (2026-10-05): version bumped in `package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`; tag `v0.1.1` pushed. v0.1.0 published and installed. Test: publish the v0.1.1 draft, open the installed 0.1.0, expect the update banner.
 - Auto-update verified (2026-10-05): installed 0.1.0 showed the 0.1.1 banner, Install & restart came back as 0.1.1. Week 12 done end to end.
 - Initial window size (2026-10-05): 1280x800 logical overflowed the screen under display scaling (bottom hidden behind the taskbar). `fit_to_work_area` in `src-tauri/src/lib.rs` shrinks the window to at most 90% of the monitor work area at startup and centers it; `center: true` in `tauri.conf.json`.
+- Graph speed (2026-10-06): `big_graph` test in `src-tauri/src/git/graph.rs` (`#[ignore]`) builds a 100k-commit repo with `git fast-import` (main + a 3-commit topic merged every 50) and times `rows`. Release build: first page (revwalk + layout + 500 rows) 0.77 s, cached page at offset 60k 6 ms. Good enough; the commit-graph-file upgrade noted in `compute` is not needed yet. Run: `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`.
+  - Not measured: wide graphs (many parallel lanes; layout is O(lanes) per row), frontend scroll fps on the 100k list.
 
 ## Next
-- Measure graph speed on a 100k+ commit repo (e.g. linux or chromium clone).
 - Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
 - Installer code signing (Authenticode, Apple notarization).

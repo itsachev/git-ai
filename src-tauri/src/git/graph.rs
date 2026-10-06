@@ -181,4 +181,53 @@ mod tests {
         let (rows, _) = layout(&[(2, vec![1]), (9, vec![1]), (1, vec![])]);
         assert_eq!(rows, vec![(0, vec![]), (1, vec![(0, 0)]), (0, vec![(0, 0), (1, 0)])]);
     }
+
+    /// 100k commits (main + a 3-commit topic branch merged every 50), timed.
+    /// `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn big_graph() {
+        use std::io::Write;
+        use std::time::Instant;
+        let dir = std::env::temp_dir().join(format!("git-ai-big-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        git2::Repository::init(&dir).unwrap();
+        let (mut s, mut mark, mut main) = (String::new(), 0, 0);
+        let mut commit = |s: &mut String, branch: &str, from: u32, merge: Option<u32>| {
+            mark += 1;
+            let t = 1_000_000_000 + mark as u64 * 60;
+            s.push_str(&format!("commit refs/heads/{branch}\nmark :{mark}\ncommitter A <a@a> {t} +0000\ndata 4\nc{:03}\n", mark % 1000));
+            if from > 0 {
+                s.push_str(&format!("from :{from}\n"));
+            }
+            if let Some(m) = merge {
+                s.push_str(&format!("merge :{m}\n"));
+            }
+            mark
+        };
+        while main < 100_000 {
+            main = commit(&mut s, "main", main, None);
+            if main % 50 == 0 {
+                let mut f = main;
+                for _ in 0..3 {
+                    f = commit(&mut s, "topic", f, None);
+                }
+                main = commit(&mut s, "main", main, Some(f));
+            }
+        }
+        let mut imp = std::process::Command::new("git").arg("-C").arg(&dir).args(["fast-import", "--quiet"])
+            .stdin(std::process::Stdio::piped()).spawn().unwrap();
+        imp.stdin.take().unwrap().write_all(s.as_bytes()).unwrap();
+        assert!(imp.wait().unwrap().success());
+
+        let cache = super::GraphCache::default();
+        let t = Instant::now();
+        let page = super::rows(&cache, &dir, 0, 500).unwrap();
+        eprintln!("first page (layout + 500 rows): {:?}, total {}, lanes {}", t.elapsed(), page.total, page.lanes);
+        assert!(page.total >= 100_000);
+        let t = Instant::now();
+        super::rows(&cache, &dir, 60_000, 500).unwrap();
+        eprintln!("cached page at 60k: {:?}", t.elapsed());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
