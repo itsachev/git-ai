@@ -39,6 +39,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   open_file: (a) => `Failed to open ${a.file}`,
   ai_set_key: () => "Failed to save the API key",
   ai_commit_message: () => "Failed to write a commit message",
+  ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
 };
 async function invoke<T>(cmd: string, args?: Args): Promise<T> {
   try {
@@ -129,3 +130,5 @@ export const aiHasKey = () => invoke<boolean>("ai_has_key");
 export const aiSetKey = (key: string | null) => invoke<void>("ai_set_key", { key });
 /** Writes a commit message from the staged diff (sent to Gemini). Codes: "ai_no_key", "ai_key" (rejected), "ai_limit", "nothing_staged". */
 export const aiCommitMessage = (path: string) => invoke<string>("ai_commit_message", { path });
+/** Explains one commit from its message and diff (sent to Gemini). Codes as above, minus "nothing_staged". */
+export const aiExplainCommit = (path: string, oid: string) => invoke<string>("ai_explain_commit", { path, oid });

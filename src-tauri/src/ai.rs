@@ -13,6 +13,11 @@ an imperative subject line of at most 72 characters, then, only if the change ne
 line and a short body (why, not a line-by-line what). Match the style of the recent subjects if given. \
 Plain text only: no Markdown, no code fences, no quotes around the message.";
 
+const EXPLAIN_PROMPT: &str = "You explain git commits to a developer reading the history. From the commit \
+message and diff, say in plain words what the commit changes and, if the code shows it, why. Start with one \
+sentence summary, then at most 5 short \"- \" bullets for the notable changes. Mention risky or surprising \
+changes. Plain text only: no Markdown headings, no bold, no code fences.";
+
 fn keychain() -> Result<keyring::Entry, AppError> {
     keyring::Entry::new("git-ai", "gemini").map_err(|e| AppError::new("keychain", e.to_string()))
 }
@@ -67,6 +72,17 @@ pub fn commit_message(repo: &Path) -> Result<String, AppError> {
     }
     let msg = generate(COMMIT_PROMPT, &input)?;
     Ok(msg.trim().trim_matches('`').trim().to_string())
+}
+
+/// Plain-language explanation of one commit (message + diff).
+pub fn explain_commit(repo: &Path, oid: &str) -> Result<String, AppError> {
+    let (message, diff) = read::commit_patch(repo, oid)?;
+    let (diff, cut) = clip(&diff, MAX_DIFF);
+    let mut input = format!("Commit message:\n{message}\n\nDiff:\n{diff}");
+    if cut {
+        input += "\n[diff cut here, too long]";
+    }
+    Ok(generate(EXPLAIN_PROMPT, &input)?.trim().to_string())
 }
 
 fn generate(system: &str, input: &str) -> Result<String, AppError> {

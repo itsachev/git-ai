@@ -492,6 +492,9 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .commit-info .subject { font: 600 1.3rem/1.25 var(--display); letter-spacing: -0.028em; overflow-wrap: anywhere; }
 .commit-info .message { margin: 0.5rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 .commit-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
+.commit-info .explain { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; background: var(--active); border-left: 3px solid var(--active-bar); border-radius: 6px; }
+.commit-info .explain h3 { margin: 0 0 0.25rem; padding: 0; }
+.commit-info .explain p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .commit-info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.9rem; margin: 0 0 0.75rem; font-size: 0.88rem; }
 .commit-info dt { color: var(--muted); }
 .commit-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
