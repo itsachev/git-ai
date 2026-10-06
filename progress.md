@@ -212,11 +212,22 @@
 - Bigger op feedback (2026-10-06): success notice is larger (1.2rem text, 1.6rem icon) on a green tint with a green border instead of glass; the error dialog is larger (1.3rem title, 1.1rem text) on a red tint with a red border. `App.css` only.
 - Step 8 passes (2026-10-06) in `tauri dev`: rejected push shows the "Pull first" dialog, fetch / pull (merge `3668b8b`) / push show their notices, remote `feat` delete + undo brings it back at `a852b2a`. Remote checked with `git ls-remote`.
 - Merged `test` into `main` (fast-forward) and pushed `main` to `origin` (2026-10-06).
+- `cli.rs` diffable (2026-10-06): it had 10 raw NUL bytes (the `-z` split char in `parse_status` and its test strings), so git treated it as binary. Replaced each with the `'\0'` escape (same compiled code). `git grep -I` now sees it as text; this one commit still diffs as binary because the old blob has the bytes. Rust tests: 29 pass. Note: GNU `sed 's/\x00/\\0/'` puts the NUL back (`\0` = whole match); use a byte-level replace.
+- AI commit message, v1 start (2026-10-06):
+  - Backend: new `src-tauri/src/ai.rs`. Key from `GEMINI_API_KEY`, else the keychain (`git-ai` / `gemini`). `commit_message` sends Gemini (`gemini-3.5-flash-lite`, `generateContent`, key in the `x-goog-api-key` header) the staged diff plus the last 10 commit subjects (to match their style). The diff is cut at 100 KB.
+  - Diff source: `read::staged_patch` (git2, HEAD → index, rename detection). Binary files and files over 1 MB send only their "Binary files … differ" line. New helper `read::recent_subjects`.
+  - Errors: `ai_no_key`, `ai_key` (HTTP 400/401/403), `ai_limit` (429), `ai_empty`, `nothing_staged`, `network`.
+  - Commands: `ai_has_key`, `ai_set_key`, `ai_commit_message`.
+  - UI: "Generate message" button in the commit box. It is disabled with nothing staged, while amending, and during a merge, because it only sees the staged diff. Without a key, a `KeyForm` explains that the diff goes to Gemini, links to the AI Studio key page and saves the key to the keychain. A rejected key (`ai_key`) opens the form again. Other errors show in `OpErrorDialog` ("Failed to write a commit message").
+  - Verified: 30 Rust tests pass (`reads_commits_and_graph` covers `staged_patch` + `recent_subjects`; `ai::clip_keeps_char_boundary`); `tsc` and `npm run build` OK.
+  - Live check: the dev key lists `gemini-3.5-flash-lite`. The ignored test `ai::live_commit_message` (scratch repo, staged `greet.py`) got "Add greeting function" in ~1 s. Run: `GEMINI_API_KEY=… cargo test --manifest-path src-tauri/Cargo.toml live_commit_message -- --ignored --nocapture`.
+  - No UI to remove a saved key (only `ai_set_key(null)`).
+- Settings dialog (2026-10-06): users shouldn't meet the key form inside the commit box. The Gemini key moved to a new `src/features/settings/Settings.tsx`. `SettingsDialog` is rendered once at the App root and opened from anywhere with `openSettings()`. Entry points: the gear button (home brand row and repo toolbar), the palette's "Settings" command, and "Generate message" clicked with no key or with a rejected one. The AI section says whether a key is set, explains BYOK + what's sent, links "Get a key", and has Save / Remove. Inline `KeyForm` removed from `Changes.tsx`. New `settings` icon (Solar). `.setting h3` joins the shared Labels rule. Verified: `tsc`, `npm run build`.
+  - Remove only clears the keychain; a `GEMINI_API_KEY` env var still counts as "a key is set".
 
 ## Next
-- `src-tauri/src/git/cli.rs` shows as binary in git diffs (likely a raw NUL byte in the source); replace it with an escape so diffs work.
+- Try AI commit message in `tauri dev`: Settings (gear) → paste the dev key → Save, then Generate message (checks the keychain path and the UI).
 - Graph: try a wide repo (many parallel lanes) and check scroll smoothness on the 100k list in `tauri dev`.
 - Finish the click-through (`~/gitai-play/work`): clone with progress, shortcuts, graph at scale. Also try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
 - Installer code signing (Authenticode, Apple notarization).
-- v1 start: AI commit message from the staged diff (Gemini 3.5 Flash Lite, key from keychain / `GEMINI_API_KEY`, skip binary + >1 MB files).

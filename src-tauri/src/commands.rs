@@ -241,3 +241,20 @@ pub async fn github_user() -> Result<Option<String>, AppError> {
 pub fn github_sign_out() -> Result<(), AppError> {
     crate::github::sign_out()
 }
+
+// AI (Gemini, BYOK).
+#[tauri::command]
+pub fn ai_has_key() -> bool {
+    crate::ai::has_key()
+}
+
+#[tauri::command]
+pub fn ai_set_key(key: Option<String>) -> Result<(), AppError> {
+    crate::ai::set_key(key)
+}
+
+/// Sends the staged diff to Gemini; async because it goes over the network.
+#[tauri::command]
+pub async fn ai_commit_message(path: String) -> Result<String, AppError> {
+    crate::ai::commit_message(Path::new(&path))
+}

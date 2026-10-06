@@ -1,3 +1,4 @@
+mod ai;
 pub mod askpass;
 mod commands;
 mod errors;
@@ -60,6 +61,9 @@ pub fn run() {
             commands::github_finish,
             commands::github_user,
             commands::github_sign_out,
+            commands::ai_has_key,
+            commands::ai_set_key,
+            commands::ai_commit_message,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

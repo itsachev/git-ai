@@ -69,6 +69,40 @@ pub fn file_diff(repo: &Path, file: &str, staged: bool) -> Result<Option<String>
     Ok(text)
 }
 
+/// The whole staged diff (HEAD → index) as patch text. Binary files and files over 1 MB appear only
+/// as a "Binary files … differ" line. Empty when nothing is staged.
+pub fn staged_patch(repo: &Path) -> Result<String, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let mut opts = git2::DiffOptions::new();
+    opts.max_size(1 << 20);
+    let head = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
+    let mut diff = repo.diff_tree_to_index(head.as_ref(), None, Some(&mut opts))?;
+    diff.find_similar(None)?;
+    let mut out = String::new();
+    diff.print(git2::DiffFormat::Patch, |_, _, line| {
+        if matches!(line.origin(), '+' | '-' | ' ') {
+            out.push(line.origin());
+        }
+        out.push_str(&String::from_utf8_lossy(line.content()));
+        true
+    })?;
+    Ok(out)
+}
+
+/// Subjects of the last `n` commits on HEAD, newest first. Empty before the first commit.
+pub fn recent_subjects(repo: &Path, n: usize) -> Result<Vec<String>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let mut walk = repo.revwalk()?;
+    if walk.push_head().is_err() {
+        return Ok(vec![]);
+    }
+    Ok(walk
+        .flatten()
+        .take(n)
+        .filter_map(|oid| repo.find_commit(oid).ok()?.summary_bytes().map(|s| String::from_utf8_lossy(s).into_owned()))
+        .collect())
+}
+
 /// Working-tree text of `file` (shows a conflicted file with its markers). None when binary or over 1 MB.
 pub fn work_file(repo: &Path, file: &str) -> Result<Option<String>, AppError> {
     let bytes = std::fs::read(repo.join(file)).map_err(|e| AppError::new("io", e.to_string()))?;
@@ -243,6 +277,20 @@ mod tests {
         let d = super::commit_details(&dir, &second.id().to_string()).unwrap();
         assert_eq!((d.files[0].kind.as_str(), d.files[0].orig_path.as_deref()), ("R", Some("a.txt")));
         assert!(super::commit_file_diff(&dir, &first.id().to_string(), "a.txt").unwrap().unwrap().ends_with("+one\n+two\n+three\n"));
+
+        assert_eq!(super::recent_subjects(&dir, 10).unwrap(), ["msg", "msg"]);
+        // Commits above bypass the index; load HEAD's tree so nothing counts as staged.
+        let mut index = repo.index().unwrap();
+        index.read_tree(&second.tree().unwrap()).unwrap();
+        index.write().unwrap();
+        assert_eq!(super::staged_patch(&dir).unwrap(), "");
+        std::fs::write(dir.join("b.txt"), "one\ntwo\nthree\nfour\n").unwrap();
+        std::fs::write(dir.join("bin.dat"), b"\0\x01\x02").unwrap();
+        index.add_path(std::path::Path::new("b.txt")).unwrap();
+        index.add_path(std::path::Path::new("bin.dat")).unwrap();
+        index.write().unwrap();
+        let patch = super::staged_patch(&dir).unwrap();
+        assert!(patch.contains("+four\n") && patch.contains("Binary files"), "{patch}");
 
         let page = crate::git::graph::rows(&Default::default(), &dir, 0, 500).unwrap();
         assert_eq!((page.total, page.lanes), (2, 1));

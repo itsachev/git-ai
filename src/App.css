@@ -524,6 +524,14 @@ dialog.palette::backdrop { background: transparent; }
   *, *::before, *::after, dialog[open] { animation: none !important; transition: none !important; }
 }
 
+dialog.settings { width: min(32rem, calc(100vw - 2rem)); padding: 1.1rem; }
+.settings h2 { margin: 0 0 0.75rem; font-size: 1.3rem; }
+.setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.setting p { margin: 0 0 0.5rem; }
+.setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.setting input { flex: 1 1 12rem; min-width: 0; }
+button.link { all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 /* Labels: one bold weight for every heading, column header, field and term label. */
 .graph-head, .section-head h2, .list-head h2, .commit-info h3, .commit-info dt,
-.sidebar summary, .history summary, .clone label { font-weight: 700; }
+.sidebar summary, .history summary, .clone label, .setting h3 { font-weight: 700; }
