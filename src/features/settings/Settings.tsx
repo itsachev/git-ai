@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { aiHasKey, aiSetKey } from "../../lib/ipc";
 import { Icon } from "../../lib/icons";
+import { ModalHead } from "../../lib/modal";
 import { errorText } from "../status/Changes";
 
 export const aiKeyQuery = { queryKey: ["ai-key"], queryFn: aiHasKey, staleTime: Infinity };
@@ -30,8 +31,8 @@ export function SettingsDialog() {
     if (!isOpen && d?.open) d.close();
   }, [isOpen]);
   return (
-    <dialog ref={dialog} className="settings" aria-labelledby="settings-title" onCancel={(e) => { e.preventDefault(); set(false); }}>
-      <h2 id="settings-title">Settings</h2>
+    <dialog ref={dialog} className="modal settings" aria-labelledby="settings-title" onCancel={(e) => { e.preventDefault(); set(false); }}>
+      <ModalHead id="settings-title" icon="settings" title="Settings" sub="Stored on this computer only." />
       {isOpen && <AiKey />}
       <div className="dialog-actions">
         <button onClick={() => set(false)}>Close</button>

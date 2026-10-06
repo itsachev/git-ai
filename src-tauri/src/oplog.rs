@@ -203,13 +203,13 @@ mod tests {
         let top = || super::entries(p, 20).unwrap()[0].clone();
         commit("a.txt", "base
 ", "base");
-        cli::create_branch(p, "feat", true).unwrap();
+        cli::create_branch(p, "feat", None, true).unwrap();
         commit("a.txt", "feat
 ", "feat change");
         commit("b.txt", "b
 ", "add b");
         let feat_b = cli::rev(p, "HEAD").unwrap();
-        cli::checkout(p, "main", false).unwrap();
+        cli::checkout(p, "main", false, false).unwrap();
         commit("a.txt", "main
 ", "main change");
         let main = cli::rev(p, "HEAD").unwrap();
@@ -367,10 +367,10 @@ mod tests {
         assert_eq!(cli::clone("-x", &dest, |_| {}).unwrap_err().code, "bad_url");
 
         // feat edits a.txt and deletes b.txt; main edits both.
-        cli::create_branch(s, "feat", true).unwrap();
+        cli::create_branch(s, "feat", None, true).unwrap();
         commit("a.txt", Some("feat\n"), "feat a");
         commit("b.txt", None, "feat rm b");
-        cli::checkout(s, "main", false).unwrap();
+        cli::checkout(s, "main", false, false).unwrap();
         commit("a.txt", Some("main\n"), "main a");
         commit("b.txt", Some("main\n"), "main b");
         cli::merge(s, "feat", false).unwrap_err();
@@ -460,11 +460,16 @@ mod tests {
 
         // Branches: create + switch, commit on it, unmerged delete needs force, undo brings it back.
         let base = git(p, &["branch", "--show-current"]).unwrap().trim().to_string();
-        cli::create_branch(p, "feat", true).unwrap();
+        cli::create_branch(p, "feat", None, true).unwrap();
         cli::stage(p, &files(&["a.txt"])).unwrap();
         cli::commit(p, "on feat", false).unwrap();
         let tip = cli::rev(p, "feat").unwrap();
-        cli::checkout(p, &base, false).unwrap();
+        // Start point: a branch made on feat from base points at base, and HEAD stays put.
+        cli::create_branch(p, "off-base", Some(&base), false).unwrap();
+        assert_eq!(cli::rev(p, "off-base").unwrap(), cli::rev(p, &base).unwrap());
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), tip);
+        cli::delete_branch(p, "off-base", false).unwrap();
+        cli::checkout(p, &base, false, false).unwrap();
         assert_eq!(cli::delete_branch(p, "feat", false).unwrap_err().code, "not_merged");
         cli::delete_branch(p, "feat", true).unwrap();
         assert!(cli::rev(p, "refs/heads/feat").is_err());
@@ -475,9 +480,61 @@ mod tests {
         let undo = super::entries(p, 20).unwrap()[0].clone();
         super::undo(p, &undo.id).unwrap();
         assert!(cli::rev(p, "refs/heads/feat").is_err());
-        assert_eq!(cli::create_branch(p, "-x", false).unwrap_err().code, "bad_name");
+        assert_eq!(cli::create_branch(p, "-x", None, false).unwrap_err().code, "bad_name");
         let refs = crate::git::read::refs(p).unwrap();
         assert_eq!((refs.head.as_deref(), refs.local.len()), (Some(base.as_str()), 1));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Checkout with conflicting local changes: refused, then carried over (clean and conflicting pop).
+    #[test]
+    fn checkout_carry() {
+        let dir = temp_repo("carry");
+        let p = dir.as_path();
+        let commit = |file: &str, text: &str| {
+            fs::write(dir.join(file), text).unwrap();
+            cli::stage(p, &[file.to_string()]).unwrap();
+            cli::commit(p, "c", false).unwrap();
+        };
+        commit("a.txt", "base
+");
+        commit("b.txt", "b
+");
+        cli::create_branch(p, "feat", None, true).unwrap();
+        commit("b.txt", "feat
+");
+        cli::checkout(p, "main", false, false).unwrap();
+
+        // b.txt differs between branches, so a plain switch refuses; carry brings the edit and the new file along.
+        fs::write(dir.join("b.txt"), "b
+mine
+").unwrap();
+        fs::write(dir.join("new.txt"), "new").unwrap();
+        assert_eq!(cli::checkout(p, "feat", false, false).unwrap_err().code, "dirty");
+        cli::checkout(p, "main", false, true).unwrap(); // same branch: stash round-trips, changes stay
+        assert_eq!(fs::read_to_string(dir.join("b.txt")).unwrap(), "b
+mine
+");
+        assert_eq!(cli::checkout(p, "feat", false, true).unwrap_err().code, "conflicts");
+        assert_eq!(cli::status(p).unwrap().branch.as_deref(), Some("feat"));
+        assert!(dir.join("new.txt").exists());
+        assert_eq!(crate::git::read::refs(p).unwrap().stashes.len(), 1);
+
+        // Non-conflicting edit: clean carry, no stash left behind.
+        let dir2 = temp_repo("carry2");
+        let q = dir2.as_path();
+        fs::write(dir2.join("a.txt"), "a
+").unwrap();
+        cli::stage(q, &["a.txt".into()]).unwrap();
+        cli::commit(q, "c", false).unwrap();
+        cli::create_branch(q, "feat", None, false).unwrap();
+        fs::write(dir2.join("a.txt"), "edit
+").unwrap();
+        cli::checkout(q, "feat", false, true).unwrap();
+        assert_eq!(fs::read_to_string(dir2.join("a.txt")).unwrap(), "edit
+");
+        assert!(crate::git::read::refs(q).unwrap().stashes.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(&dir2);
     }
 }

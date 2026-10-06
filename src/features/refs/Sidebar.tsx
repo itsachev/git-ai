@@ -1,11 +1,23 @@
 ﻿import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ask } from "@tauri-apps/plugin-dialog";
-import { checkout, createBranch, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, refs, stash, stashSave, undo } from "../../lib/ipc";
+import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, refs, stash, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
+import { openNewBranch } from "./NewBranch";
+import { confirm } from "../../lib/modal";
+
+/** Checkout that offers to bring conflicting local changes along instead of just failing. */
+export async function switchTo(path: string, name: string, track: boolean) {
+  try {
+    await checkout(path, name, track);
+  } catch (e) {
+    if ((e as AppError).code !== "dirty") throw e;
+    if (await confirm("Bring your changes along?", `Some changed files also differ on ${name}. Stash them, switch, and put them back on ${name}? If they clash, they stay in Stashes and the conflicts show in File Status.`, "Switch and bring changes"))
+      await checkout(path, name, track, true);
+  }
+}
 
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
 
@@ -15,9 +27,9 @@ export function Sidebar({ path }: { path: string }) {
   const log = useQuery(opLogQuery(path)).data;
   const run = useRun();
   const [filter, setFilter] = useState("");
-  const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
+  const [creating, setCreating] = useState<"stash" | null>(null);
   // The form lives inside the section, so open the section too (Stashes starts collapsed).
-  const toggle = (what: "branch" | "stash") => (e: React.MouseEvent<HTMLElement>) => {
+  const toggle = (what: "stash") => (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     e.currentTarget.closest("details")!.open = true;
     setCreating((c) => (c === what ? null : what));
@@ -39,25 +51,25 @@ export function Sidebar({ path }: { path: string }) {
   // A remote branch checks out as the local branch of the same name, created (tracking) if missing.
   const checkoutRemote = (name: string) => {
     const short = name.slice(name.indexOf("/") + 1);
-    return run(() => (localNames.has(short) ? checkout(path, short, false) : checkout(path, name, true)));
+    return run(() => (localNames.has(short) ? switchTo(path, short, false) : switchTo(path, name, true)));
   };
   const mergeIn = (name: string) => run(() => merge(path, name, false));
   async function dropStash(i: number, s: RefItem) {
-    if (await ask(`Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, { title: "Drop stash", kind: "warning" }))
+    if (await confirm("Drop stash", `Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, "Drop", "danger"))
       run(() => stash(path, "Drop", i, s.oid));
   }
   async function removeRemote(name: string) {
-    if (await ask(`Delete branch ${name} on the remote? Undo history (sidebar) can push it back.`, { title: "Delete remote branch", kind: "warning" }))
+    if (await confirm("Delete remote branch", `Delete branch ${name} on the remote? Undo history (sidebar) can push it back.`, "Delete", "danger"))
       run(() => deleteRemoteBranch(path, name), `Deleted ${name} on the remote`);
   }
   async function remove(name: string) {
-    if (!(await ask(`Delete branch ${name}? Undo history (sidebar) can restore it.`, { title: "Delete branch", kind: "warning" }))) return;
+    if (!(await confirm("Delete branch", `Delete branch ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))) return;
     run(async () => {
       try {
         await deleteBranch(path, name, false);
       } catch (e) {
         if ((e as AppError).code !== "not_merged") throw e;
-        if (await ask(`${errorText(e)} Delete it anyway?`, { title: "Delete branch", kind: "warning" })) await deleteBranch(path, name, true);
+        if (await confirm("Delete unmerged branch", `${errorText(e)} Delete it anyway?`, "Delete anyway", "danger")) await deleteBranch(path, name, true);
       }
     });
   }
@@ -69,16 +81,15 @@ export function Sidebar({ path }: { path: string }) {
       <details open>
         <summary>
           <Icon name="branch" />Branches <span className="count">{data.local.length}</span>
-          <button className="icon-btn" onClick={toggle("branch")} aria-expanded={creating === "branch"} aria-label="New branch" title="New branch"><Icon name="add" /></button>
+          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openNewBranch(); }} aria-label="New branch" title="New branch"><Icon name="add" /></button>
         </summary>
-        {creating === "branch" && <NameForm label="Branch name" check="Check out" button="Create" onCancel={() => setCreating(null)}
-          onSubmit={async (name, co) => { if (await run(() => createBranch(path, name, co))) setCreating(null); }} />}
         <ul className="refs">
           {local.map((b) => {
             const cur = b.name === data.head;
+            const branchOff: [string, () => void] = ["New branch from here", () => openNewBranch(b.name)];
             return (
-              <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => checkout(path, b.name, false))}
-                actions={cur ? [] : [["Checkout", () => run(() => checkout(path, b.name, false))], ["Merge", () => mergeIn(b.name)], ["Delete", () => remove(b.name)]]} />
+              <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => switchTo(path, b.name, false))}
+                actions={cur ? [branchOff] : [["Checkout", () => run(() => switchTo(path, b.name, false))], branchOff, ["Merge", () => mergeIn(b.name)], ["Delete", () => remove(b.name)]]} />
             );
           })}
         </ul>
@@ -91,7 +102,7 @@ export function Sidebar({ path }: { path: string }) {
             <ul className="refs">
               {items.map((r) => (
                 <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={() => checkoutRemote(r.name)}
-                  actions={[["Checkout", () => checkoutRemote(r.name)], ["Merge", () => mergeIn(r.name)], ["Delete", () => removeRemote(r.name)]]} />
+                  actions={[["Checkout", () => checkoutRemote(r.name)], ["New branch from here", () => openNewBranch(r.name)], ["Merge", () => mergeIn(r.name)], ["Delete", () => removeRemote(r.name)]]} />
               ))}
             </ul>
           </details>
@@ -101,8 +112,8 @@ export function Sidebar({ path }: { path: string }) {
         <summary><Icon name="tag" />Tags <span className="count">{data.tags.length}</span></summary>
         <ul className="refs">
           {match(data.tags).map((t) => (
-            <Row key={t.name} item={t} actions={[["Push", () => run(() => pushTag(path, t.name), `Pushed tag ${t.name}`)], ["Delete", async () => {
-              if (await ask(`Delete tag ${t.name}? Undo history (sidebar) can restore it.`, { title: "Delete tag", kind: "warning" }))
+            <Row key={t.name} item={t} actions={[["New branch from here", () => openNewBranch(t.name)], ["Push",() => run(() => pushTag(path, t.name), `Pushed tag ${t.name}`)], ["Delete", async () => {
+              if (await confirm("Delete tag", `Delete tag ${t.name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))
                 run(() => deleteTag(path, t.name));
             }]]} />
           ))}

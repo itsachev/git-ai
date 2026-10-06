@@ -458,18 +458,43 @@ pub fn stash(repo: &Path, op: StashOp, index: usize, oid: &str) -> Result<(), Ap
 }
 
 /// Switches to a local branch, or with `track` creates a local branch tracking the remote branch `name`.
-/// Git refuses (no data lost) when local changes would be overwritten.
-pub fn checkout(repo: &Path, name: &str, track: bool) -> Result<(), AppError> {
+/// Git refuses (code "dirty", no data lost) when local changes would be overwritten. With `carry`, the
+/// changes are stashed, the branch switched, and the stash popped on top; a conflicting pop keeps the stash.
+pub fn checkout(repo: &Path, name: &str, track: bool, carry: bool) -> Result<(), AppError> {
     ref_arg(name)?;
     let args: &[&str] = if track { &["switch", "-q", "--track", name] } else { &["switch", "-q", name] };
-    git(repo, args).map(drop)
+    if !carry {
+        return git(repo, args).map(drop);
+    }
+    let before = rev(repo, "refs/stash").ok();
+    git(repo, &["stash", "push", "-q", "-u", "-m", &format!("carried to {name}")])?;
+    let stashed = rev(repo, "refs/stash").ok() != before;
+    let switched = git(repo, args).map(drop);
+    if !stashed {
+        return switched;
+    }
+    // Switch failed: pop back where we started.
+    // ponytail: no --index, so staged changes come back unstaged; add it if people miss their staging.
+    let popped = git(repo, &["stash", "pop", "-q"]);
+    switched?;
+    popped.map(drop).map_err(|e| if status(repo).is_ok_and(|s| !s.conflicted.is_empty()) {
+        AppError::new("conflicts", "Switched, but your changes conflict with this branch. They were kept as a stash; resolve the conflicts in File Status.")
+    } else {
+        e
+    })
 }
 
 /// New branch at HEAD, optionally switched to.
-pub fn create_branch(repo: &Path, name: &str, checkout: bool) -> Result<(), AppError> {
+/// `from` is the start point (branch, remote branch, tag or commit); None = HEAD. A branch started
+/// from a remote branch doesn't track it: its first push sets the upstream.
+pub fn create_branch(repo: &Path, name: &str, from: Option<&str>, checkout: bool) -> Result<(), AppError> {
     ref_arg(name)?;
-    let args: &[&str] = if checkout { &["switch", "-q", "-c", name] } else { &["branch", name] };
-    git(repo, args).map(drop)
+    let mut args = if checkout { vec!["switch", "-q", "--no-track", "-c", name] } else { vec!["branch", "--no-track", name] };
+    if let Some(f) = from {
+        ref_arg(f)?;
+        args.push(f);
+    }
+    git(repo, &args).map(drop)
 }
 
 /// Deletes a local branch; its tip is logged so undo can recreate it. Without `force`, git refuses

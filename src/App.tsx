@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
-import { checkout, openRepo, recentRepos, stage, undo, unstage } from "./lib/ipc";
+import { openRepo, recentRepos, stage, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
+import { ConfirmDialog } from "./lib/modal";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
 import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQuery, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
-import { Sidebar, refsQuery } from "./features/refs/Sidebar";
+import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
+import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs/NewBranch";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Palette, type Command } from "./features/palette/Palette";
@@ -119,6 +121,7 @@ function App() {
       {body}
       <AskpassDialog />
       <SettingsDialog />
+      <ConfirmDialog />
       <UpdateBanner />
     </>
   );
@@ -148,6 +151,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "Go to File Status", keys: "Ctrl+1", run: () => show("status") },
     { label: "Go to History", keys: "Ctrl+2", run: () => show("history") },
     { label: "Toggle branches", keys: "Ctrl+B", run: () => setSide((v) => !v) },
+    { label: "New branch", keys: "Ctrl+Shift+B", run: () => openNewBranch() },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], run: o.go })),
@@ -157,7 +161,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   if (status?.staged.length) commands.push({ label: "Unstage all", run: () => run(() => unstage(path, pathsOf(status.staged))) });
   if (log?.[0]) commands.push({ label: `Undo: ${opLabel(log[0])}`, run: () => run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
-    if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, run: () => run(() => checkout(path, b.name, false)) });
+    if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
   commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Close repository", run: onClose });
 
   return (
@@ -188,14 +192,15 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : "History"}</h1>
           <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
-          <SyncButtons sync={sync} />
-          <Palette commands={commands} />
+          <SyncButtons sync={sync}><NewBranchButton /></SyncButtons>
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>
         <Notice />
         <OpErrorDialog />
+        <NewBranchDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
+        <footer className="statusbar"><Palette commands={commands} /></footer>
       </main>
     </div>
   );

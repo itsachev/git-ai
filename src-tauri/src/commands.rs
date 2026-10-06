@@ -107,13 +107,13 @@ pub fn refs(path: String) -> Result<read::Refs, AppError> {
 }
 
 #[tauri::command]
-pub fn checkout(path: String, name: String, track: bool) -> Result<(), AppError> {
-    cli::checkout(Path::new(&path), &name, track)
+pub fn checkout(path: String, name: String, track: bool, carry: bool) -> Result<(), AppError> {
+    cli::checkout(Path::new(&path), &name, track, carry)
 }
 
 #[tauri::command]
-pub fn create_branch(path: String, name: String, checkout: bool) -> Result<(), AppError> {
-    cli::create_branch(Path::new(&path), &name, checkout)
+pub fn create_branch(path: String, name: String, from: Option<String>, checkout: bool) -> Result<(), AppError> {
+    cli::create_branch(Path::new(&path), &name, from.as_deref(), checkout)
 }
 
 #[tauri::command]

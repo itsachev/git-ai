@@ -29,7 +29,9 @@
   --tool-hover: linear-gradient(#4a4a4d, #363639);
   --tool-ink: #f5f5f7;
   --tool-lit: inset 0 0.5px 0 rgb(255 255 255 / 0.16);
-  --tool-edge: 0 0 0 0.5px rgb(0 0 0 / 0.75), 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px rgb(0 0 0 / 0.12);
+  /* Light: the dark theme's black edge and drop shadow read as a heavy outline on a pale
+     window, so keep only a hairline. Same flat look as on dark. */
+  --tool-edge: 0 0 0 0.5px rgb(0 0 0 / 0.3);
   /* Geist + Geist Mono: one superfamily, so prose, refs and hashes share metrics and rhythm.
      Bundled from @fontsource-variable (imported in main.tsx), so it works offline. */
   --sans: "Geist Variable", -apple-system, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -72,6 +74,7 @@
   --info: #8e8cff;
   --shadow: 0 0 0 0.5px rgb(0 0 0 / 0.6), inset 0 0.5px 0 rgb(255 255 255 / 0.08), 0 16px 48px rgb(0 0 0 / 0.5);
   --glass: rgb(40 40 42 / 0.78);
+  --tool-edge: 0 0 0 0.5px rgb(0 0 0 / 0.75), 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px rgb(0 0 0 / 0.12);
 }
 @media (pointer: coarse) { :root { --ctl: 2.75rem; } }
 
@@ -103,7 +106,7 @@ button {
   border: 0; border-radius: var(--r); box-shadow: var(--tool-lit), var(--tool-edge);
   min-height: var(--ctl); padding: 0 0.75rem;
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-  cursor: default; white-space: nowrap;
+  white-space: nowrap;
   transition: background-color 140ms, color 140ms, filter 140ms, scale 160ms var(--spring), box-shadow 160ms;
 }
 button:hover { background: var(--tool-hover); }
@@ -242,7 +245,10 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .sync button:last-child { border-radius: 0 var(--r) var(--r) 0; }
 .sync button[aria-busy="true"] .icon { animation: spin 900ms linear infinite; }
 .sync .count { color: var(--accent-ink); background: var(--accent); }
-.palette-trigger { color: rgb(245 245 247 / 0.75); }
+/* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
+.statusbar { display: flex; justify-content: flex-end; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
+.palette-trigger { min-height: 1.75rem; padding: 0 0.5rem; font-size: 0.8rem; color: var(--muted); background: none; box-shadow: none; }
+.palette-trigger:hover { color: var(--fg); background: var(--pick); }
 .palette-trigger kbd { margin-left: 0.25rem; }
 
 /* Wide: rail beside the stage. Narrow: rail is a drawer over it. */
@@ -265,8 +271,8 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   .scrim { position: fixed; inset: 0; z-index: 19; background: rgb(0 0 0 / 0.4); opacity: 0; pointer-events: none; transition: opacity 200ms; }
   .show-side .scrim { opacity: 1; pointer-events: auto; }
   /* Labels become screen-reader only; icons carry the toolbar. */
-  .btn-label, .palette-trigger kbd { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .sync button, .palette-trigger { padding: 0 0.6rem; }
+  .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .sync button { padding: 0 0.6rem; }
   .stage-body { padding: 0.5rem; }
 }
 
@@ -298,7 +304,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .refs { list-style: none; padding: 0; margin: 0; }
 .refs li { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; border-radius: var(--r); padding-right: 0.25rem; transition: background-color 140ms; }
 .refs li:hover, .refs li:focus-within { background: var(--pick); }
-.refs .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.45rem; min-height: calc(var(--ctl) - 0.15rem); padding: 0 0.5rem 0 1.6rem; white-space: nowrap; font: 0.86rem var(--mono); cursor: default; }
+.refs .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.45rem; min-height: calc(var(--ctl) - 0.15rem); padding: 0 0.5rem 0 1.6rem; white-space: nowrap; font: 0.86rem var(--mono); }
 .refs .name > span:not([aria-label]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .refs li.cur, .refs li.cur:hover { background: var(--active); box-shadow: var(--active-bar); }
 .refs li.cur .name { padding-left: 0.6rem; font-weight: 700; color: var(--accent-fg); }
@@ -450,7 +456,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .graph-head > span { font: inherit; color: inherit; }
 .graph-body { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .graph-body:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: -2px; }
-.grow { position: absolute; left: 0; right: 0; font-size: 0.9rem; cursor: default; }
+.grow { position: absolute; left: 0; right: 0; font-size: 0.9rem; }
 .grow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .grow { transition: background-color 120ms; }
 .grow:hover { background: var(--raised); }
@@ -498,7 +504,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   .history-bottom > .diff pre { flex: 1; min-height: 0; }
 }
 
-/* ---------- Dialogs: askpass, command palette ---------- */
+/* ---------- Dialogs ---------- */
 /* Spring in, fade out; the backdrop blurs the app behind. Exit runs via allow-discrete on display/overlay. */
 dialog {
   color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
@@ -516,21 +522,40 @@ dialog[open]::backdrop { background: rgb(8 8 16 / 0.38); -webkit-backdrop-filter
 @starting-style { dialog[open]::backdrop { background: rgb(8 8 16 / 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } }
 dialog h2 { font: 650 1.4rem/1.2 var(--display); letter-spacing: -0.03em; }
 dialog p { line-height: 1.55; }
-dialog.askpass { width: min(28rem, calc(100vw - 2rem)); padding: 1.4rem; }
-.askpass p { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-dialog.op-error {
-  width: min(32rem, calc(100vw - 2rem)); padding: 1.5rem;
-  background: linear-gradient(color-mix(in srgb, var(--danger) 14%, var(--panel)), var(--panel) 70%);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+/* Every modal (features + lib/modal.tsx): same width, padding, tone-tinted top, icon badge header.
+   `tone-*` sets --tone: accent (info), ok, warn (a decision), danger (failed / destroys something). */
+.tone-accent { --tone: var(--accent); }
+.tone-ok { --tone: var(--add); }
+.tone-warn { --tone: var(--mod); }
+.tone-danger { --tone: var(--danger); }
+dialog.modal {
+  --tone: var(--accent);
+  width: min(30rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.4rem;
+  background: linear-gradient(color-mix(in srgb, var(--tone) 9%, var(--panel)), var(--panel) 9rem);
+  border-color: color-mix(in srgb, var(--tone) 22%, var(--line));
 }
-.op-error h2 { display: flex; align-items: center; gap: 0.7rem; margin: 0 0 0.7rem; }
-.op-error h2 svg {
-  width: 2.2rem; height: 2.2rem; padding: 0.4rem; border-radius: 50%; color: var(--danger); flex: none;
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+dialog.modal.tone-accent { --tone: var(--accent); }
+dialog.modal.tone-warn { --tone: var(--mod); }
+dialog.modal.tone-danger { --tone: var(--danger); }
+.modal-head { display: flex; gap: 0.85rem; align-items: flex-start; margin-bottom: 1rem; }
+.modal-head h2 { font-size: 1.3rem; overflow-wrap: anywhere; }
+.modal-head p { margin: 0.1rem 0 0; font-size: 0.92rem; line-height: 1.4; }
+.modal-badge {
+  display: grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem; border-radius: 12px;
+  color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 75%, white), var(--tone));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--tone) 35%, transparent);
 }
-.op-error[open] h2 svg { animation: nudge 420ms var(--ease) 120ms; }
-.op-error p { margin: 0; font-size: 1.05rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.9rem; }
+.modal-badge .icon { width: 1.35rem; height: 1.35rem; }
+dialog.modal[open] .modal-badge { animation: pop 380ms var(--spring) 80ms backwards; }
+dialog.modal.tone-danger[open] .modal-badge .icon { animation: nudge 420ms var(--ease) 380ms; }
+.modal-text { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
+button.danger {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, white), var(--danger));
+  color: #fff; font-weight: 500; box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 0.5px 1.5px rgb(0 0 0 / 0.18);
+}
+button.danger:hover:not(:disabled) { background: var(--danger); box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 4px 14px color-mix(in srgb, var(--danger) 40%, transparent); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
+@media (max-width: 30rem) { .modal .dialog-actions button { flex: 1; } }
 /* Near the top, full width minus a gutter on phones. No padding: a click on the dialog itself is the backdrop. */
 dialog.palette {
   width: min(40rem, calc(100vw - 2rem)); margin-top: 14vh; padding: 0; overflow: hidden; border-radius: 16px;
@@ -548,22 +573,20 @@ dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdro
 .palette li[aria-selected="true"] kbd { color: inherit; background: rgb(255 255 255 / 0.2); }
 .palette li.muted { cursor: default; }
 
-/* ---------- Update toast ---------- */
-.update {
-  position: fixed; right: 1rem; bottom: 1rem; z-index: 30; max-width: calc(100vw - 2rem);
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.6rem 0.75rem;
-  background: var(--glass); -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8);
-  border-radius: 14px; box-shadow: var(--shadow); animation: rise 420ms var(--spring);
+/* ---------- Toasts: op notice (bottom center), update (bottom right). Same card as the modals. ---------- */
+.toast {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 1.1rem 0.55rem 0.55rem; overflow-wrap: anywhere;
+  background: color-mix(in srgb, var(--tone) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--line));
+  border-radius: 16px; box-shadow: var(--shadow); animation: toast-in 460ms var(--spring);
 }
-
-/* ---------- Op success notice (toast, bottom center) ---------- */
+.toast .modal-badge { width: 2.1rem; height: 2.1rem; border-radius: 10px; animation: pop 360ms var(--spring) 120ms backwards; }
+.toast .modal-badge .icon { width: 1.15rem; height: 1.15rem; }
+.toast-text { display: grid; min-width: 0; }
+.toast-text small { font-size: 0.82rem; }
+.toast-actions { display: flex; gap: 0.4rem; margin-left: 0.25rem; }
+.update { position: fixed; right: 1rem; bottom: 1rem; z-index: 30; max-width: calc(100vw - 2rem); flex-wrap: wrap; }
 .notice { position: fixed; left: 50%; bottom: 1rem; translate: -50% 0; z-index: 29; margin: 0; max-width: calc(100vw - 2rem); pointer-events: none; }
-.notice > span {
-  display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1.4rem; font-size: 1.2rem; overflow-wrap: anywhere;
-  background: color-mix(in srgb, var(--add) 16%, var(--panel)); border: 1px solid color-mix(in srgb, var(--add) 35%, transparent);
-  border-radius: 999px; box-shadow: var(--shadow); animation: toast-in 460ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards;
-}
-.notice svg { width: 1.6rem; height: 1.6rem; color: var(--add); flex: none; animation: pop 360ms var(--spring) 120ms backwards; }
+.notice .toast { font-size: 1.05rem; animation: toast-in 460ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
 
 /* ---------- Motion ---------- */
 @keyframes fade { from { opacity: 0; } }
@@ -577,8 +600,58 @@ dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdro
   *, *::before, *::after, dialog[open] { animation: none !important; transition: none !important; }
 }
 
-dialog.settings { width: min(34rem, calc(100vw - 2rem)); padding: 1.5rem; }
-.settings h2 { margin: 0 0 1rem; }
+/* ---------- New branch dialog (features/refs/NewBranch.tsx) ---------- */
+.new-branch-dialog form { display: grid; gap: 1.1rem; }
+.new-branch-dialog .modal-head, .new-branch-dialog .dialog-actions { margin: 0; }
+.nb-field { display: grid; gap: 0.4rem; }
+.nb-field > label { font-size: 0.85rem; font-weight: 700; }
+.nb-field input, .select select { min-height: calc(var(--ctl) + 0.4rem); font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0; }
+.nb-field input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
+.nb-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+button.chip {
+  min-height: 1.6rem; padding: 0 0.6rem; border-radius: 999px; font: 0.8rem var(--mono); letter-spacing: 0;
+  color: var(--muted); background: var(--pick); box-shadow: none;
+}
+button.chip:hover { color: var(--fg); background: var(--sunken); }
+button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--active); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+.nb-hint { margin: 0; font-size: 0.82rem; line-height: 1.4; color: var(--faint); }
+.nb-hint.error { color: var(--danger); }
+/* Native select (keyboard, screen readers, long lists for free), restyled like the text fields. */
+.select { position: relative; }
+.select select {
+  appearance: none; width: 100%; padding: 0 2rem 0 0.55rem; color: var(--fg); background: var(--panel);
+  border: 0; border-radius: 5px; box-shadow: inset 0 0 0 0.5px var(--line-strong), inset 0 0.5px 1px rgb(0 0 0 / 0.06);
+}
+.select select:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 0; box-shadow: inset 0 0 0 0.5px var(--accent); }
+.select .icon { position: absolute; right: 0.6rem; top: 50%; translate: 0 -50%; color: var(--muted); pointer-events: none; }
+.nb-commit {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 0.6rem; align-items: baseline;
+  padding: 0.55rem 0.7rem; border-radius: 8px; background: var(--sunken); animation: rise 200ms var(--ease);
+}
+.nb-commit .c-oid { color: var(--accent-fg); font-size: 0.85rem; }
+.nb-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nb-commit small { grid-column: 2; font-size: 0.8rem; }
+.nb-toggle { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); }
+.nb-toggle span { display: grid; }
+.nb-toggle small { font-size: 0.82rem; }
+/* Checkbox drawn as a switch. */
+.nb-toggle input {
+  appearance: none; flex: none; width: 2.3rem; height: 1.35rem; min-height: 0; padding: 0; border-radius: 999px;
+  background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line-strong); position: relative; transition: background-color 160ms;
+}
+.nb-toggle input::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.35rem - 4px); aspect-ratio: 1; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); transition: translate 220ms var(--spring);
+}
+.nb-toggle input:checked { background: var(--accent); box-shadow: none; }
+.nb-toggle input:checked::after { translate: 0.95rem 0; }
+.nb-cmd {
+  display: block; padding: 0.5rem 0.7rem; border-radius: 8px; font: 0.82rem var(--mono); letter-spacing: 0;
+  color: var(--muted); background: var(--sunken); overflow-x: auto; white-space: nowrap;
+}
+.nb-cmd::before { content: "$ "; color: var(--faint); }
+
+dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
 .setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
 .setting p { margin: 0 0 0.5rem; }
 .setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -592,3 +665,9 @@ button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
    tracking. Tabular figures so hashes, dates, counts and line numbers line up. */
 .mono, kbd, pre, .refs .name, .ref, .c-oid, .branch-chip, .recent small, .path small { letter-spacing: 0; }
 .mono, pre, .c-oid, .c-date, .count, .ab, .ref, .branch-chip { font-variant-numeric: tabular-nums; }
+
+/* Everything clickable gets the hand cursor. */
+button, a[href], summary, select, label:has(input), input[type="checkbox"], input[type="radio"],
+[role="button"], [role="checkbox"], [role="option"], [role="tab"], [role="menuitem"],
+.grow, .palette li, .refs .name { cursor: pointer; }
+button:disabled, .palette li.muted { cursor: default; }
