@@ -188,6 +188,7 @@
   - Not measured: wide graphs (many parallel lanes; layout is O(lanes) per row), frontend scroll fps on the 100k list.
 
 ## Next
+- Graph: try a wide repo (many parallel lanes) and check scroll smoothness on the 100k list in `tauri dev`.
 - Click through weeks 2–11 in `tauri dev`; try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
 - Installer code signing (Authenticode, Apple notarization).
