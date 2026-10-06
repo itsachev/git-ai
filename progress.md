@@ -211,8 +211,10 @@
 - Step 8 status (2026-10-06), from the scratch repo's op log: pull, undo pull, redo, and push done in `tauri dev`; remote `main` is at `bc381fd`, `main` is level with `origin/main`. Still to click: rejected-push dialog with the new text, success notices after the fix, fetch, remote branch delete + undo (`feat` is on the remote at `a852b2a`). Branch `test` (3 commits ahead of `main` before this entry: branch menu/panes, op feedback, rejected push; now plus the notice fix) is not merged or pushed yet.
 - Bigger op feedback (2026-10-06): success notice is larger (1.2rem text, 1.6rem icon) on a green tint with a green border instead of glass; the error dialog is larger (1.3rem title, 1.1rem text) on a red tint with a red border. `App.css` only.
 - Step 8 passes (2026-10-06) in `tauri dev`: rejected push shows the "Pull first" dialog, fetch / pull (merge `3668b8b`) / push show their notices, remote `feat` delete + undo brings it back at `a852b2a`. Remote checked with `git ls-remote`.
+- Merged `test` into `main` (fast-forward) and pushed `main` to `origin` (2026-10-06).
 
 ## Next
+- `src-tauri/src/git/cli.rs` shows as binary in git diffs (likely a raw NUL byte in the source); replace it with an escape so diffs work.
 - Graph: try a wide repo (many parallel lanes) and check scroll smoothness on the 100k list in `tauri dev`.
 - Finish the click-through (`~/gitai-play/work`): clone with progress, shortcuts, graph at scale. Also try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
