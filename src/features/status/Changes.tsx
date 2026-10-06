@@ -35,6 +35,7 @@ export function useRun() {
   const qc = useQueryClient();
   async function run(op: () => Promise<unknown>, done?: string) {
     const mine = ++opGen;
+    notice = null;
     opSubs.forEach((f) => f());
     try {
       await op();
@@ -77,9 +78,10 @@ export function OpErrorDialog() {
 
 /** Short success line for the last op (`run`'s `done`); fades out after 4 s. */
 export function Notice() {
-  const gen = useSyncExternalStore(subscribeOps, () => opGen);
+  // The snapshot must be `notice` itself: a success changes it but not `opGen`.
+  const shown = useSyncExternalStore(subscribeOps, () => notice);
   const [hidden, setHidden] = useState<number | null>(null);
-  const cur = notice?.gen === gen && hidden !== gen ? notice : null;
+  const cur = shown && hidden !== shown.gen ? shown : null;
   useEffect(() => {
     if (!cur) return;
     const t = setTimeout(() => setHidden(cur.gen), 4000);
