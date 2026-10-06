@@ -26,6 +26,12 @@ pub struct AskpassPrompt {
 /// "<port> <token>", set once the listener runs.
 static ENV: OnceLock<String> = OnceLock::new();
 static PENDING: Mutex<Vec<(u32, Sender<Option<String>>)>> = Mutex::new(Vec::new());
+/// Private key chosen in Settings; None = ssh's own defaults (~/.ssh/id_*, ssh-agent).
+static SSH_KEY: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn set_ssh_key(path: Option<String>) {
+    *SSH_KEY.lock().unwrap() = path;
+}
 
 /// Listens on a random localhost port for the lifetime of the app.
 pub fn start(app: AppHandle) -> io::Result<()> {
@@ -44,12 +50,22 @@ pub fn start(app: AppHandle) -> io::Result<()> {
 /// Env for network git commands. Empty until `start` ran (tests), so git fails instead of prompting.
 pub fn env() -> Vec<(&'static str, OsString)> {
     let (Some(v), Ok(exe)) = (ENV.get(), std::env::current_exe()) else { return vec![] };
-    vec![
+    let mut env = vec![
         ("GIT_ASKPASS", exe.clone().into()),
         ("SSH_ASKPASS", exe.into()),
         ("SSH_ASKPASS_REQUIRE", "force".into()),
         ("GITAI_ASKPASS", v.into()),
-    ]
+    ];
+    if let Some(key) = SSH_KEY.lock().unwrap().as_deref() {
+        env.push(("GIT_SSH_COMMAND", ssh_command(key).into()));
+    }
+    env
+}
+
+/// git runs GIT_SSH_COMMAND through sh: forward slashes and single quotes keep Windows paths intact.
+/// `ssh_key_set` rejects paths containing a quote.
+fn ssh_command(key: &str) -> String {
+    format!("ssh -i '{}' -o IdentitiesOnly=yes", key.replace('\\', "/"))
 }
 
 /// Delivers the UI's answer; None cancels.
@@ -136,5 +152,10 @@ mod tests {
         assert_eq!(request(&format!("{port} tok"), "cancel"), None);
         server.join().unwrap();
         assert_ne!(token(), token());
+    }
+
+    #[test]
+    fn ssh_command_quotes_windows_path() {
+        assert_eq!(ssh_command(r"C:\Users\A B\.ssh\id_ed25519"), "ssh -i 'C:/Users/A B/.ssh/id_ed25519' -o IdentitiesOnly=yes");
     }
 }

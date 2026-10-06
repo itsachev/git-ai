@@ -659,6 +659,7 @@ dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
 .setting p { margin: 0 0 0.5rem; }
 .setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .setting input { flex: 1 1 12rem; min-width: 0; }
+.ssh-key-path { overflow-wrap: anywhere; }
 button.link { all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 /* Labels: one bold weight for every heading, column header, field and term label. */
