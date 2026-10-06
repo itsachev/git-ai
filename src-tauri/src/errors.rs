@@ -19,6 +19,9 @@ impl AppError {
         if stderr.contains("would be overwritten by") {
             return Self::new("dirty", "You have uncommitted changes. Stash, commit or discard them, then try again.");
         }
+        if stderr.contains("[rejected]") && (stderr.contains("(fetch first)") || stderr.contains("(non-fast-forward)")) {
+            return Self::new("rejected", "The remote has commits you don't have yet. Pull first, then push again.");
+        }
         Self::new("git", stderr.trim())
     }
 }
@@ -48,5 +51,17 @@ Aborting
         assert!(e.message.starts_with("You have uncommitted changes"), "{}", e.message);
         assert_eq!(AppError::from_stderr("fatal: nope
 ").code, "git");
+    }
+
+    #[test]
+    fn rejected_push() {
+        let e = AppError::from_stderr("To C:/remote.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'C:/remote.git'
+hint: Updates were rejected because the remote contains work that you do not
+");
+        assert_eq!(e.code, "rejected");
+        assert_eq!(AppError::from_stderr(" ! [rejected]        main -> main (non-fast-forward)
+").code, "rejected");
     }
 }
