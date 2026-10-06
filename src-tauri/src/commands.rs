@@ -258,3 +258,9 @@ pub fn ai_set_key(key: Option<String>) -> Result<(), AppError> {
 pub async fn ai_commit_message(path: String) -> Result<String, AppError> {
     crate::ai::commit_message(Path::new(&path))
 }
+
+/// Sends one commit's message and diff to Gemini.
+#[tauri::command]
+pub async fn ai_explain_commit(path: String, oid: String) -> Result<String, AppError> {
+    crate::ai::explain_commit(Path::new(&path), &oid)
+}

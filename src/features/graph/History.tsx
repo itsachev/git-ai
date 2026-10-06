@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { commitDetails, commitFileDiff, createTag, merge } from "../../lib/ipc";
+import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge } from "../../lib/ipc";
+import type { AppError } from "../../bindings/AppError";
 import { Gutter, errorText, kindClass, lineNumbers, useRun } from "../status/Changes";
+import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm } from "../refs/Sidebar";
 import { CommitGraph, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
@@ -12,7 +14,25 @@ export function History({ path }: { path: string }) {
   const [file, setFile] = useState<string | null>(null);
   const [tagging, setTagging] = useState(false);
   const run = useRun();
-  const details = useQuery({ queryKey: ["commit", path, sel?.oid], queryFn: () => commitDetails(path, sel!.oid), enabled: !!sel });
+  const hasKey = useQuery(aiKeyQuery).data;
+  // Explanations by oid, kept while the view is open so going back to a commit doesn't call Gemini again.
+  const [explained, setExplained] = useState<Record<string, string>>({});
+  const [explaining, setExplaining] = useState<string | null>(null);
+  async function explain(oid: string) {
+    if (!hasKey) return openSettings();
+    setExplaining(oid);
+    await run(async () => {
+      try {
+        const text = await aiExplainCommit(path, oid);
+        setExplained((m) => ({ ...m, [oid]: text }));
+      } catch (e) {
+        if ((e as AppError).code === "ai_key") openSettings();
+        throw e;
+      }
+    });
+    setExplaining(null);
+  }
+  const details =useQuery({ queryKey: ["commit", path, sel?.oid], queryFn: () => commitDetails(path, sel!.oid), enabled: !!sel });
   const d = details.data;
   // Keep the picked file only while the commit has it, else show the first file.
   const shown = d?.files.find((f) => f.path === file)?.path ?? d?.files[0]?.path ?? null;
@@ -35,7 +55,17 @@ export function History({ path }: { path: string }) {
                 <button className="small" onClick={() => run(() => merge(path, d.oid, true))}>Cherry-pick</button>
                 <button className="small" onClick={() => run(() => merge(path, d.oid, false))}>Merge into current</button>
                 <button className="small" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}>Tag…</button>
+                <button className="small" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
+                  title={hasKey ? "Explain this commit in plain words (message and diff sent to Gemini)" : "Add a Gemini API key in Settings first"}>
+                  {explaining === d.oid ? "Explaining…" : "Explain"}
+                </button>
               </div>
+              {explained[d.oid] && (
+                <section className="explain" aria-label="AI explanation">
+                  <h3>Explanation (AI)</h3>
+                  <p>{explained[d.oid]}</p>
+                </section>
+              )}
               {tagging && <NameForm label="Tag name" check="Annotated (message = name)" button="Create tag" onCancel={() => setTagging(false)}
                 onSubmit={async (name, annotated) => { if (await run(() => createTag(path, name, d.oid, annotated ? name : ""))) setTagging(false); }} />}
               <dl>

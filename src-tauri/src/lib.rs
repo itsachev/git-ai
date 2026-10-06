@@ -64,6 +64,7 @@ pub fn run() {
             commands::ai_has_key,
             commands::ai_set_key,
             commands::ai_commit_message,
+            commands::ai_explain_commit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

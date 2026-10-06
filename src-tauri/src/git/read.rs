@@ -78,6 +78,18 @@ pub fn staged_patch(repo: &Path) -> Result<String, AppError> {
     let head = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
     let mut diff = repo.diff_tree_to_index(head.as_ref(), None, Some(&mut opts))?;
     diff.find_similar(None)?;
+    patch_text(&diff)
+}
+
+/// Message and whole patch (first parent → commit) of one commit, binary files as in `staged_patch`.
+pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
+    let patch = patch_text(&commit_diff_all(&repo, &c)?)?;
+    Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
+}
+
+fn patch_text(diff: &git2::Diff) -> Result<String, AppError> {
     let mut out = String::new();
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
         if matches!(line.origin(), '+' | '-' | ' ') {
@@ -277,6 +289,9 @@ mod tests {
         let d = super::commit_details(&dir, &second.id().to_string()).unwrap();
         assert_eq!((d.files[0].kind.as_str(), d.files[0].orig_path.as_deref()), ("R", Some("a.txt")));
         assert!(super::commit_file_diff(&dir, &first.id().to_string(), "a.txt").unwrap().unwrap().ends_with("+one\n+two\n+three\n"));
+
+        let (msg, patch) = super::commit_patch(&dir, &first.id().to_string()).unwrap();
+        assert!(msg == "msg\n\nbody" && patch.contains("+++ b/a.txt") && patch.ends_with("+three\n"), "{patch}");
 
         assert_eq!(super::recent_subjects(&dir, 10).unwrap(), ["msg", "msg"]);
         // Commits above bypass the index; load HEAD's tree so nothing counts as staged.
