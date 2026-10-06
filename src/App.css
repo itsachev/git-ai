@@ -473,10 +473,13 @@ dialog[open] { animation: pop 180ms var(--ease); }
 dialog::backdrop { background: rgb(0 0 0 / 0.22); }
 dialog.askpass { width: min(28rem, calc(100vw - 2rem)); padding: 1.1rem; }
 .askpass p { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-dialog.op-error { width: min(28rem, calc(100vw - 2rem)); padding: 1.1rem; }
-.op-error h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.5rem; font-size: 1.1rem; }
-.op-error h2 svg { color: var(--danger); flex: none; }
-.op-error p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
+dialog.op-error {
+  width: min(32rem, calc(100vw - 2rem)); padding: 1.3rem;
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.op-error h2 { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.6rem; font-size: 1.3rem; }
+.op-error h2 svg { width: 1.6rem; height: 1.6rem; color: var(--danger); flex: none; }
+.op-error p { margin: 0; font-size: 1.1rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.9rem; }
 /* Near the top, full width minus a gutter on phones. No padding: a click on the dialog itself is the backdrop. */
 dialog.palette {
@@ -506,11 +509,11 @@ dialog.palette::backdrop { background: transparent; }
 /* ---------- Op success notice (toast, bottom center) ---------- */
 .notice { position: fixed; left: 50%; bottom: 1rem; translate: -50% 0; z-index: 29; margin: 0; max-width: calc(100vw - 2rem); pointer-events: none; }
 .notice > span {
-  display: flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.8rem; overflow-wrap: anywhere;
-  background: var(--glass); -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8);
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1.4rem; font-size: 1.2rem; overflow-wrap: anywhere;
+  background: color-mix(in srgb, var(--add) 16%, var(--panel)); border: 1px solid color-mix(in srgb, var(--add) 35%, transparent);
   border-radius: 999px; box-shadow: var(--shadow); animation: rise 200ms var(--ease), fade 400ms var(--ease) 3.6s reverse forwards;
 }
-.notice svg { color: var(--add); flex: none; }
+.notice svg { width: 1.6rem; height: 1.6rem; color: var(--add); flex: none; }
 
 /* ---------- Motion ---------- */
 @keyframes fade { from { opacity: 0; } }
