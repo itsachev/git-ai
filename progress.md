@@ -206,6 +206,8 @@
 
 - Error titles (2026-10-06): the "dirty" error no longer lists files: "You have uncommitted changes. Stash, commit or discard them, then try again." (`errors.rs`, test updated). The dialog title names the failed op: `invoke` in `src/lib/ipc.ts` wraps Tauri's and adds `title` from a per-command `FAILED` map ("Failed to check out main", "Push failed", "Failed to cherry-pick 1a2b3c4"); fallback "Something went wrong". Verified: `tsc`, `npm run build`, `dirty_checkout` test OK.
 
+- Rejected push (2026-10-06): a non-fast-forward push showed git's raw `! [rejected] … hint:` text. `AppError::from_stderr` maps `[rejected]` + "(fetch first)"/"(non-fast-forward)" to code `rejected`: "The remote has commits you don't have yet. Pull first, then push again." Test `errors::rejected_push`; real stderr from `~/gitai-play/work` (ahead 4, behind 1) matches. Rest of step 8 still to click through in `tauri dev`.
+
 ## Next
 - Graph: try a wide repo (many parallel lanes) and check scroll smoothness on the 100k list in `tauri dev`.
 - Finish the click-through (`~/gitai-play/work`): rest of step 8 (rejected push, pull + undo, fetch, remote branch delete + undo), clone with progress, shortcuts, graph at scale. Also try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
