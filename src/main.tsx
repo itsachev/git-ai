@@ -2,6 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
+// Bundled (offline) variable fonts: Geist for UI, Geist Mono for refs, hashes and diffs.
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import App from "./App";
 
 // Data only refetches when the repo watcher says something changed.
