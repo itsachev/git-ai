@@ -16,21 +16,21 @@ export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const [busy, setBusy] = useState<string | null>(null);
-  const op = (label: string, doing: string, fn: () => Promise<unknown>, count = 0) => ({
+  const op = (label: string, doing: string, done: string, fn: () => Promise<unknown>, count = 0) => ({
     label, doing, count,
     go: async () => {
       if (busy) return;
       setBusy(doing);
-      await run(fn);
+      await run(fn, done);
       setBusy(null);
     },
   });
   return {
     busy,
     ops: [
-      op("Fetch", "Fetching…", () => fetchAll(path)),
-      op("Pull", "Pulling…", () => pull(path), cur?.behind ?? 0),
-      op("Push", "Pushing…", () => push(path), cur?.ahead ?? 0),
+      op("Fetch", "Fetching…", "Fetched all remotes", () => fetchAll(path)),
+      op("Pull", "Pulling…", `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
+      op("Push", "Pushing…", `Pushed ${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`, () => push(path), cur?.ahead ?? 0),
     ],
   };
 }

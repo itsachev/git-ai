@@ -11,7 +11,7 @@ export function History({ path }: { path: string }) {
   const [sel, setSel] = useState<Picked | null>(null);
   const [file, setFile] = useState<string | null>(null);
   const [tagging, setTagging] = useState(false);
-  const [run, opError] = useRun();
+  const run = useRun();
   const details = useQuery({ queryKey: ["commit", path, sel?.oid], queryFn: () => commitDetails(path, sel!.oid), enabled: !!sel });
   const d = details.data;
   // Keep the picked file only while the commit has it, else show the first file.
@@ -38,7 +38,6 @@ export function History({ path }: { path: string }) {
               </div>
               {tagging && <NameForm label="Tag name" check="Annotated (message = name)" button="Create tag" onCancel={() => setTagging(false)}
                 onSubmit={async (name, annotated) => { if (await run(() => createTag(path, name, d.oid, annotated ? name : ""))) setTagging(false); }} />}
-              {opError && <p className="error" role="alert">{opError}</p>}
               <dl>
                 <dt>Commit</dt><dd className="mono">{d.oid}</dd>
                 <dt>Parents</dt><dd className="mono">{d.parents.map((p) => p.slice(0, 7)).join(", ") || "none"}</dd>

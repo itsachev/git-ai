@@ -17,10 +17,7 @@ impl AppError {
     /// A failed git command: known failures get a code and a plain explanation, the rest keep git's text (code "git").
     pub fn from_stderr(stderr: &str) -> Self {
         if stderr.contains("would be overwritten by") {
-            // git lists the files tab-indented under the error line.
-            let files: Vec<&str> = stderr.lines().filter(|l| l.starts_with('\t')).map(str::trim).collect();
-            let what = if files.is_empty() { "some files".to_string() } else { files.join(", ") };
-            return Self::new("dirty", format!("This would overwrite your uncommitted changes to {what}. Commit or stash them first, then try again."));
+            return Self::new("dirty", "You have uncommitted changes. Stash, commit or discard them, then try again.");
         }
         Self::new("git", stderr.trim())
     }
@@ -48,7 +45,7 @@ Please commit your changes or stash them before you switch branches.
 Aborting
 ");
         assert_eq!(e.code, "dirty");
-        assert!(e.message.contains("a.txt, dir/b.txt"), "{}", e.message);
+        assert!(e.message.starts_with("You have uncommitted changes"), "{}", e.message);
         assert_eq!(AppError::from_stderr("fatal: nope
 ").code, "git");
     }
