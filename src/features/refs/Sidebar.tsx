@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { checkout, createBranch, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, refs, stash, stashSave } from "../../lib/ipc";
@@ -15,7 +15,12 @@ export function Sidebar({ path }: { path: string }) {
   const [run, opError] = useRun();
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
-  const toggle = (what: "branch" | "stash") => (e: React.MouseEvent) => { e.preventDefault(); setCreating((c) => (c === what ? null : what)); };
+  // The form lives inside the section, so open the section too (Stashes starts collapsed).
+  const toggle = (what: "branch" | "stash") => (e: React.MouseEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.currentTarget.closest("details")!.open = true;
+    setCreating((c) => (c === what ? null : what));
+  };
 
   if (error) return <div className="sidebar error" role="alert">{errorText(error)}</div>;
   if (!data) return <div className="sidebar" />;
@@ -124,13 +129,26 @@ export function Sidebar({ path }: { path: string }) {
   );
 }
 
-/** `onOpen` runs on double-click; `actions` are [label, handler] buttons shown on hover/focus. */
+/** `onOpen` runs on double-click; `actions` are [label, handler] items of a popover menu (right-click or the ⋯ button). */
 type RowProps = { item: RefItem; label?: string; cur?: boolean; onOpen?: () => void; actions?: [string, () => void][] };
 
 function Row({ item, label = item.name, cur, onOpen, actions = [] }: RowProps) {
   const title = item.upstream ? `${item.name} (tracks ${item.upstream})` : item.name;
+  const pop = useRef<HTMLDivElement>(null);
+  // ponytail: in-page popover; the native Tauri menu showed but its item clicks never arrived (Windows).
+  const menu = (e: React.MouseEvent<HTMLElement>) => {
+    e.preventDefault();
+    const el = pop.current;
+    if (!el) return;
+    // Right-click: at the pointer. ⋯ button (also via keyboard): under the button.
+    const r = e.type === "contextmenu" ? { left: e.clientX, bottom: e.clientY } : e.currentTarget.getBoundingClientRect();
+    el.showPopover();
+    el.style.left = `${Math.max(4, Math.min(r.left, innerWidth - el.offsetWidth - 4))}px`;
+    el.style.top = `${Math.max(4, Math.min(r.bottom, innerHeight - el.offsetHeight - 4))}px`;
+    el.querySelector("button")?.focus();
+  };
   return (
-    <li className={cur ? "cur" : undefined}>
+    <li className={cur ? "cur" : undefined} onContextMenu={menu}>
       <span className="name" title={title} onDoubleClick={onOpen}>
         {cur && <span className="dot" aria-label="current branch" />}
         <span>{label}</span>
@@ -138,9 +156,12 @@ function Row({ item, label = item.name, cur, onOpen, actions = [] }: RowProps) {
         {item.behind > 0 && <small className="ab" title={`${item.behind} to pull`}>↓{item.behind}</small>}
       </span>
       {actions.length > 0 && (
-        <span className="acts">
-          {actions.map(([a, fn]) => <button key={a} className="small" onClick={fn} aria-label={`${a} ${item.name}`}>{a}</button>)}
-        </span>
+        <>
+          <button className="icon-btn more" onClick={menu} aria-label={`Actions for ${item.name}`} title="Actions"><Icon name="more" /></button>
+          <div ref={pop} popover="auto" className="row-menu" role="menu" aria-label={item.name}>
+            {actions.map(([a, fn]) => <button key={a} role="menuitem" onClick={() => { pop.current!.hidePopover(); fn(); }}>{a}</button>)}
+          </div>
+        </>
       )}
     </li>
   );

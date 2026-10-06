@@ -227,11 +227,14 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 /* Wide: rail beside the stage. Narrow: rail is a drawer over it. */
 .menu { display: none; }
 @media (min-width: 48rem) {
-  .shell { grid-template-columns: 15.5rem minmax(0, 1fr); }
+  .shell { grid-template-columns: var(--rail-w, 15.5rem) auto minmax(0, 1fr); }
+  /* Zero-width track; the handle overlaps the rail border. */
+  .shell > .split { width: 7px; margin-inline: -3.5px; z-index: 5; }
   .scrim { display: none; }
 }
 @media (max-width: 47.99rem) {
   .menu { display: inline-flex; }
+  .shell > .split { display: none; }
   .rail {
     position: fixed; inset: 0 auto 0 0; z-index: 20; width: min(20rem, 86vw);
     translate: -100% 0; visibility: hidden; box-shadow: var(--shadow);
@@ -245,6 +248,18 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   .sync button, .palette-trigger { padding: 0 0.6rem; }
   .stage-body { padding: 0.5rem; }
 }
+
+/* Pane splitters (src/lib/splitter.tsx). Between panes the handle is the 0.75rem gap itself. */
+.split { position: relative; touch-action: none; }
+.split-x { width: 0.75rem; cursor: col-resize; }
+.split-y { height: 0.75rem; cursor: row-resize; }
+.split::after { content: ""; position: absolute; border-radius: 2px; background: var(--accent); opacity: 0; transition: opacity 120ms; }
+.split-x::after { inset: 0 calc(50% - 1px); }
+.split-y::after { inset: calc(50% - 1px) 0; }
+.split:hover::after, .split:active::after, .split:focus-visible::after { opacity: 1; }
+.split:focus-visible { outline: none; }
+.changes > .split, .history-bottom > .split { display: none; }
+@media (min-width: 52rem) { .changes > .split, .history-bottom > .split { display: block; } }
 
 /* ---------- Sidebar: branches, remotes, tags, stashes ---------- */
 .sidebar { flex: 1; min-height: 0; overflow: auto; padding: 0.6rem 0.5rem 1rem; }
@@ -268,11 +283,15 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .refs li.cur .name { padding-left: 0.6rem; font-weight: 600; color: var(--fg); }
 .dot { width: 0.55rem; height: 0.55rem; margin: 0 0.2rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); flex-shrink: 0; }
 .refs .ab { flex-shrink: 0; color: var(--accent-fg); font-size: 0.75rem; }
-/* Opacity, not display: the buttons must stay keyboard focusable. With a mouse they overlay the
-   right end of the name so it keeps the full width; on touch they sit in flow and wrap below it. */
-.refs .acts { display: flex; gap: 0.25rem; opacity: 0; position: absolute; right: 0.25rem; padding-left: 0.75rem; background: linear-gradient(to right, transparent, color-mix(in srgb, var(--fg) 7%, var(--rail)) 0.75rem); transition: opacity 120ms; }
-.refs li:hover .acts, .refs li:focus-within .acts { opacity: 1; }
-@media (hover: none) { .refs .acts { opacity: 1; position: static; margin-left: auto; background: none; } }
+/* One ⋯ button opens the row's menu (same as right-click). Opacity, not display: it must stay keyboard focusable. */
+.refs .name { padding-right: 2rem; }
+.refs .more { position: absolute; right: 0.2rem; width: 1.7rem; min-height: 1.7rem; opacity: 0; transition: opacity 120ms; }
+.refs li:hover .more, .refs li:focus-within .more { opacity: 1; }
+@media (hover: none) { .refs .more { opacity: 1; } }
+.row-menu { position: fixed; inset: auto; margin: 0; padding: 0.3rem; min-width: 9rem; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.row-menu:popover-open { display: grid; gap: 1px; }
+.row-menu button { justify-content: flex-start; color: inherit; background: none; box-shadow: none; padding: 0 0.6rem; }
+.row-menu button:hover, .row-menu button:focus-visible { background: var(--accent); color: var(--accent-ink); outline: none; }
 .new-branch { display: grid; gap: 0.4rem; margin: 0.25rem 0 0.5rem; padding: 0.6rem; background: var(--panel); border-radius: 8px; box-shadow: var(--shadow); animation: rise 180ms var(--ease); }
 .new-branch button { justify-self: end; }
 
@@ -338,7 +357,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .history .path { flex: 1; }
 .history li > button.small { opacity: 1; }
 @media (min-width: 52rem) {
-  .changes { height: 100%; grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .changes { height: 100%; grid-template-columns: var(--side-w, 22rem) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 0; }
   .side { min-height: 0; }
   .lists { flex: 1; min-height: 0; overflow: auto; }
   .changes > .diff { min-height: 0; display: flex; flex-direction: column; }
@@ -385,7 +404,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .legend span { padding: 0 0.3rem; border-radius: 3px; }
 
 /* ---------- History ---------- */
-.history-view { height: 100%; display: grid; grid-template-rows: minmax(9rem, 1.1fr) minmax(10rem, 1fr); gap: 0.75rem; }
+.history-view { height: 100%; display: grid; grid-template-rows: var(--graph-h, minmax(9rem, 1.1fr)) auto minmax(10rem, 1fr); }
 .graph {
   --graph-cols: minmax(0, 1fr) 9.5rem 9rem 4.75rem;
   display: flex; flex-direction: column; min-height: 0;
@@ -419,12 +438,14 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .grow.sel.head .ref:first-child { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); }
 .c-date, .c-author, .c-oid { color: var(--muted); font-size: 0.85rem; }
 .c-oid { font-family: var(--mono); }
-@media (max-width: 48rem) {
-  .graph { --graph-cols: minmax(0, 1fr) 4.75rem; }
+/* Columns follow the table's own width (the sidebar takes part of the window). */
+.graph { container-type: inline-size; }
+@container (max-width: 46rem) {
+  .graph-head, .grow { --graph-cols: minmax(0, 1fr) 4.75rem; }
   .c-date, .c-author { display: none; }
 }
-@media (max-width: 30rem) {
-  .graph { --graph-cols: minmax(0, 1fr); }
+@container (max-width: 26rem) {
+  .graph-head, .grow { --graph-cols: minmax(0, 1fr); }
   .c-oid { display: none; }
 }
 .history-bottom { display: grid; gap: 0.75rem; min-height: 0; overflow: auto; align-content: start; }
@@ -439,7 +460,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .commit-info dd.mono { font-size: 0.82rem; }
 .commit-info h3 { margin: 0.5rem 0 0.25rem; padding-left: 0.4rem; }
 @media (min-width: 52rem) {
-  .history-bottom { grid-template-columns: minmax(18rem, 28rem) minmax(0, 1fr); overflow: hidden; align-content: stretch; }
+  .history-bottom { grid-template-columns: var(--info-w, 24rem) auto minmax(0, 1fr); column-gap: 0; overflow: hidden; align-content: stretch; }
   .history-bottom > * { min-height: 0; overflow: auto; }
   .history-bottom > .diff { display: flex; flex-direction: column; }
   .history-bottom > .diff pre { flex: 1; min-height: 0; }
