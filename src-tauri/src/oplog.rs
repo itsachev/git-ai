@@ -127,6 +127,11 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
             .chain(e.paths.iter().map(String::as_str))
             .collect();
         git(repo, &args)?;
+        if e.op.starts_with("take ") {
+            // Taking a side marked the file resolved; git keeps the conflict stages (resolve-undo), put them back.
+            let args: Vec<&str> = ["update-index", "--unresolve", "--"].into_iter().chain(e.paths.iter().map(String::as_str)).collect();
+            git(repo, &args)?;
+        }
         u
     } else if let ("drop stash", Some(oid)) = (e.op.as_str(), &e.head) {
         let msg = git(repo, &["log", "-1", "--format=%s", oid])?;
@@ -375,7 +380,12 @@ mod tests {
 
         cli::resolve(s, &["a.txt".into()], cli::Side::Theirs).unwrap();
         assert_eq!(fs::read_to_string(src.join("a.txt")).unwrap(), "feat\n");
-        assert_eq!(super::entries(s, 20).unwrap()[0].op, "take theirs");
+        let take = super::entries(s, 20).unwrap().remove(0);
+        assert_eq!(take.op, "take theirs");
+        super::undo(s, &take.id).unwrap(); // conflict is back: markers and UU
+        assert!(fs::read_to_string(src.join("a.txt")).unwrap().contains("<<<<<<<"));
+        assert_eq!(cli::status(s).unwrap().conflicted[0].kind, "UU");
+        cli::resolve(s, &["a.txt".into()], cli::Side::Theirs).unwrap();
         cli::resolve(s, &["b.txt".into()], cli::Side::Theirs).unwrap(); // theirs deleted it
         assert!(!src.join("b.txt").exists());
         let st = cli::status(s).unwrap();

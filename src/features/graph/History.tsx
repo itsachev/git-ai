@@ -4,6 +4,7 @@ import { commitDetails, commitFileDiff, createTag, merge } from "../../lib/ipc";
 import { Gutter, errorText, kindClass, lineNumbers, useRun } from "../status/Changes";
 import { NameForm } from "../refs/Sidebar";
 import { CommitGraph, type Picked } from "./CommitGraph";
+import { Splitter } from "../../lib/splitter";
 
 /** Commit graph on top; the picked commit's details, files and file diff below. */
 export function History({ path }: { path: string }) {
@@ -22,6 +23,7 @@ export function History({ path }: { path: string }) {
   return (
     <div className="history-view">
       <CommitGraph path={path} sel={sel} onSelect={setSel} />
+      <Splitter name="graph-h" axis="y" label="Resize commit list" />
       <div className="history-bottom">
         <section className="commit-info">
           {details.error ? <p className="error" role="alert">{errorText(details.error)}</p> : null}
@@ -66,6 +68,7 @@ export function History({ path }: { path: string }) {
             </>
           )}
         </section>
+        <Splitter name="info-w" axis="x" label="Resize commit details" />
         {d && shown && <CommitDiff path={path} oid={d.oid} file={shown} />}
       </div>
     </div>

@@ -15,7 +15,7 @@
       {
         "title": "git-ai",
         "width": 1280,
-        "minWidth": 800,
+        "minWidth": 360,
         "height": 800,
         "minHeight": 500,
         "center": true

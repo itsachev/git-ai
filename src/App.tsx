@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
 import { checkout, openRepo, recentRepos, stage, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
+import { Splitter } from "./lib/splitter";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
@@ -178,6 +179,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         </nav>
         <Sidebar path={path} />
       </aside>
+      <Splitter name="rail-w" axis="x" label="Resize sidebar" />
       <div className="scrim" aria-hidden="true" onClick={() => setSide(false)} />
       <main className="stage">
         <header className="toolbar">

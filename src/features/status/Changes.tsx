@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, undo, unstage, workFile } from "../../lib/ipc";
@@ -7,6 +7,7 @@ import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon } from "../../lib/icons";
+import { Splitter } from "../../lib/splitter";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
@@ -21,22 +22,30 @@ const confirmDiscard = (what: string) =>
   ask(`Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, { title: "Discard changes", kind: "warning" });
 
 /** `run(op)` runs a git op, keeps its error, refreshes right away (the watcher would too, 300 ms later). */
+// Every op bumps `opGen`; an op's error shows only until the next op starts anywhere in the app,
+// so e.g. aborting a merge from File Status clears the sidebar's "merge has conflicts".
+let opGen = 0;
+const opSubs = new Set<() => void>();
+const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
+
 export function useRun() {
   const qc = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
+  const gen = useSyncExternalStore(subscribeOps, () => opGen);
+  const [error, setError] = useState<{ text: string; gen: number } | null>(null);
   async function run(op: () => Promise<unknown>) {
-    setError(null);
+    const mine = ++opGen;
+    opSubs.forEach((f) => f());
     try {
       await op();
       return true;
     } catch (e) {
-      setError(errorText(e));
+      setError({ text: errorText(e), gen: mine });
       return false;
     } finally {
       qc.invalidateQueries();
     }
   }
-  return [run, error] as const;
+  return [run, error?.gen === gen ? error.text : null] as const;
 }
 
 export function Changes({ path }: { path: string }) {
@@ -91,6 +100,7 @@ export function Changes({ path }: { path: string }) {
         <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation}
           onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
       </div>
+      <Splitter name="side-w" axis="x" label="Resize file list" />
       {conflicted ? <Conflict path={path} file={sel.file} run={run} /> : <Diff path={path} sel={shown ? sel : null} run={run} />}
     </div>
   );
@@ -351,7 +361,9 @@ function History({ path, run }: { path: string; run: Run }) {
 }
 
 export function opLabel(e: OpEntry): string {
-  if (e.op.startsWith("undo ")) return `Undo: ${opLabel({ ...e, op: e.op.slice(5) })}`;
+  // "undo undo x" re-applies x: odd depth = Undo, even = Redo.
+  const depth = e.op.match(/^(undo )*/)![0].length / 5;
+  if (depth) return `${depth % 2 ? "Undo" : "Redo"}: ${opLabel({ ...e, op: e.op.slice(depth * 5) })}`;
   const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
   const name = e.ref_name?.replace(/^refs\/(heads|tags)\//, "");
   const labels: Record<string, string> = {
