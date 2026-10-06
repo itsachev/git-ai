@@ -7,7 +7,7 @@ import { Splitter } from "./lib/splitter";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
-import { Changes, opLabel, opLogQuery, pathsOf, statusQuery, useRun } from "./features/status/Changes";
+import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQuery, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery } from "./features/refs/Sidebar";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
@@ -136,7 +136,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const [tab, setTab] = useState<"status" | "history">("status");
   // Narrow windows show the rail as a drawer over the body; wide ones show both.
   const [side, setSide] = useState(false);
-  const [run, error] = useRun();
+  const run = useRun();
   const sync = useSync(path, run);
   const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
   const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
@@ -189,7 +189,8 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <Palette commands={commands} />
           <ThemeButton theme={theme} onChange={setTheme} />
         </header>
-        {error && <p className="error strip" role="alert"><Icon name="warn" />{error}</p>}
+        <Notice />
+        <OpErrorDialog />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
       </main>
     </div>

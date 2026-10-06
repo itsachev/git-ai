@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type { RepoInfo } from "../bindings/RepoInfo";
 import type { Status } from "../bindings/Status";
 import type { LineOp } from "../bindings/LineOp";
@@ -9,6 +9,43 @@ import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
 import type { Side } from "../bindings/Side";
 import type { DeviceCode } from "../bindings/DeviceCode";
+
+// Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Args = any;
+const short = (rev: string) => (/^[0-9a-f]{40}$/.test(rev) ? rev.slice(0, 7) : rev);
+const FAILED: Record<string, (a: Args) => string> = {
+  stage: () => "Failed to stage changes",
+  unstage: () => "Failed to unstage changes",
+  discard: () => "Failed to discard changes",
+  commit: (a) => (a.amend ? "Failed to amend the commit" : "Failed to commit"),
+  apply_lines: () => "Failed to update the selected lines",
+  undo: () => "Failed to undo",
+  checkout: (a) => `Failed to check out ${a.name}`,
+  create_branch: (a) => `Failed to create branch ${a.name}`,
+  delete_branch: (a) => `Failed to delete branch ${a.name}`,
+  merge: (a) => (a.cherryPick ? `Failed to cherry-pick ${short(a.rev)}` : `Failed to merge ${short(a.rev)}`),
+  abort: () => "Failed to abort",
+  create_tag: (a) => `Failed to create tag ${a.name}`,
+  delete_tag: (a) => `Failed to delete tag ${a.name}`,
+  stash_save: () => "Failed to stash changes",
+  stash: (a) => `Failed to ${a.op.toLowerCase()} stash`,
+  fetch: () => "Fetch failed",
+  pull: () => "Pull failed",
+  push: () => "Push failed",
+  push_tag: (a) => `Failed to push tag ${a.name}`,
+  delete_remote_branch: (a) => `Failed to delete ${a.name} on the remote`,
+  resolve: () => "Failed to resolve the conflict",
+  open_file: (a) => `Failed to open ${a.file}`,
+};
+async function invoke<T>(cmd: string, args?: Args): Promise<T> {
+  try {
+    return await tauriInvoke<T>(cmd, args);
+  } catch (e) {
+    const title = FAILED[cmd]?.(args);
+    throw title && typeof e === "object" && e ? { ...e, title } : e;
+  }
+}
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");

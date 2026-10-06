@@ -12,7 +12,7 @@ export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn:
 /** Branches, remotes, tags and stashes (Sourcetree's left sidebar). Double-click a branch to check it out. */
 export function Sidebar({ path }: { path: string }) {
   const { data, error } = useQuery(refsQuery(path));
-  const [run, opError] = useRun();
+  const run = useRun();
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
   // The form lives inside the section, so open the section too (Stashes starts collapsed).
@@ -47,7 +47,7 @@ export function Sidebar({ path }: { path: string }) {
   }
   async function removeRemote(name: string) {
     if (await ask(`Delete branch ${name} on the remote? Undo history (File Status) can push it back.`, { title: "Delete remote branch", kind: "warning" }))
-      run(() => deleteRemoteBranch(path, name));
+      run(() => deleteRemoteBranch(path, name), `Deleted ${name} on the remote`);
   }
   async function remove(name: string) {
     if (!(await ask(`Delete branch ${name}? Undo history (File Status) can restore it.`, { title: "Delete branch", kind: "warning" }))) return;
@@ -65,7 +65,6 @@ export function Sidebar({ path }: { path: string }) {
     <section className="sidebar" aria-label="Branches">
       <label className="search"><Icon name="search" /><input type="search" placeholder="Filter branches" aria-label="Filter branches"
         value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
-      {opError && <p className="error" role="alert">{opError}</p>}
       <details open>
         <summary>
           <Icon name="branch" />Branches <span className="count">{data.local.length}</span>
@@ -101,7 +100,7 @@ export function Sidebar({ path }: { path: string }) {
         <summary><Icon name="tag" />Tags <span className="count">{data.tags.length}</span></summary>
         <ul className="refs">
           {match(data.tags).map((t) => (
-            <Row key={t.name} item={t} actions={[["Push", () => run(() => pushTag(path, t.name))], ["Delete", async () => {
+            <Row key={t.name} item={t} actions={[["Push", () => run(() => pushTag(path, t.name), `Pushed tag ${t.name}`)], ["Delete", async () => {
               if (await ask(`Delete tag ${t.name}? Undo history (File Status) can restore it.`, { title: "Delete tag", kind: "warning" }))
                 run(() => deleteTag(path, t.name));
             }]]} />

@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, undo, unstage, workFile } from "../../lib/ipc";
@@ -13,7 +13,7 @@ export const statusQuery = (path: string) => ({ queryKey: ["status", path], quer
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
 
 type Selection = { file: string; staged: boolean };
-export type Run = (op: () => Promise<unknown>) => Promise<boolean>;
+export type Run = (op: () => Promise<unknown>, done?: string) => Promise<boolean>;
 
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
@@ -21,37 +21,77 @@ export const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_pat
 const confirmDiscard = (what: string) =>
   ask(`Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, { title: "Discard changes", kind: "warning" });
 
-/** `run(op)` runs a git op, keeps its error, refreshes right away (the watcher would too, 300 ms later). */
-// Every op bumps `opGen`; an op's error shows only until the next op starts anywhere in the app,
-// so e.g. aborting a merge from File Status clears the sidebar's "merge has conflicts".
+/** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
+ * A failure shows in `OpErrorDialog` until OK. */
 let opGen = 0;
+let opError: { title: string; text: string } | null = null;
 const opSubs = new Set<() => void>();
 const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
 
+// `run(op, done)`: on success `done` ("Pushed main") shows in `Notice` until the next op or for a few seconds.
+let notice: { text: string; gen: number } | null = null;
+
 export function useRun() {
   const qc = useQueryClient();
-  const gen = useSyncExternalStore(subscribeOps, () => opGen);
-  const [error, setError] = useState<{ text: string; gen: number } | null>(null);
-  async function run(op: () => Promise<unknown>) {
+  async function run(op: () => Promise<unknown>, done?: string) {
     const mine = ++opGen;
     opSubs.forEach((f) => f());
     try {
       await op();
+      if (done && mine === opGen) {
+        notice = { text: done, gen: mine };
+        opSubs.forEach((f) => f());
+      }
       return true;
     } catch (e) {
-      setError({ text: errorText(e), gen: mine });
+      opError = { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e) };
+      opSubs.forEach((f) => f());
       return false;
     } finally {
       qc.invalidateQueries();
     }
   }
-  return [run, error?.gen === gen ? error.text : null] as const;
+  return run;
+}
+
+/** Modal for the last failed op; OK (or Esc) dismisses it. */
+export function OpErrorDialog() {
+  const err = useSyncExternalStore(subscribeOps, () => opError);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (err) dialog.current?.showModal();
+    else dialog.current?.close();
+  }, [err]);
+  const close = () => { opError = null; opSubs.forEach((f) => f()); };
+  return (
+    <dialog ref={dialog} className="op-error" role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
+      onCancel={(e) => { e.preventDefault(); close(); }}>
+      <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
+        <h2 id="op-error-title"><Icon name="warn" />{err?.title}</h2>
+        <p id="op-error-text">{err?.text}</p>
+        <div className="dialog-actions"><button className="primary" autoFocus>OK</button></div>
+      </form>
+    </dialog>
+  );
+}
+
+/** Short success line for the last op (`run`'s `done`); fades out after 4 s. */
+export function Notice() {
+  const gen = useSyncExternalStore(subscribeOps, () => opGen);
+  const [hidden, setHidden] = useState<number | null>(null);
+  const cur = notice?.gen === gen && hidden !== gen ? notice : null;
+  useEffect(() => {
+    if (!cur) return;
+    const t = setTimeout(() => setHidden(cur.gen), 4000);
+    return () => clearTimeout(t);
+  }, [cur]);
+  return <p className="notice" role="status">{cur && <span key={cur.gen}><Icon name="check" />{cur.text}</span>}</p>;
 }
 
 export function Changes({ path }: { path: string }) {
   const { data, error } = useQuery(statusQuery(path));
   const [sel, setSel] = useState<Selection | null>(null);
-  const [run, opError] = useRun();
+  const run = useRun();
 
   async function discardFiles(files: FileChange[]) {
     if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`)) run(() => discard(path, pathsOf(files)));
@@ -96,7 +136,6 @@ export function Changes({ path }: { path: string }) {
         )}
         <History path={path} run={run} />
         </div>
-        {opError && <p className="error" role="alert">{opError}</p>}
         <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation}
           onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
       </div>

@@ -200,9 +200,15 @@
   - Step 7 passes: cherry-pick + undo, tag create/delete/undo, stash apply/drop/undo/pop.
   - Step 8 (remote): tag push works (checked with `git ls-remote --tags`), but gives no feedback. Gap: successful network ops (fetch, push, tag push, remote branch delete) are silent; add a short fading status line ("Pushed v1 to origin").
 
+- Network op feedback (2026-10-06): successful remote ops were silent. `run(op, done?)` in `Changes.tsx` now takes a success text; `Notice` (rendered once in the repo view, `role="status"`) shows it as a frosted pill at the bottom center with a green check, until the next op or 4 s (JS timer, so it also clears under reduced motion; CSS fades it). Texts: "Fetched all remotes", "Pulled origin/main", "Pushed main to origin/main", "Pushed tag v1", "Deleted origin/feat on the remote". New `check` icon (Solar check-circle). Verified: `npm run build` OK. Not yet seen in `tauri dev`.
+
+- Op error dialog (2026-10-06): failed git ops no longer show as red lines (toolbar strip, sidebar, File Status, commit details). `useRun` now returns only `run`; the error goes to a shared store and `OpErrorDialog` (in the repo view, `role="alertdialog"`) shows it as a centered modal with OK (Esc also closes). Form errors (clone, GitHub, open repo) stay inline. `.strip` CSS removed. Verified: `tsc` + `npm run build` OK.
+
+- Error titles (2026-10-06): the "dirty" error no longer lists files: "You have uncommitted changes. Stash, commit or discard them, then try again." (`errors.rs`, test updated). The dialog title names the failed op: `invoke` in `src/lib/ipc.ts` wraps Tauri's and adds `title` from a per-command `FAILED` map ("Failed to check out main", "Push failed", "Failed to cherry-pick 1a2b3c4"); fallback "Something went wrong". Verified: `tsc`, `npm run build`, `dirty_checkout` test OK.
+
 ## Next
 - Graph: try a wide repo (many parallel lanes) and check scroll smoothness on the 100k list in `tauri dev`.
-- Finish the click-through (`~/gitai-play/work`): rest of step 8 (rejected push, pull + undo, fetch, remote branch delete + undo), clone with progress, shortcuts, graph at scale. Then: success feedback for network ops (see step 8 note). Also try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
+- Finish the click-through (`~/gitai-play/work`): rest of step 8 (rejected push, pull + undo, fetch, remote branch delete + undo), clone with progress, shortcuts, graph at scale. Also try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
 - Create a GitHub OAuth app (enable device flow), run with `GITAI_GITHUB_CLIENT_ID=<id>`, sign in, push to an HTTPS remote with GCM off (`git config --global --unset credential.helper` in a test profile).
 - Installer code signing (Authenticode, Apple notarization).
 - v1 start: AI commit message from the staged diff (Gemini 3.5 Flash Lite, key from keychain / `GEMINI_API_KEY`, skip binary + >1 MB files).
