@@ -13,6 +13,7 @@ import { Sidebar, refsQuery } from "./features/refs/Sidebar";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Palette, type Command } from "./features/palette/Palette";
+import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { UpdateBanner } from "./features/update/Update";
 import "./App.css";
 
@@ -66,7 +67,7 @@ function App() {
   const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} theme={theme} setTheme={setTheme} /> : (
     <main className="home">
       <section className="home-intro">
-        <p className="brand"><Mark /> git-ai <ThemeButton theme={theme} onChange={setTheme} /></p>
+        <p className="brand"><Mark /> git-ai <ThemeButton theme={theme} onChange={setTheme} /><SettingsButton /></p>
         <h1>Git, in plain sight.</h1>
         <p className="lede">Local-first. Discards, branch deletes and merges are recorded, so each one can be undone.</p>
         <div className="tiles">
@@ -117,6 +118,7 @@ function App() {
     <>
       {body}
       <AskpassDialog />
+      <SettingsDialog />
       <UpdateBanner />
     </>
   );
@@ -156,7 +158,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   if (log?.[0]) commands.push({ label: `Undo: ${opLabel(log[0])}`, run: () => run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
     if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, run: () => run(() => checkout(path, b.name, false)) });
-  commands.push(...themeCommands(theme, setTheme), { label: "Close repository", run: onClose });
+  commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Close repository", run: onClose });
 
   return (
     <div className={`shell${side ? " show-side" : ""}`}>
@@ -188,6 +190,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <SyncButtons sync={sync} />
           <Palette commands={commands} />
           <ThemeButton theme={theme} onChange={setTheme} />
+          <SettingsButton />
         </header>
         <Notice />
         <OpErrorDialog />

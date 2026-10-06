@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, undo, unstage, workFile } from "../../lib/ipc";
+import { aiCommitMessage, abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, undo, unstage, workFile } from "../../lib/ipc";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon } from "../../lib/icons";
 import { Splitter } from "../../lib/splitter";
+import { aiKeyQuery, openSettings } from "../settings/Settings";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
@@ -138,7 +139,7 @@ export function Changes({ path }: { path: string }) {
         )}
         <History path={path} run={run} />
         </div>
-        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation}
+        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation} run={run}
           onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />
@@ -148,12 +149,28 @@ export function Changes({ path }: { path: string }) {
 }
 
 /** `finishing`: a merge/cherry-pick is in progress; committing finishes it, an empty message uses git's. */
-type CommitProps = { path: string; canCommit: boolean; finishing: boolean; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+type CommitProps = { path: string; canCommit: boolean; finishing: boolean; run: Run; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
 
-function CommitBox({ path, canCommit, finishing, onCommit }: CommitProps) {
+function CommitBox({ path, canCommit, finishing, run, onCommit }: CommitProps) {
   const [msg, setMsg] = useState("");
   const [amend, setAmend] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [writing, setWriting] = useState(false);
+  const hasKey = useQuery(aiKeyQuery).data;
+  // Generates from the staged diff only, so not for amend (the message would miss HEAD's changes) or merges.
+  async function generate() {
+    if (!hasKey) return openSettings();
+    setWriting(true);
+    await run(async () => {
+      try {
+        setMsg(await aiCommitMessage(path));
+      } catch (e) {
+        if ((e as AppError).code === "ai_key") openSettings();
+        throw e;
+      }
+    });
+    setWriting(false);
+  }
   const head = useQuery({ queryKey: ["head", path], queryFn: () => headMessage(path) }).data;
   // Amend may just reword, so it doesn't need staged changes.
   // A merge commit may have nothing staged (all conflicts resolved to "ours").
@@ -185,6 +202,10 @@ function CommitBox({ path, canCommit, finishing, onCommit }: CommitProps) {
         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
       />
       <div className="commit-row">
+        <button type="button" className="small" disabled={!canCommit || amend || finishing || writing} onClick={generate}
+          title={hasKey ? "Write a message from the staged changes (sent to Gemini)" : "Add a Gemini API key in Settings first"}>
+          {writing ? "Writing…" : "Generate message"}
+        </button>
         <label className="check">
           <input type="checkbox" checked={amend} disabled={!head || finishing} onChange={(e) => toggleAmend(e.target.checked)} />
           Amend last commit
