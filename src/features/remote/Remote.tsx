@@ -8,6 +8,7 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { refsQuery } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
+import { ModalHead } from "../../lib/modal";
 
 export type Sync = ReturnType<typeof useSync>;
 
@@ -36,7 +37,7 @@ export function useSync(path: string, run: Run) {
 }
 
 /** Sourcetree's toolbar buttons for `useSync`. */
-export function SyncButtons({ sync }: { sync: Sync }) {
+export function SyncButtons({ sync, children }: { sync: Sync; children?: React.ReactNode }) {
   return (
     <span className="sync">
       {sync.ops.map((o) => (
@@ -46,6 +47,7 @@ export function SyncButtons({ sync }: { sync: Sync }) {
           {o.count > 0 && <span className="count" title={`${o.count} to ${o.label.toLowerCase()}`}>{o.count}</span>}
         </button>
       ))}
+      {children}
     </span>
   );
 }
@@ -133,10 +135,11 @@ export function AskpassDialog() {
   // Usernames and ssh's host-key yes/no question are shown; passwords and passphrases are masked.
   const plain = !!cur && /username|yes\/no/i.test(cur.prompt);
   return (
-    <dialog ref={dialog} className="askpass" onCancel={(e) => { e.preventDefault(); answer(null); }}>
+    <dialog ref={dialog} className="modal askpass" aria-labelledby="askpass-title" onCancel={(e) => { e.preventDefault(); answer(null); }}>
       {cur && (
         <form onSubmit={(e) => { e.preventDefault(); answer(value); }}>
-          <p id="askpass-prompt">{cur.prompt.trim()}</p>
+          <ModalHead id="askpass-title" icon="remote" title="Git needs your input" sub="Your answer goes straight to git. git-ai doesn't store it." />
+          <p id="askpass-prompt" className="modal-text">{cur.prompt.trim()}</p>
           <input autoFocus key={cur.id} type={plain ? "text" : "password"} aria-labelledby="askpass-prompt"
             autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} />
           <div className="dialog-actions">

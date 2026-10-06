@@ -75,9 +75,14 @@ export const commitDetails = (path: string, oid: string) => invoke<CommitDetails
 export const commitFileDiff = (path: string, oid: string, file: string) =>
   invoke<string | null>("commit_file_diff", { path, oid, file });
 export const refs = (path: string) => invoke<Refs>("refs", { path });
-/** `track`: create a local branch tracking remote branch `name` ("origin/feat") and switch to it. */
-export const checkout = (path: string, name: string, track: boolean) => invoke<void>("checkout", { path, name, track });
-export const createBranch = (path: string, name: string, checkout: boolean) => invoke<void>("create_branch", { path, name, checkout });
+/** `track`: create a local branch tracking remote branch `name` ("origin/feat") and switch to it.
+ * Code "dirty" = local changes in the way; `carry` stashes them, switches and pops them back
+ * (code "conflicts" = they clash with the branch and stay stashed). */
+export const checkout = (path: string, name: string, track: boolean, carry = false) =>
+  invoke<void>("checkout", { path, name, track, carry });
+/** `from`: start point (branch, remote branch, tag); null = HEAD. Never tracks `from`. */
+export const createBranch = (path: string, name: string, from: string | null, checkout: boolean) =>
+  invoke<void>("create_branch", { path, name, from, checkout });
 /** Fails with code "not_merged" unless `force`. Undoable via the op log. */
 export const deleteBranch = (path: string, name: string, force: boolean) => invoke<void>("delete_branch", { path, name, force });
 /** Merges `rev` into the current branch, or with `cherryPick` applies that one commit. Code "conflicts" = stopped halfway. */

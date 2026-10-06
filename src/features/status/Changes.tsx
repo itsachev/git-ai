@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { aiCommitMessage, abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile } from "../../lib/ipc";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
@@ -8,6 +7,7 @@ import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon } from "../../lib/icons";
 import { Splitter } from "../../lib/splitter";
+import { ModalHead, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
@@ -20,7 +20,7 @@ export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
 export const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
 const confirmDiscard = (what: string) =>
-  ask(`Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, { title: "Discard changes", kind: "warning" });
+  confirm("Discard changes", `Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, "Discard", "danger");
 
 /** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
  * A failure shows in `OpErrorDialog` until OK. */
@@ -69,11 +69,11 @@ export function OpErrorDialog() {
   }, [err]);
   const close = () => { opError = null; opSubs.forEach((f) => f()); };
   return (
-    <dialog ref={dialog} className="op-error" role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
+    <dialog ref={dialog} className="modal tone-danger" role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
       onCancel={(e) => { e.preventDefault(); close(); }}>
       <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
-        <h2 id="op-error-title"><Icon name="warn" />{last.current?.title}</h2>
-        <p id="op-error-text">{last.current?.text}</p>
+        <ModalHead id="op-error-title" icon="warn" tone="danger" title={last.current?.title} />
+        <p id="op-error-text" className="modal-text">{last.current?.text}</p>
         <div className="dialog-actions"><button className="primary" autoFocus>OK</button></div>
       </form>
     </dialog>
@@ -91,7 +91,7 @@ export function Notice() {
     const t = setTimeout(() => setHidden(cur.gen), 4000);
     return () => clearTimeout(t);
   }, [cur]);
-  return <p className="notice" role="status">{cur && <span key={cur.gen}><Icon name="check" />{cur.text}</span>}</p>;
+  return <p className="notice" role="status">{cur && <span key={cur.gen} className="toast tone-ok"><span className="modal-badge tone-ok"><Icon name="check" /></span>{cur.text}</span>}</p>;
 }
 
 export function Changes({ path }: { path: string }) {
@@ -122,7 +122,7 @@ export function Changes({ path }: { path: string }) {
               {data.conflicted.length ? "Resolve the conflicts, then commit." : "Commit to finish it."}
             </span>
             <button className="small" onClick={async () => {
-              if (await ask(`Abort the ${data.operation}? Changed files are backed up first (Undo history).`, { title: "Abort", kind: "warning" }))
+              if (await confirm(`Abort the ${data.operation}?`, "Changed files are backed up first (Undo history).", "Abort"))
                 run(() => abortOp(path));
             }}>Abort</button>
           </div>
