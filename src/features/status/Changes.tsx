@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { aiCommitMessage, abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, undo, unstage, workFile } from "../../lib/ipc";
+import { aiCommitMessage, abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile } from "../../lib/ipc";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
@@ -60,6 +60,9 @@ export function useRun() {
 export function OpErrorDialog() {
   const err = useSyncExternalStore(subscribeOps, () => opError);
   const dialog = useRef<HTMLDialogElement>(null);
+  // Keep the last text through the close transition so the dialog doesn't empty while fading.
+  const last = useRef(err);
+  if (err) last.current = err;
   useEffect(() => {
     if (err) dialog.current?.showModal();
     else dialog.current?.close();
@@ -69,8 +72,8 @@ export function OpErrorDialog() {
     <dialog ref={dialog} className="op-error" role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
       onCancel={(e) => { e.preventDefault(); close(); }}>
       <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
-        <h2 id="op-error-title"><Icon name="warn" />{err?.title}</h2>
-        <p id="op-error-text">{err?.text}</p>
+        <h2 id="op-error-title"><Icon name="warn" />{last.current?.title}</h2>
+        <p id="op-error-text">{last.current?.text}</p>
         <div className="dialog-actions"><button className="primary" autoFocus>OK</button></div>
       </form>
     </dialog>
@@ -137,7 +140,6 @@ export function Changes({ path }: { path: string }) {
               action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} />
           </>
         )}
-        <History path={path} run={run} />
         </div>
         <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation} run={run}
           onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
@@ -400,27 +402,6 @@ export function lineNumbers(lines: string[], start: number) {
 }
 
 export const Gutter = ({ o, n }: { o: number | ""; n: number | "" }) => <span className="ln" aria-hidden="true"><span>{o}</span><span>{n}</span></span>;
-
-function History({ path, run }: { path: string; run: Run }) {
-  const { data } = useQuery(opLogQuery(path));
-  if (!data?.length) return null;
-  return (
-    <details className="history">
-      <summary><Icon name="undo" />Undo history <span className="count">{data.length}</span></summary>
-      <ul className="files">
-        {data.map((e) => (
-          <li key={e.id}>
-            <span className="path">
-              <strong>{opLabel(e)}</strong>
-              <small>{new Date(Number(e.id)).toLocaleString()}</small>
-            </span>
-            <button className="small" onClick={() => run(() => undo(path, e.id))}>Undo</button>
-          </li>
-        ))}
-      </ul>
-    </details>
-  );
-}
 
 export function opLabel(e: OpEntry): string {
   // "undo undo x" re-applies x: odd depth = Undo, even = Redo.

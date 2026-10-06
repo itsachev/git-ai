@@ -167,7 +167,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <button className="icon-btn" onClick={onClose} aria-label="Back to repositories" title="Back to repositories"><Icon name="back" /></button>
           <div className="repo-id">
             <strong title={path}>{repo.name}</strong>
-            <span className="branch-chip" title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
+            <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
           </div>
         </div>
         <nav className="views" aria-label="Views">
@@ -187,6 +187,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         <header className="toolbar">
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : "History"}</h1>
+          <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
           <SyncButtons sync={sync} />
           <Palette commands={commands} />
           <ThemeButton theme={theme} onChange={setTheme} />

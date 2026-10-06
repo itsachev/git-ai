@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+﻿import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { checkout, createBranch, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, refs, stash, stashSave } from "../../lib/ipc";
+import { checkout, createBranch, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, refs, stash, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
-import { errorText, useRun } from "../status/Changes";
+import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
@@ -12,6 +12,7 @@ export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn:
 /** Branches, remotes, tags and stashes (Sourcetree's left sidebar). Double-click a branch to check it out. */
 export function Sidebar({ path }: { path: string }) {
   const { data, error } = useQuery(refsQuery(path));
+  const log = useQuery(opLogQuery(path)).data;
   const run = useRun();
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<"branch" | "stash" | null>(null);
@@ -42,15 +43,15 @@ export function Sidebar({ path }: { path: string }) {
   };
   const mergeIn = (name: string) => run(() => merge(path, name, false));
   async function dropStash(i: number, s: RefItem) {
-    if (await ask(`Drop stash "${s.name}"? Undo history (File Status) can restore it.`, { title: "Drop stash", kind: "warning" }))
+    if (await ask(`Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, { title: "Drop stash", kind: "warning" }))
       run(() => stash(path, "Drop", i, s.oid));
   }
   async function removeRemote(name: string) {
-    if (await ask(`Delete branch ${name} on the remote? Undo history (File Status) can push it back.`, { title: "Delete remote branch", kind: "warning" }))
+    if (await ask(`Delete branch ${name} on the remote? Undo history (sidebar) can push it back.`, { title: "Delete remote branch", kind: "warning" }))
       run(() => deleteRemoteBranch(path, name), `Deleted ${name} on the remote`);
   }
   async function remove(name: string) {
-    if (!(await ask(`Delete branch ${name}? Undo history (File Status) can restore it.`, { title: "Delete branch", kind: "warning" }))) return;
+    if (!(await ask(`Delete branch ${name}? Undo history (sidebar) can restore it.`, { title: "Delete branch", kind: "warning" }))) return;
     run(async () => {
       try {
         await deleteBranch(path, name, false);
@@ -101,7 +102,7 @@ export function Sidebar({ path }: { path: string }) {
         <ul className="refs">
           {match(data.tags).map((t) => (
             <Row key={t.name} item={t} actions={[["Push", () => run(() => pushTag(path, t.name), `Pushed tag ${t.name}`)], ["Delete", async () => {
-              if (await ask(`Delete tag ${t.name}? Undo history (File Status) can restore it.`, { title: "Delete tag", kind: "warning" }))
+              if (await ask(`Delete tag ${t.name}? Undo history (sidebar) can restore it.`, { title: "Delete tag", kind: "warning" }))
                 run(() => deleteTag(path, t.name));
             }]]} />
           ))}
@@ -124,6 +125,22 @@ export function Sidebar({ path }: { path: string }) {
           ))}
         </ul>
       </details>
+      {log && log.length > 0 && (
+        <details>
+          <summary><Icon name="undo" />Undo history <span className="count">{log.length}</span></summary>
+          <ul className="refs ops">
+            {log.map((e) => (
+              <li key={e.id}>
+                <span className="name">
+                  <span>{opLabel(e)}</span>
+                  <small>{new Date(Number(e.id)).toLocaleString()}</small>
+                </span>
+                <button className="small" onClick={() => run(() => undo(path, e.id))}>Undo</button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }

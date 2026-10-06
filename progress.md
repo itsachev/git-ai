@@ -8,6 +8,7 @@
 - **Git access (hybrid):** reads via `git2` (log, diff, blame, refs, graph); writes + network via system `git` binary (no shell, porcelain v2 `-z` parsing). Requires git ≥ 2.38.
 - **Credentials:** git's own credential helpers (GCM, ssh-agent) via `GIT_ASKPASS`; provider OAuth tokens in OS keychain (`keyring`).
 - **Undo:** op log in `.git/git-ai/oplog.jsonl` + backup refs under `refs/git-ai/backup/*`.
+- **UI look:** one stylesheet (`src/App.css`), light/dark tokens on `:root`. Indigo accent; "active" = tint + 3px bar + bold accent text. Type: Geist + Geist Mono, bundled via `@fontsource-variable` (offline). Motion is CSS only (spring dialogs/popovers via `@starting-style`), off under reduced motion.
 - **Graph:** lane layout in Rust (`src-tauri/src/git/graph.rs`), paged to a virtualized canvas (`src/features/graph/CommitGraph.tsx`).
 - **Run/build:** `npm install`, then `npm run tauri dev`. It opens a native window and rebuilds as `src/` changes; the first Rust build takes ~2 min. `npm run dev` serves only the frontend at http://localhost:1420, where the Tauri IPC (git data, folder picker) does not work, so use the window. Release: `npm run tauri build` produces `src-tauri/target/release/gitai.exe` + installers in `bundle/`.
 
@@ -224,8 +225,25 @@
   - No UI to remove a saved key (only `ai_set_key(null)`).
 - Settings dialog (2026-10-06): users shouldn't meet the key form inside the commit box. The Gemini key moved to a new `src/features/settings/Settings.tsx`. `SettingsDialog` is rendered once at the App root and opened from anywhere with `openSettings()`. Entry points: the gear button (home brand row and repo toolbar), the palette's "Settings" command, and "Generate message" clicked with no key or with a rejected one. The AI section says whether a key is set, explains BYOK + what's sent, links "Get a key", and has Save / Remove. Inline `KeyForm` removed from `Changes.tsx`. New `settings` icon (Solar). `.setting h3` joins the shared Labels rule. Verified: `tsc`, `npm run build`.
   - Remove only clears the keychain; a `GEMINI_API_KEY` env var still counts as "a key is set".
+- Visual redesign (2026-10-06), "signal on graphite":
+  - Readability: base font 13 → 14px, line-height 1.5, controls 2rem. `--muted`/`--faint` darker in light and lighter in dark. Sidebar section headers and file-path dirs use `--muted` instead of `--faint`. Note: rem breakpoints and container queries scale with the base, so 48rem is now 672 px.
+  - Accent changed from system blue to indigo (`#4f46e5` light, `#5e5ce6` dark).
+  - One "active" language (`--active` tint + `--active-bar` 3px inset bar + bold accent text) for the current view, the current branch row and the HEAD row in the graph. The current branch is a filled accent pill in the rail head and now also in the toolbar (`App.tsx`), so it stays visible when the rail is a drawer. It is keyed on the branch, so it pops again after a checkout. The HEAD dot has a slow ring pulse.
+  - Popups: dialogs spring in (scale + rise), fade out on close (`@starting-style` + `allow-discrete` on `display`/`overlay`), and get a blurred backdrop. The branch row menu is frosted and animated the same way. The error dialog keeps its last text during the close fade (`OpErrorDialog` in `Changes.tsx`). The error icon gets a short wiggle, and the success toast springs in.
+  - Buttons scale to 0.97 on press. Primary buttons glow on hover. Rows fade their hover background. The stage body rises in on a tab switch. Reduced motion still turns off every animation and transition.
+  - Skipped from the awwwards skill: GSAP, Lenis and Three.js. This is a desktop tool, so CSS covers the motion and no dependency was added.
+  - Verified: `npm run build` OK. Not yet seen in `tauri dev`.
+- Typography (2026-10-06): Geist (UI and headings) and Geist Mono (refs, hashes, diffs), one superfamily. Self-hosted from `@fontsource-variable/geist` and `geist-mono` (new deps, imported in `main.tsx`), about 52 KB woff2, so it works offline. System fonts are the fallback.
+  - Text gets -0.006em tracking. Headings are 650 weight with tighter tracking that grows with size: home h1 is 650, up to 3.4rem, -0.045em; toolbar, dialog and commit subject are -0.03em. Labels stay 700 (shared rule).
+  - Mono runs have no tracking. Ref names drop to 0.86rem because Geist Mono runs wide, and diff line-height goes to 1.65.
+  - Hashes, dates, counts and ahead/behind numbers use tabular figures. That rule sits at the end of `App.css`, because the `font` shorthands above reset `font-variant`.
+  - Verified: `npm run build` OK. Not yet seen in `tauri dev`.
+- Undo history moved to the sidebar (2026-10-06): a collapsible section after Stashes (`Sidebar.tsx`, `.ops` rows: label over time, Undo button), so it is reachable from both views. Removed from `Changes.tsx`. Confirm dialogs now say "Undo history (sidebar)".
+  - File lists get hairline separators: a 1px gradient line between rows, inset past the kind badge, hidden next to the hovered or selected row (`App.css`, `.files li + li::before`).
+  - Verified: `tsc --noEmit` OK. Not yet seen in `tauri dev`.
 
 ## Next
+- Look over the redesign and the new type in `tauri dev`, light and dark: active branch pill and rows, dialog and menu open/close animations, the 672 px drawer breakpoint, Geist Mono widths in the sidebar and graph, the sidebar Undo history and the file-list separators.
 - Try AI commit message in `tauri dev`: Settings (gear) → paste the dev key → Save, then Generate message (checks the keychain path and the UI).
 - Graph: try a wide repo (many parallel lanes) and check scroll smoothness on the 100k list in `tauri dev`.
 - Finish the click-through (`~/gitai-play/work`): clone with progress, shortcuts, graph at scale. Also try askpass with an HTTPS remote without GCM and an SSH key with a passphrase; clone a real HTTPS repo to see the progress line; check no shortcut clashes with WebView2/WKWebView defaults.
