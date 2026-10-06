@@ -12,6 +12,7 @@ Tauri scaffold in place (create-tauri-app react-ts template). The plan and the s
 - `npm run tauri dev`: run the app in a native window with hot reload (first Rust build takes ~2 min). Plain `npm run dev` (http://localhost:1420) has no Tauri backend, so IPC calls fail there.
 - `npm run tauri build`: release build. Output: `src-tauri/target/release/gitai.exe` plus MSI/NSIS installers under `src-tauri/target/release/bundle/`.
 - `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests; also regenerates `src/bindings/*.ts` (commit them).
+- `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`: times the graph on a generated 100k-commit repo (last run: 0.77 s first page, 6 ms cached page).
 - The exe name comes from `mainBinaryName` in `src-tauri/tauri.conf.json`. Keep it `gitai`.
 
 ## What this is
