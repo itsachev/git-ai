@@ -255,8 +255,12 @@
   - Verified: cargo test 31 pass (`reads_commits_and_graph` covers `commit_patch`), `tsc --noEmit` OK. Not yet seen in `tauri dev`.
   - Where: History view → click a commit → Explain, after Cherry-pick / Merge into current / Tag… in the details panel. Needs a Gemini key (Settings or `GEMINI_API_KEY`).
   - Committed on `main` (not pushed).
+- 2026-10-06: SSH-only notice + SSH key setting. On every launch `SshNotice` (`Settings.tsx`, mounted in `App`) says only SSH remotes are supported for now, with "Set up SSH key" (opens Settings) and OK. Settings has an "SSH key" section: Choose key (file picker in `~/.ssh`), Use ssh defaults. Backend: `ssh_key` / `ssh_key_set` commands store the path as `ssh_key` in `settings.json` (only the path, the key file stays put); `ssh_key_set` rejects `.pub`, unreadable files, non-"PRIVATE KEY" files and paths with `'`. `askpass::env()` (used by every network git call) adds `GIT_SSH_COMMAND=ssh -i '<path>' -o IdentitiesOnly=yes` (forward slashes); loaded at startup in `lib.rs` setup. Test `askpass::tests::ssh_command_quotes_windows_path`. Verified: cargo test 32 pass, `tsc` OK. Not yet seen in `tauri dev`.
+  - Note: the GitHub HTTPS sign-in still exists; the notice just says HTTPS may not work.
+  - Committed on `main` (not pushed).
 
 ## Next
+- Try the SSH key setting in `tauri dev`: launch notice, Choose key (passphrase key prompts via askpass), push/fetch over SSH with the chosen key, Use ssh defaults. Maybe a "don't show again" for the notice.
 - AI follow-ups after Explain: PR title/description and changelog from a commit range (branch vs base, or between tags). Both can reuse `commit_patch`/`patch_text` + `generate`.
 - Look over the redesign and the new type in `tauri dev`, light and dark: active branch pill and rows, dialog and menu open/close animations, the 672 px drawer breakpoint, Geist Mono widths in the sidebar and graph, the sidebar Undo history and the file-list separators.
 - Try AI commit message in `tauri dev`: Settings (gear) → paste the dev key → Save, then Generate message (checks the keychain path and the UI).

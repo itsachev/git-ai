@@ -242,6 +242,38 @@ pub fn github_sign_out() -> Result<(), AppError> {
     crate::github::sign_out()
 }
 
+// SSH key for network git (path only; the key file stays where it is).
+#[tauri::command]
+pub fn ssh_key(app: AppHandle) -> Option<String> {
+    app.store(STORE).ok()?.get("ssh_key")?.as_str().map(String::from)
+}
+
+/// Checks that `path` is a private key file, saves it and uses it from the next network op. None = ssh defaults.
+#[tauri::command]
+pub fn ssh_key_set(app: AppHandle, path: Option<String>) -> Result<(), AppError> {
+    let path = path.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
+    if let Some(p) = &path {
+        let bad = |m: &str| Err(AppError::new("ssh_key", m));
+        if p.contains('\'') {
+            return bad("The key path can't contain a ' character. Move or rename the key.");
+        }
+        if p.ends_with(".pub") {
+            return bad("That's the public key. Pick the private key: the same file without .pub.");
+        }
+        let Ok(text) = std::fs::read_to_string(p) else { return bad("Can't read that file.") };
+        if !text.contains("PRIVATE KEY") {
+            return bad("That file isn't an SSH private key.");
+        }
+    }
+    let store = app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?;
+    match &path {
+        Some(p) => store.set("ssh_key", json!(p)),
+        None => drop(store.delete("ssh_key")),
+    }
+    crate::askpass::set_ssh_key(path);
+    Ok(())
+}
+
 // AI (Gemini, BYOK).
 #[tauri::command]
 pub fn ai_has_key() -> bool {

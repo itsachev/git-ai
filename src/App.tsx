@@ -15,7 +15,7 @@ import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Palette, type Command } from "./features/palette/Palette";
-import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
+import { SettingsButton, SettingsDialog, SshNotice, openSettings } from "./features/settings/Settings";
 import { UpdateBanner } from "./features/update/Update";
 import "./App.css";
 
@@ -121,6 +121,7 @@ function App() {
       {body}
       <AskpassDialog />
       <SettingsDialog />
+      <SshNotice />
       <ConfirmDialog />
       <UpdateBanner />
     </>

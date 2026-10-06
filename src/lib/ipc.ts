@@ -124,6 +124,10 @@ export const githubFinish = (code: DeviceCode) => invoke<string>("github_finish"
 /** null = signed out. */
 export const githubUser = () => invoke<string | null>("github_user");
 export const githubSignOut = () => invoke<void>("github_sign_out");
+// SSH key used for fetch/pull/push/clone. null = ssh's defaults (~/.ssh/id_*, ssh-agent).
+export const sshKey = () => invoke<string | null>("ssh_key");
+/** null clears it. Code "ssh_key" when the file isn't a readable private key. */
+export const sshKeySet = (path: string | null) => invoke<void>("ssh_key_set", { path });
 // AI (Gemini, bring your own key). The key stays in the OS keychain (or GEMINI_API_KEY in dev).
 export const aiHasKey = () => invoke<boolean>("ai_has_key");
 /** null removes the stored key. */

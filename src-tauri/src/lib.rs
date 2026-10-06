@@ -19,6 +19,7 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             #[cfg(desktop)]
             fit_to_work_area(app);
+            askpass::set_ssh_key(commands::ssh_key(app.handle().clone()));
             Ok(askpass::start(app.handle().clone())?)
         })
         .manage(watch::RepoWatcher::default())
@@ -61,6 +62,8 @@ pub fn run() {
             commands::github_finish,
             commands::github_user,
             commands::github_sign_out,
+            commands::ssh_key,
+            commands::ssh_key_set,
             commands::ai_has_key,
             commands::ai_set_key,
             commands::ai_commit_message,

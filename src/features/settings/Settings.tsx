@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { aiHasKey, aiSetKey } from "../../lib/ipc";
+import { open as pickFile } from "@tauri-apps/plugin-dialog";
+import { homeDir, join } from "@tauri-apps/api/path";
+import { aiHasKey, aiSetKey, sshKey, sshKeySet } from "../../lib/ipc";
 import { Icon } from "../../lib/icons";
 import { ModalHead } from "../../lib/modal";
 import { errorText } from "../status/Changes";
@@ -33,7 +35,7 @@ export function SettingsDialog() {
   return (
     <dialog ref={dialog} className="modal settings" aria-labelledby="settings-title" onCancel={(e) => { e.preventDefault(); set(false); }}>
       <ModalHead id="settings-title" icon="settings" title="Settings" sub="Stored on this computer only." />
-      {isOpen && <AiKey />}
+      {isOpen && <><SshKey /><AiKey /></>}
       <div className="dialog-actions">
         <button onClick={() => set(false)}>Close</button>
       </div>
@@ -73,5 +75,61 @@ function AiKey() {
       </form>
       {error && <p className="error" role="alert">{error}</p>}
     </section>
+  );
+}
+
+/** Private key for fetch/pull/push/clone. Only the path is stored; ssh reads the file. */
+function SshKey() {
+  const qc = useQueryClient();
+  const key = useQuery({ queryKey: ["ssh-key"], queryFn: sshKey }).data;
+  const [error, setError] = useState<string | null>(null);
+  async function save(path: string | null) {
+    setError(null);
+    try {
+      await sshKeySet(path);
+      qc.invalidateQueries({ queryKey: ["ssh-key"] });
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
+  async function choose() {
+    const defaultPath = await join(await homeDir(), ".ssh").catch(() => undefined);
+    const path = await pickFile({ title: "Choose your SSH private key", defaultPath });
+    if (typeof path === "string") save(path);
+  }
+  return (
+    <section className="setting">
+      <h3>SSH key</h3>
+      <p className="muted">
+        Remotes connect over SSH (git@host:owner/repo.git). Pick the private key, not the .pub file.
+        Without one, ssh uses ssh-agent and the default keys in ~/.ssh.
+      </p>
+      <p className="mono ssh-key-path">{key ?? "Using ssh defaults."}</p>
+      <div className="row">
+        <button className="primary" onClick={choose}>{key ? "Change key" : "Choose key"}</button>
+        {key && <button onClick={() => save(null)}>Use ssh defaults</button>}
+      </div>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+/** Shown once per launch: only SSH remotes are supported for now. */
+export function SshNotice() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+  const close = () => dialog.current?.close();
+  return (
+    <dialog ref={dialog} className="modal" aria-labelledby="ssh-notice-title" aria-describedby="ssh-notice-text">
+      <ModalHead id="ssh-notice-title" icon="remote" title="SSH remotes only, for now" />
+      <p id="ssh-notice-text" className="modal-text">
+        git-ai currently supports connecting to remote repositories over SSH only (URLs like git@github.com:owner/repo.git).
+        HTTPS remotes may not sign in. Add your SSH key in Settings, or leave it to ssh-agent and ~/.ssh.
+      </p>
+      <div className="dialog-actions">
+        <button onClick={() => { close(); openSettings(); }}>Set up SSH key</button>
+        <button className="primary" autoFocus onClick={close}>OK</button>
+      </div>
+    </dialog>
   );
 }
