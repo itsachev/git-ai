@@ -212,7 +212,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .github .error { margin: 0.5rem 0 0; }
 
 /* ---------- Repo shell: rail + stage ---------- */
-.shell { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); }
+.shell { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 .rail {
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   background: var(--rail); border-right: 1px solid var(--line);
@@ -237,6 +237,10 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .views button[aria-current="page"] { background: var(--active); box-shadow: var(--active-bar); color: var(--accent-fg); font-weight: 700; }
 .views button[aria-current="page"] .icon { color: var(--accent); }
 .views button[aria-current="page"] .count { color: var(--accent-ink); background: var(--accent); }
+/* Unresolved conflicts: File Status turns red, active or not. */
+.views button.conflict, .views button.conflict .icon { color: var(--danger); }
+.views button.conflict[aria-current="page"] { background: color-mix(in srgb, var(--danger) 13%, transparent); box-shadow: inset 3px 0 0 var(--danger); }
+.views button.conflict .count { color: #fff; background: var(--danger); }
 
 .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .toolbar {
@@ -277,10 +281,15 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   .show-side .rail { translate: 0 0; visibility: visible; transition: translate 240ms var(--ease); }
   .scrim { position: fixed; inset: 0; z-index: 19; background: rgb(0 0 0 / 0.4); opacity: 0; pointer-events: none; transition: opacity 200ms; }
   .show-side .scrim { opacity: 1; pointer-events: auto; }
-  /* Labels become screen-reader only; icons carry the toolbar. */
+  .stage-body { padding: 0.5rem; }
+}
+/* Stage panes follow the stage's own width: the resizable sidebar takes part of the window. */
+.toolbar { container: toolbar / inline-size; }
+.stage-body { container: stage / inline-size; }
+/* Narrow toolbar: labels become screen-reader only; icons carry it. */
+@container toolbar (max-width: 44rem) {
   .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .sync button { padding: 0 0.6rem; }
-  .stage-body { padding: 0.5rem; }
 }
 
 /* Pane splitters (src/lib/splitter.tsx). Between panes the handle is the 0.75rem gap itself. */
@@ -293,10 +302,10 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .split:hover::after, .split:active::after, .split:focus-visible::after { opacity: 1; }
 .split:focus-visible { outline: none; }
 .changes > .split, .history-bottom > .split { display: none; }
-@media (min-width: 52rem) { .changes > .split, .history-bottom > .split { display: block; } }
+@container stage (min-width: 38rem) { .changes > .split, .history-bottom > .split { display: block; } }
 
 /* ---------- Sidebar: branches, remotes, tags, stashes ---------- */
-.sidebar { flex: 1; min-height: 0; overflow: auto; padding: 0.6rem 0.5rem 1rem; }
+.sidebar { flex: 1; min-height: 0; overflow: auto; padding: 0.6rem 0.5rem 10px; }
 .sidebar > .search { margin-bottom: 0.25rem; }
 .sidebar summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.45rem;
@@ -378,9 +387,9 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 
 /* ---------- File Status ---------- */
 .changes { display: grid; gap: 0.75rem; }
-.side { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.side { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; container: side / inline-size; }
 .lists { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; align-content: start; }
-.list-head { display: flex; align-items: center; gap: 0.35rem; margin: 0.6rem 0 0.2rem; padding-left: 0.4rem; }
+.list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.6rem 0 0.2rem; padding-left: 0.4rem; }
 .list-head h2, .commit-info h3 {
   display: flex; align-items: center; gap: 0.45rem; margin-right: auto;
   font-size: 0.8rem; color: var(--muted);
@@ -398,8 +407,17 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   background: color-mix(in srgb, var(--mod) 10%, var(--panel)); color: var(--fg);
 }
 .banner .icon { color: var(--mod); }
-.banner span { flex: 1; min-width: 12rem; }
-@media (min-width: 52rem) {
+.banner span { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
+@container side (max-width: 17rem) {
+  .banner { padding: 0.5rem 0.6rem; font-size: 0.9rem; }
+  .banner > button, .commit-row > * { flex: 1 1 100%; }
+  /* Row actions drop under the file name instead of squeezing it to nothing. */
+  .files li { flex-wrap: wrap; padding-bottom: 0.15rem; }
+  .files .row { flex-basis: 100%; }
+  .files li > button.small { margin-left: auto; }
+  .files li > button.small + button.small { margin-left: 0; }
+}
+@container stage (min-width: 38rem) {
   .changes { height: 100%; grid-template-columns: var(--side-w, 22rem) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 0; }
   .side { min-height: 0; }
   .lists { flex: 1; min-height: 0; overflow: auto; }
@@ -437,6 +455,25 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .diff .pick.on { box-shadow: inset 3px 0 var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
 .diff-bar { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-height: var(--ctl); margin-bottom: 0.4rem; font-size: 0.9rem; }
 .diff-bar > span { margin-right: auto; }
+.diff-bar > .split-btn, .diff-bar > .conflict-actions { margin-right: 0; }
+.conflict-file { min-width: 0; overflow-wrap: anywhere; }
+.conflict-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
+.changes > .diff { container: pane / inline-size; }
+@container pane (max-width: 40rem) {
+  .conflict-file { flex-basis: 100%; }
+  .conflict-actions { flex: 1; justify-content: stretch; }
+  .conflict-actions > * { flex: 1 1 8rem; }
+  .conflict-actions .split-btn > button:first-child { flex: 1; max-width: none; }
+}
+.split-btn { display: inline-flex; min-width: 0; }
+.split-btn > button { border-radius: var(--r) 0 0 var(--r); min-width: 0; max-width: 15rem; }
+.split-btn > button > span { overflow: hidden; text-overflow: ellipsis; }
+.split-btn > .split-menu {
+  flex: none; width: 1.7rem; padding: 0; border-radius: 0 var(--r) var(--r) 0;
+  border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent);
+}
+.editor-menu { transform-origin: top right; min-width: 12rem; }
+.editor-menu .check { display: inline-flex; width: 1.1rem; margin-right: 0.2rem; }
 /* Conflict view: regions between the markers. */
 .diff .ours, .legend .ours { background: color-mix(in srgb, var(--info) 16%, var(--panel)); }
 .diff .theirs, .legend .theirs { background: color-mix(in srgb, var(--add) 16%, var(--panel)); }
@@ -507,7 +544,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .commit-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .commit-info dd.mono { font-size: 0.82rem; }
 .commit-info h3 { margin: 0.5rem 0 0.25rem; padding-left: 0.4rem; }
-@media (min-width: 52rem) {
+@container stage (min-width: 38rem) {
   .history-bottom { grid-template-columns: var(--info-w, 24rem) auto minmax(0, 1fr); column-gap: 0; overflow: hidden; align-content: stretch; }
   .history-bottom > * { min-height: 0; overflow: auto; }
   .history-bottom > .diff { display: flex; flex-direction: column; }

@@ -1,6 +1,7 @@
 mod ai;
 pub mod askpass;
 mod commands;
+mod editors;
 mod errors;
 mod git;
 mod github;
@@ -62,6 +63,7 @@ pub fn run() {
             commands::resolve,
             commands::work_file,
             commands::open_file,
+            commands::editors,
             commands::github_start,
             commands::github_finish,
             commands::github_user,

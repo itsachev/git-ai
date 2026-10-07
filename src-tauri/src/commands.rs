@@ -227,9 +227,16 @@ pub fn work_file(path: String, file: String) -> Result<Option<String>, AppError>
     read::work_file(Path::new(&path), &file)
 }
 
-/// Opens a repo file in its default app (e.g. to resolve a conflict in an editor).
+/// Editors installed here plus the last one picked for `open_file`.
 #[tauri::command]
-pub fn open_file(app: AppHandle, path: String, file: String) -> Result<(), AppError> {
+pub fn editors(app: AppHandle) -> crate::editors::Editors {
+    crate::editors::list(app.store(STORE).ok().and_then(|s| s.get("editor")).and_then(|v| v.as_str().map(String::from)))
+}
+
+/// Opens a repo file (e.g. to resolve a conflict) in `editor` (a name from `editors`), or its default app when None.
+/// The choice is remembered for next time.
+#[tauri::command]
+pub fn open_file(app: AppHandle, path: String, file: String, editor: Option<String>) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;
     // Only paths inside the repo; `file` comes from the status list.
     let rel = Path::new(&file);
@@ -237,7 +244,16 @@ pub fn open_file(app: AppHandle, path: String, file: String) -> Result<(), AppEr
         return Err(AppError::new("bad_path", format!("'{file}' is not inside the repository.")));
     }
     let full = Path::new(&path).join(rel);
-    app.opener().open_path(full.to_string_lossy(), None::<&str>).map_err(|e| AppError::new("open", e.to_string()))
+    if let Ok(store) = app.store(STORE) {
+        match &editor {
+            Some(e) => store.set("editor", json!(e)),
+            None => drop(store.delete("editor")),
+        }
+    }
+    match editor {
+        Some(e) => crate::editors::open(&e, &full),
+        None => app.opener().open_path(full.to_string_lossy(), None::<&str>).map_err(|e| AppError::new("open", e.to_string())),
+    }
 }
 
 #[tauri::command]

@@ -8,6 +8,7 @@ import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
 import type { Side } from "../bindings/Side";
+import type { Editors } from "../bindings/Editors";
 import type { DeviceCode } from "../bindings/DeviceCode";
 import type { RebaseCommit } from "../bindings/RebaseCommit";
 import type { RebaseStep } from "../bindings/RebaseStep";
@@ -138,8 +139,10 @@ export const cloneRepo = (url: string, dest: string) => invoke<RepoInfo>("clone_
 export const resolve = (path: string, paths: string[], side: Side) => invoke<void>("resolve", { path, paths, side });
 /** Working-tree text of a file; null = binary or over 1 MB. */
 export const workFile = (path: string, file: string) => invoke<string | null>("work_file", { path, file });
-/** Opens a repo file in its default app. */
-export const openFile = (path: string, file: string) => invoke<void>("open_file", { path, file });
+/** Opens a repo file in `editor` (a name from `editors()`), or its default app when null. Remembers the choice. */
+export const openFile = (path: string, file: string, editor: string | null) => invoke<void>("open_file", { path, file, editor });
+/** Installed editors and the last one used. */
+export const editors = () => invoke<Editors>("editors");
 /** Answers an "askpass" prompt; null cancels (git then fails). */
 export const askpassReply = (id: number, answer: string | null) => invoke<void>("askpass_reply", { id, answer });
 // GitHub sign-in (OAuth device flow). The token stays in the OS keychain; git gets it via askpass.

@@ -76,6 +76,8 @@ pub struct Status {
     pub conflicted: Vec<FileChange>,
     /// Merge/cherry-pick/... waiting for commit or abort, see `read::operation`.
     pub operation: Option<String>,
+    /// What that operation is applying right now, see `read::op_step`.
+    pub step: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, TS)]
@@ -93,6 +95,7 @@ pub fn status(repo: &Path) -> Result<Status, AppError> {
     let out = git(repo, &["--no-optional-locks", "status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"])?;
     let mut s = parse_status(&out);
     s.operation = crate::git::read::operation(repo)?;
+    s.step = s.operation.as_deref().and_then(|op| crate::git::read::op_step(repo, op));
     Ok(s)
 }
 
@@ -213,8 +216,11 @@ pub fn merge(repo: &Path, rev_name: &str, cherry_pick: bool) -> Result<(), AppEr
 /// When git stopped halfway (the op is still in progress), says so instead of git's raw error.
 fn stopped(repo: &Path, op: &str, e: AppError) -> AppError {
     match crate::git::read::operation(repo) {
-        Ok(Some(_)) if op == "rebase" => AppError::new("conflicts", "The rebase stopped at a conflict. Resolve it in File Status, then commit to continue (or abort the rebase)."),
-        Ok(Some(_)) => AppError::new("conflicts", format!("The {op} has conflicts. Resolve them in File Status, then commit (or abort the {op}).")),
+        Ok(Some(_)) if op == "rebase" => {
+            let at = crate::git::read::op_step(repo, op).map(|s| format!(" at {s}")).unwrap_or_default();
+            AppError::new("conflicts", format!("The rebase paused{at} because of a conflict. Resolve it in File Status, then Continue rebase (or abort it)."))
+        }
+        Ok(Some(_)) => AppError::new("conflicts", format!("The {op} paused because of conflicts. Resolve them in File Status, then commit to finish (or abort the {op}).")),
         _ => e,
     }
 }
@@ -471,16 +477,64 @@ pub enum Side {
     Ours,
     /// The commit being merged / cherry-picked in.
     Theirs,
+    /// Both sides of every conflict block, ours first.
+    OursThenTheirs,
+    /// Both sides of every conflict block, theirs first.
+    TheirsThenOurs,
 }
 
-/// Resolves conflicted files by taking one side whole, then marks them resolved. A side that deleted
-/// the file deletes it. The working-tree content (conflict markers, edits) is backed up first.
+/// Replaces each conflict block in `text` with both sides (a diff3 base section is dropped).
+/// None when there is no complete block.
+fn union(text: &str, ours_first: bool) -> Option<String> {
+    let (mut out, mut ours, mut theirs) = (String::new(), String::new(), String::new());
+    // 0 = outside, 1 = ours, 2 = base, 3 = theirs.
+    let (mut state, mut found) = (0, false);
+    for line in text.split_inclusive('\n') {
+        let bare = line.trim_end_matches(['\r', '\n']);
+        let marker = |c: char| bare.len() >= 7 && bare[..7].chars().all(|x| x == c) && matches!(bare[7..].chars().next(), None | Some(' '));
+        match state {
+            0 if marker('<') => state = 1,
+            1 | 2 if marker('=') => state = 3,
+            1 if marker('|') => state = 2,
+            3 if marker('>') => {
+                let (a, b) = if ours_first { (&ours, &theirs) } else { (&theirs, &ours) };
+                out.push_str(a);
+                out.push_str(b);
+                ours.clear();
+                theirs.clear();
+                (state, found) = (0, true);
+            }
+            0 => out.push_str(line),
+            1 => ours.push_str(line),
+            3 => theirs.push_str(line),
+            _ => {}
+        }
+    }
+    (found && state == 0).then_some(out)
+}
+
+/// Resolves conflicted files by taking one side whole (a side that deleted the file deletes it),
+/// or both sides of each block in order, then marks them resolved. The working-tree content
+/// (conflict markers, edits) is backed up first.
 pub fn resolve(repo: &Path, paths: &[String], side: Side) -> Result<(), AppError> {
     let (flag, op) = match side {
         Side::Ours => ("--ours", "take ours"),
         Side::Theirs => ("--theirs", "take theirs"),
+        Side::OursThenTheirs => ("", "take ours then theirs"),
+        Side::TheirsThenOurs => ("", "take theirs then ours"),
     };
     crate::oplog::backup(repo, op, paths)?;
+    if flag.is_empty() {
+        for p in paths {
+            let file = repo.join(p);
+            let text = std::fs::read_to_string(&file).map_err(|e| AppError::new("io", e.to_string()))?;
+            let merged = union(&text, matches!(side, Side::OursThenTheirs))
+                .ok_or_else(|| AppError::new("no_markers", format!("{p} has no conflict markers to combine; take one side or edit it.")))?;
+            std::fs::write(&file, merged).map_err(|e| AppError::new("io", e.to_string()))?;
+            git(repo, &["add", "--", p])?;
+        }
+        return Ok(());
+    }
     for p in paths {
         match git(repo, &["checkout", flag, "--", p]) {
             Ok(_) => git(repo, &["add", "--", p])?,
@@ -785,6 +839,15 @@ mod tests {
         assert_eq!(parse_version("git version 2.45.1.windows.1\n"), Some((2, 45)));
         assert_eq!(parse_version("git version 2.38.0"), Some((2, 38)));
         assert_eq!(parse_version("nope"), None);
+    }
+
+    #[test]
+    fn unions_conflicts() {
+        let t = "a\n<<<<<<< HEAD\no\n||||||| base\nb\n=======\nt\n>>>>>>> x\nz\n";
+        assert_eq!(union(t, true).as_deref(), Some("a\no\nt\nz\n"));
+        assert_eq!(union(t, false).as_deref(), Some("a\nt\no\nz\n"));
+        assert_eq!(union("plain\n", true), None);
+        assert_eq!(union("<<<<<<< HEAD\no\n=======\n", true), None);
     }
 
     #[test]
