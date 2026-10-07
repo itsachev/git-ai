@@ -158,23 +158,29 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   content: ""; position: fixed; inset: 0; z-index: -2;
   background: radial-gradient(ellipse 75% 65% at 45% 38%, #fdfdff, #ebebf1 60%, #dcdce4);
 }
-:root[data-theme="dark"] .home::before { background: radial-gradient(ellipse 75% 65% at 45% 38%, #26262c, #141418 60%, #0b0b0d); }
+/* Dark: the static artwork already draws the network, fan and cards, so it stands in for the canvas backdrop. */
+:root[data-theme="dark"] .home::before { background: #0e1014 url("./assets/app_bg.jpg") center / cover no-repeat; }
+:root[data-theme="dark"] .home-bg { display: none; }
 .home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; animation: home-bg-in 1.4s var(--ease) both; }
 .home-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.home-bg { --glass: color-mix(in srgb, var(--fg) 5%, transparent); --glass-edge: color-mix(in srgb, var(--fg) 14%, transparent); }
+.home-bg { --glass: color-mix(in srgb, var(--fg) 8%, transparent); --glass-edge: color-mix(in srgb, var(--fg) 18%, transparent); }
 .bg-float, .bg-cube { position: absolute; animation: bg-float 9s ease-in-out infinite alternate; }
-.bg-float { display: grid; }
+.bg-float { display: grid; transform: perspective(500px) rotateY(var(--ry, 0deg)) rotateX(8deg); } /* turned toward the focus */
 .bg-card {
   grid-area: 1 / 1; display: grid; align-content: start; gap: 6px; width: 5.4rem; height: 6.6rem; padding: 0.75rem 0.65rem;
-  background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 8px;
-  box-shadow: 0 12px 30px rgb(0 0 0 / 0.18); backdrop-filter: blur(6px);
+  mask-image: linear-gradient(#000 35%, transparent);
+  background: linear-gradient(160deg, var(--glass-edge), var(--glass) 60%); border: 1px solid var(--glass-edge); border-radius: 8px;
+  box-shadow: inset 0 1px color-mix(in srgb, var(--fg) 18%, transparent), 0 12px 30px rgb(0 0 0 / 0.25); backdrop-filter: blur(6px);
 }
 .bg-float.stack .bg-card:first-child { translate: -0.8rem -0.7rem; opacity: 0.7; }
 .bg-float.single { opacity: 0.55; }
 .bg-card i { display: block; height: 4px; border-radius: 2px; background: var(--glass-edge); }
 .bg-card i:nth-child(1) { width: 45%; } .bg-card i:nth-child(2) { width: 90%; } .bg-card i:nth-child(3) { width: 70%; }
 .bg-card i:nth-child(4) { width: 85%; } .bg-card i:nth-child(5) { width: 40%; }
-.bg-cube { border-radius: 4px; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: 0 4px 12px rgb(0 0 0 / 0.15); animation-duration: 7s; }
+.bg-cube {
+  border-radius: 4px; background: linear-gradient(145deg, color-mix(in srgb, var(--fg) 30%, transparent), var(--glass) 60%); border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px color-mix(in srgb, var(--fg) 22%, transparent), 0 4px 12px rgb(0 0 0 / 0.2); animation-duration: 7s;
+}
 @keyframes bg-float { to { translate: 0 -0.6rem; } }
 @keyframes home-bg-in { from { opacity: 0; } }
 @media (max-width: 40rem) { .bg-float { display: none; } }
