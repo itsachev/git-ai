@@ -276,6 +276,8 @@
   - Verified: cargo test 40 pass (`read::tests::file_history_and_blame`: rename followed in both log and blame, an unrelated commit skipped, max), `tsc --noEmit` + `vite build` OK. Not yet seen in `tauri dev`, not timed on the 100k-commit repo.
   - Skipped: entry from File Status rows and the palette, blame of the working tree (uncommitted lines), "blame the parent" navigation, virtualized blame rows.
 
+- 2026-10-07: Home screen GitHub account: "GitHub: @login" and Sign out stack in a column, aligned to the start (`.github p` in `App.css`, label wrapped in a span in `GitHub.tsx`). Verified: `tsc --noEmit` OK.
+
 ## Next
 - Try interactive rebase in `tauri dev`: History → a commit → Rebase from here…; reorder, reword, squash, drop; a conflicting reorder, resolve, commit to continue; Undo history entry.
 - Try file history + blame in `tauri dev`: History → a commit → hover a file → History; a renamed file, Blame tab, click a blame hash. Time `file_log`/`blame` on a big repo.
