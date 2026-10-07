@@ -122,21 +122,36 @@ fn generate(system: &str, input: &str) -> Result<String, AppError> {
         "systemInstruction": { "parts": [{ "text": system }] },
         "contents": [{ "role": "user", "parts": [{ "text": input }] }],
     });
-    let res = ureq::post(&url).header("x-goog-api-key", &key).send_json(body);
-    let v: Value = match res {
-        Ok(mut r) => r.body_mut().read_json().map_err(net)?,
-        Err(ureq::Error::StatusCode(400 | 401 | 403)) => {
-            return Err(AppError::new("ai_key", "Gemini didn't accept the API key. Check it, or replace it."))
-        }
-        Err(ureq::Error::StatusCode(429)) => {
-            return Err(AppError::new("ai_limit", "Gemini's rate limit or quota is used up. Try again in a minute."))
-        }
-        Err(e) => return Err(net(e)),
-    };
+    let mut res = ureq::post(&url)
+        .config()
+        .http_status_as_error(false)
+        .build()
+        .header("x-goog-api-key", &key)
+        .send_json(body)
+        .map_err(net)?;
+    let status = res.status().as_u16();
+    let v: Value = res.body_mut().read_json().unwrap_or_default();
+    if status != 200 {
+        return Err(api_error(status, &v));
+    }
     v["candidates"][0]["content"]["parts"][0]["text"]
         .as_str()
         .map(String::from)
         .ok_or_else(|| AppError::new("ai_empty", "Gemini returned no text. Try again."))
+}
+
+/// Only a rejected key is `ai_key` (the UI opens Settings for it). Other 400s (model gone, bad request)
+/// show Gemini's own message, so a saved, working key isn't blamed.
+fn api_error(status: u16, v: &Value) -> AppError {
+    let reason_is = |r: &str| v["error"]["details"].as_array().is_some_and(|d| d.iter().any(|x| x["reason"] == r));
+    if status == 401 || reason_is("API_KEY_INVALID") {
+        return AppError::new("ai_key", "Gemini didn't accept the API key. Check it, or replace it.");
+    }
+    if status == 429 {
+        return AppError::new("ai_limit", "Gemini's rate limit or quota is used up. Try again in a minute.");
+    }
+    let msg = v["error"]["message"].as_str().unwrap_or("no details");
+    AppError::new("ai_error", format!("Gemini returned an error ({status}): {msg}"))
 }
 
 fn net(e: ureq::Error) -> AppError {
@@ -151,6 +166,18 @@ mod tests {
     fn clip_keeps_char_boundary() {
         assert_eq!(clip("abc", 5), ("abc", false));
         assert_eq!(clip("aé", 2), ("a", true));
+    }
+
+    #[test]
+    fn only_a_bad_key_blames_the_key() {
+        let bad_key = json!({"error": {"message": "API key not valid.", "details": [{"reason": "API_KEY_INVALID"}]}});
+        assert_eq!(api_error(400, &bad_key).code, "ai_key");
+        let bad_model = json!({"error": {"message": "models/x is not found"}});
+        let e = api_error(404, &bad_model);
+        assert_eq!(e.code, "ai_error");
+        assert!(e.message.contains("is not found"));
+        assert_eq!(api_error(400, &json!({})).code, "ai_error");
+        assert_eq!(api_error(429, &json!({})).code, "ai_limit");
     }
 
     /// Calls Gemini for real. Run: `GEMINI_API_KEY=… cargo test live_commit_message -- --ignored --nocapture`.

@@ -707,9 +707,110 @@ dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, 
 dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
 .setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
 .setting p { margin: 0 0 0.5rem; }
-.setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.setting + .setting { margin-top: 1.25rem; padding-top: 1.1rem; border-top: 1px solid var(--line); }
+.setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .setting input { flex: 1 1 12rem; min-width: 0; }
 .ssh-key-path { overflow-wrap: anywhere; }
+/* Git identity form and the "key found" offer (shared by Settings and the setup wizard). */
+.identity { display: grid; gap: 0.75rem; }
+.identity > label:not(.check) { display: grid; gap: 0.3rem; font-size: 0.85rem; font-weight: 700; }
+.identity input:not([type="checkbox"]) { min-height: calc(var(--ctl) + 0.3rem); font-size: 0.95rem; }
+.identity .row { margin-top: 0.25rem; align-items: center; }
+label.check { display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.9rem; line-height: 1.4; cursor: pointer; }
+label.check input { flex: none; width: 1.05rem; height: 1.05rem; margin: 0.12rem 0 0; accent-color: var(--accent); }
+.helper-note, .saved { display: flex; gap: 0.45rem; align-items: center; margin: 0; font-size: 0.9rem; color: var(--add); }
+.helper-note .icon, .saved .icon { flex: none; width: 1rem; height: 1rem; }
+.found {
+  display: grid; gap: 0.6rem; justify-items: start; margin: 0.75rem 0 0; padding: 0.8rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel)); animation: rise 260ms var(--ease);
+}
+.found p { display: flex; gap: 0.45rem; align-items: center; margin: 0; font-weight: 700; }
+.found p .icon { width: 1rem; height: 1rem; color: var(--accent-fg); }
+.found select, .found code { width: 100%; font-family: var(--mono); font-size: 0.85rem; }
+.found select { min-height: var(--ctl); }
+.setup-again { margin-right: auto; align-self: center; font-size: 0.9rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- First-run setup (features/setup/Setup.tsx) ----------
+   The stepper is a commit graph: one lane, a node per step; the lane fills to the current node. */
+dialog.setup { width: min(36rem, calc(100vw - 2rem)); padding: 1.5rem 1.6rem 1.3rem; }
+.setup-lane {
+  --node: 1.35rem; --p: 0;
+  position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 1.5rem; padding: 0; list-style: none;
+}
+/* Track and fill run node center to node center: the first and last columns are each 1/8 of the width. */
+.setup-lane::before, .setup-lane::after {
+  content: ""; position: absolute; top: calc(var(--node) / 2 - 1px); left: 12.5%; height: 2px; border-radius: 2px;
+}
+.setup-lane::before { right: 12.5%; background: var(--line-strong); }
+.setup-lane::after {
+  width: calc(75% * var(--p)); background: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: width 520ms var(--ease);
+}
+.setup-lane li { display: grid; justify-items: center; }
+.setup-lane button {
+  all: unset; box-sizing: border-box; position: relative; z-index: 1; display: grid; justify-items: center; gap: 0.4rem;
+  min-width: 2.75rem; padding: 0 0.25rem; border-radius: 8px; cursor: pointer;
+}
+.setup-lane button:disabled { cursor: default; }
+.setup-lane button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.setup-lane .node {
+  display: grid; place-items: center; width: var(--node); height: var(--node); border-radius: 50%;
+  background: var(--panel); box-shadow: inset 0 0 0 2px var(--line-strong);
+  transition: background 300ms var(--ease), box-shadow 300ms var(--ease), scale 360ms var(--spring);
+}
+.setup-lane .node .icon { width: 0.8rem; height: 0.8rem; color: var(--accent-ink); animation: pop 320ms var(--spring); }
+.setup-lane .done .node { background: var(--accent); box-shadow: none; }
+.setup-lane .now .node { position: relative; scale: 1.12; box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 5px var(--panel), inset 0 0 0 9px var(--accent); }
+.setup-lane .now .node::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent);
+  animation: ping 1.8s var(--ease) 600ms infinite;
+}
+.setup-lane button:not(:disabled):hover .node { scale: 1.18; }
+.setup-lane .lbl { display: grid; justify-items: center; font-size: 0.8rem; font-weight: 700; color: var(--faint); transition: color 300ms; }
+.setup-lane .lbl small { font-family: var(--mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.04em; }
+.setup-lane .done .lbl, .setup-lane .now .lbl { color: var(--fg); }
+.setup-lane .now .lbl small { color: var(--accent-fg); }
+
+.setup-step { min-height: 17rem; }
+.setup-step.fwd { animation: step-in-fwd 380ms var(--ease); }
+.setup-step.back { animation: step-in-back 380ms var(--ease); }
+@keyframes step-in-fwd { from { opacity: 0; translate: 1.5rem 0; } }
+@keyframes step-in-back { from { opacity: 0; translate: -1.5rem 0; } }
+.setup-head { display: flex; gap: 0.95rem; align-items: flex-start; margin-bottom: 1.25rem; }
+.setup-head .modal-badge { animation: pop 420ms var(--spring) 60ms backwards; }
+.setup-title { margin: 0; font-family: var(--display); font-size: clamp(1.25rem, 1.05rem + 1.1vw, 1.6rem); line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
+.setup-title .word { display: inline-block; white-space: pre; animation: word-in 520ms var(--ease) backwards; animation-delay: calc(90ms + var(--i) * 55ms); }
+@keyframes word-in { from { opacity: 0; translate: 0 0.45em; filter: blur(3px); } }
+.setup-head p { margin: 0.35rem 0 0; line-height: 1.45; animation: fade 500ms var(--ease) 320ms backwards; }
+/* Sections inside the wizard: the step header already names them; their notes (privacy, .pub) stay. */
+.setup-step .setting { animation: rise 420ms var(--ease) 380ms backwards; }
+.setup-step .setting > h3 { display: none; }
+
+.setup-summary { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.setup-summary li {
+  display: flex; gap: 0.8rem; align-items: center; padding: 0.7rem 0.85rem; border-radius: 10px;
+  background: var(--sunken); animation: rise 420ms var(--ease) backwards; animation-delay: calc(300ms + var(--i) * 70ms);
+}
+.setup-summary li > .icon { flex: none; width: 1.1rem; height: 1.1rem; color: var(--faint); }
+.setup-summary li.ok > .icon { color: var(--accent-fg); }
+.setup-summary span { display: grid; min-width: 0; }
+.setup-summary small { font-size: 0.75rem; color: var(--muted); }
+.setup-summary strong { overflow-wrap: anywhere; font-size: 0.92rem; }
+.setup-actions { align-items: center; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.setup-actions .ghost { margin-right: auto; background: none; box-shadow: none; color: var(--muted); display: inline-flex; gap: 0.35rem; align-items: center; }
+.setup-actions .ghost:hover { color: var(--fg); background: var(--raised); }
+.setup-actions .ghost .icon { width: 0.95rem; height: 0.95rem; }
+@media (max-width: 30rem) {
+  dialog.setup { padding: 1.2rem 1rem 1rem; }
+  .setup-lane .lbl small { display: none; }
+  .setup-step { min-height: 0; }
+  .setup-head .modal-badge { display: none; }
+  /* Ghost link stays compact; only the primary action stretches. */
+  .modal .setup-actions .ghost { flex: none; }
+}
 button.link { all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 /* Labels: one bold weight for every heading, column header, field and term label. */
