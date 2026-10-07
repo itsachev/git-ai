@@ -398,19 +398,52 @@ pub fn pull(repo: &Path) -> Result<(), AppError> {
 /// Pushes the current branch to its upstream. Without one it goes to the same name on `origin` (or the
 /// first remote) and becomes the upstream.
 pub fn push(repo: &Path) -> Result<(), AppError> {
-    let branch = git(repo, &["symbolic-ref", "-q", "--short", "HEAD"])
-        .map_err(|_| AppError::new("detached", "Check out a branch to push it."))?;
-    let branch = branch.trim();
+    push_branch(repo, &current_branch(repo)?).map(drop)
+}
+
+fn current_branch(repo: &Path) -> Result<String, AppError> {
+    Ok(git(repo, &["symbolic-ref", "-q", "--short", "HEAD"])
+        .map_err(|_| AppError::new("detached", "Check out a branch to push it."))?
+        .trim()
+        .to_string())
+}
+
+/// Pushes local `branch` as `push` does; returns the remote and the branch name there.
+fn push_branch(repo: &Path, branch: &str) -> Result<(String, String), AppError> {
     let config = |key: &str| git(repo, &["config", "--get", &format!("branch.{branch}.{key}")]).ok().map(|s| s.trim().to_string());
     let src = format!("refs/heads/{branch}");
-    match (config("remote"), config("merge")) {
+    let (remote, dst) = match (config("remote"), config("merge")) {
         (Some(remote), Some(dst)) => {
             ref_arg(&remote)?;
-            git_net(repo, &["push", "-q", &remote, &format!("{src}:{dst}")])
+            git_net(repo, &["push", "-q", &remote, &format!("{src}:{dst}")])?;
+            (remote, dst)
         }
-        _ => git_net(repo, &["push", "-q", "-u", &default_remote(repo)?, &format!("{src}:{src}")]),
-    }
-    .map(drop)
+        _ => {
+            let remote = default_remote(repo)?;
+            git_net(repo, &["push", "-q", "-u", &remote, &format!("{src}:{src}")])?;
+            (remote, src)
+        }
+    };
+    Ok((remote, dst.strip_prefix("refs/heads/").unwrap_or(&dst).to_string()))
+}
+
+/// Readies `head` for a pull request into `base`. A local branch ("" = current) is pushed first; a remote
+/// branch ("origin/feat") is used as is. Returns the head's remote URL and the bare head and base names.
+// ponytail: head and base on the same GitHub repo; PRs from a fork to its upstream need an owner:branch head.
+pub fn pr_branches(repo: &Path, head: &str, base: &str) -> Result<(String, String, String), AppError> {
+    let remote_branch = |n: &str| split_remote(repo, n).ok().filter(|_| rev(repo, &format!("refs/remotes/{n}")).is_ok());
+    let (remote, head) = match remote_branch(head) {
+        Some(rb) => rb,
+        None => {
+            let b = if head.is_empty() { current_branch(repo)? } else { head.to_string() };
+            rev(repo, &format!("refs/heads/{b}"))
+                .map_err(|_| AppError::new("not_branch", format!("'{b}' isn't a branch. Pick a branch to open the pull request from.")))?;
+            push_branch(repo, &b)?
+        }
+    };
+    let base = remote_branch(base).map_or_else(|| base.to_string(), |(_, b)| b);
+    let url = git(repo, &["remote", "get-url", "--", &remote])?.trim().to_string();
+    Ok((url, head, base))
 }
 
 /// Pushes one tag to `origin` (or the first remote).

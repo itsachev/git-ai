@@ -289,6 +289,14 @@ pub async fn github_repos() -> Result<Vec<crate::github::GhRepo>, AppError> {
     crate::github::repos()
 }
 
+/// Pushes `head` (a local branch, "" = current; a remote branch is used as is), then opens a pull request
+/// into `base` on GitHub. Returns the PR's web URL.
+#[tauri::command]
+pub async fn github_create_pr(path: String, head: String, base: String, title: String, body: String) -> Result<String, AppError> {
+    let (url, head, base) = cli::pr_branches(Path::new(&path), &head, &base)?;
+    crate::github::create_pr(&url, &head, &base, &title, &body)
+}
+
 #[tauri::command]
 pub fn github_sign_out() -> Result<(), AppError> {
     crate::github::sign_out()
