@@ -152,6 +152,32 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   padding: clamp(1.5rem, 7vh, 5rem) clamp(1rem, 6vw, 5rem) 3rem; max-width: 76rem; margin: 0 auto;
 }
 @media (min-width: 60rem) { .home { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-content: center; } }
+/* Backdrop (features/home/Backdrop.tsx): radial ground, canvas network + fan, floating cards. */
+.home { position: relative; isolation: isolate; }
+.home::before {
+  content: ""; position: fixed; inset: 0; z-index: -2;
+  background: radial-gradient(ellipse 75% 65% at 45% 38%, #fdfdff, #ebebf1 60%, #dcdce4);
+}
+:root[data-theme="dark"] .home::before { background: radial-gradient(ellipse 75% 65% at 45% 38%, #26262c, #141418 60%, #0b0b0d); }
+.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; animation: home-bg-in 1.4s var(--ease) both; }
+.home-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.home-bg { --glass: color-mix(in srgb, var(--fg) 5%, transparent); --glass-edge: color-mix(in srgb, var(--fg) 14%, transparent); }
+.bg-float, .bg-cube { position: absolute; animation: bg-float 9s ease-in-out infinite alternate; }
+.bg-float { display: grid; }
+.bg-card {
+  grid-area: 1 / 1; display: grid; align-content: start; gap: 6px; width: 5.4rem; height: 6.6rem; padding: 0.75rem 0.65rem;
+  background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 8px;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.18); backdrop-filter: blur(6px);
+}
+.bg-float.stack .bg-card:first-child { translate: -0.8rem -0.7rem; opacity: 0.7; }
+.bg-float.single { opacity: 0.55; }
+.bg-card i { display: block; height: 4px; border-radius: 2px; background: var(--glass-edge); }
+.bg-card i:nth-child(1) { width: 45%; } .bg-card i:nth-child(2) { width: 90%; } .bg-card i:nth-child(3) { width: 70%; }
+.bg-card i:nth-child(4) { width: 85%; } .bg-card i:nth-child(5) { width: 40%; }
+.bg-cube { border-radius: 4px; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: 0 4px 12px rgb(0 0 0 / 0.15); animation-duration: 7s; }
+@keyframes bg-float { to { translate: 0 -0.6rem; } }
+@keyframes home-bg-in { from { opacity: 0; } }
+@media (max-width: 40rem) { .bg-float { display: none; } }
 .brand { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 clamp(1.5rem, 6vh, 3.5rem); font: 650 1.05rem var(--display); letter-spacing: -0.03em; }
 .brand .icon-btn { margin-left: auto; }
 .mark { width: 1.6rem; height: 1.6rem; color: var(--fg); }
