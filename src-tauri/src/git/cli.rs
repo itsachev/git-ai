@@ -213,6 +213,15 @@ pub fn merge(repo: &Path, rev_name: &str, cherry_pick: bool) -> Result<(), AppEr
     })
 }
 
+/// Replays the current branch's own commits on top of `onto`. Conflicts pause it like the
+/// interactive rebase (Continue rebase / abort).
+pub fn rebase_onto(repo: &Path, onto: &str) -> Result<(), AppError> {
+    ref_arg(onto)?;
+    log_head_move(repo, "rebase", || {
+        git(repo, &["rebase", "--autostash", onto]).map(drop).map_err(|e| stopped(repo, "rebase", e))
+    })
+}
+
 /// When git stopped halfway (the op is still in progress), says so instead of git's raw error.
 fn stopped(repo: &Path, op: &str, e: AppError) -> AppError {
     match crate::git::read::operation(repo) {
