@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, openRepo, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, missingRepos, openRepo, recentRepos,stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { ConfirmDialog, ModalHead } from "./lib/modal";
@@ -36,7 +36,7 @@ function Mark() {
 }
 
 /** Remove a recent repo from the list, or also move its folder to the OS trash. */
-function RemoveRepoDialog({ path, onClose, onDone }: { path: string | null; onClose: () => void; onDone: (error: string | null) => void }) {
+function RemoveRepoDialog({ path, missing, onClose, onDone }: { path: string | null; missing: boolean; onClose: () => void; onDone: (error: string | null) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   // Keep the text through the close transition.
@@ -59,15 +59,22 @@ function RemoveRepoDialog({ path, onClose, onDone }: { path: string | null; onCl
   return (
     <dialog ref={dialog} className="modal tone-danger" aria-labelledby="remove-title" aria-describedby="remove-text"
       onCancel={(e) => { e.preventDefault(); if (!busy) onClose(); }}>
-      <ModalHead id="remove-title" icon="warn" tone="danger" title={`Remove ${p.split(/[\\/]/).pop()}?`} sub={p} />
-      <p id="remove-text" className="modal-text">
-        Remove it from this list only, or also move the folder to the {navigator.userAgent.includes("Windows") ? "Recycle Bin" : "Trash"}.
-        Deleting from disk loses anything not pushed (unpushed commits, stashes, uncommitted changes) unless you restore the folder from there.
-      </p>
+      <ModalHead id="remove-title" icon="warn" tone="danger" title={missing ? `${p.split(/[\\/]/).pop()} was deleted` : `Remove ${p.split(/[\\/]/).pop()}?`} sub={p} />
+      {missing ? (
+        <p id="remove-text" className="modal-text">
+          This folder no longer exists on disk. It was deleted or moved outside git-ai.
+          Remove it from this list. If you moved it, use Open repository to add it from its new place.
+        </p>
+      ) : (
+        <p id="remove-text" className="modal-text">
+          Remove it from this list only, or also move the folder to the {navigator.userAgent.includes("Windows") ? "Recycle Bin" : "Trash"}.
+          Deleting from disk loses anything not pushed (unpushed commits, stashes, uncommitted changes) unless you restore the folder from there.
+        </p>
+      )}
       <div className="dialog-actions">
         <button type="button" autoFocus disabled={busy} onClick={onClose}>Cancel</button>
         <button type="button" className="primary" disabled={busy} onClick={() => go(forgetRepo)}>Remove from list</button>
-        <button type="button" className="danger" disabled={busy} onClick={() => go(trashRepo)}>{busy ? "Deleting…" : "Delete from disk"}</button>
+        {!missing && <button type="button" className="danger" disabled={busy} onClick={() => go(trashRepo)}>{busy ? "Deleting…" : "Delete from disk"}</button>}
       </div>
     </dialog>
   );
@@ -76,23 +83,35 @@ function RemoveRepoDialog({ path, onClose, onDone }: { path: string | null; onCl
 function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
+  const [missing, setMissing] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
   const [filter, setFilter] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
 
+  async function refresh() {
+    const [r, m] = await Promise.all([recentRepos(), missingRepos()]);
+    setRecent(r);
+    setMissing(m);
+  }
+
+  // Re-check on focus: folders get deleted outside the app.
   useEffect(() => {
-    recentRepos().then(setRecent);
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   async function load(path: string) {
+    if (missing.includes(path)) return setRemoving(path);
     try {
       setError(null);
       setRepo(await openRepo(path));
-      setRecent(await recentRepos());
+      refresh();
     } catch (e) {
       setError((e as AppError).message ?? String(e));
+      refresh();
     }
   }
 
@@ -104,7 +123,7 @@ function App() {
   async function cloned(info: RepoInfo) {
     setCloning(false);
     setRepo(info);
-    setRecent(await recentRepos());
+    refresh();
   }
 
   const f = filter.trim().toLowerCase();
@@ -137,29 +156,33 @@ function App() {
         {recent.length > 3 && (
           <label className="search">
             <Icon name="search" />
-            <input type="search" placeholder="Filter repositories" aria-label="Filter repositories" value={filter} onChange={(e) => setFilter(e.target.value)} />
+            <input type="search" placeholder="Filter repositories" aria-label="Filter repositories" value={filter} onChange={(e) => setFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && shown.length) load(shown[0]); }} />
           </label>
         )}
         {!recent.length && <p className="empty">Repositories you open or clone show up here.</p>}
         {recent.length > 0 && !shown.length && <p className="empty">No repository matches “{filter}”.</p>}
         <ul className="recent">
-          {shown.map((p) => (
-            <li key={p}>
-              <button onClick={() => load(p)} title={p}>
-                <Icon name="folder" />
+          {shown.map((p) => {
+            const gone = missing.includes(p);
+            return (
+            <li key={p} className={gone ? "missing" : undefined} onContextMenu={(e) => { e.preventDefault(); setRemoving(p); }}>
+              <button onClick={() => load(p)} title={gone ? `Deleted from disk: ${p}` : p}>
+                <Icon name={gone ? "warn" : "folder"} />
                 <span>
                   <strong>{p.split(/[\\/]/).pop()}</strong>
-                  <small>{p}</small>
+                  <small>{gone ? <><em>Deleted from disk</em> · {p}</> : p}</small>
                 </span>
               </button>
               <button className="icon-btn" onClick={() => setRemoving(p)} title="Remove…" aria-label={`Remove ${p}`}>
                 <Icon name="more" />
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
-      <RemoveRepoDialog path={removing} onClose={() => setRemoving(null)} onDone={(e) => { setError(e); recentRepos().then(setRecent); }} />
+      <RemoveRepoDialog path={removing} missing={!!removing && missing.includes(removing)} onClose={() => setRemoving(null)} onDone={(e) => { setError(e); refresh(); }} />
     </main>
   );
   // One askpass dialog for both screens: clone runs from the welcome screen.

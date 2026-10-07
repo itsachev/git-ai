@@ -66,6 +66,7 @@ async function invoke<T>(cmd: string, args?: Args): Promise<T> {
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");
+export const missingRepos = () => invoke<string[]>("missing_repos");
 /** Drops a repo from the recent list; the folder stays. */
 export const forgetRepo = (path: string) => invoke<void>("forget_repo", { path });
 /** Moves a recent repo's folder to the OS trash and forgets it. */
