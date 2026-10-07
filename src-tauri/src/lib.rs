@@ -25,7 +25,7 @@ pub fn run() {
         .manage(watch::RepoWatcher::default())
         .manage(git::graph::GraphCache::default())
         .invoke_handler(tauri::generate_handler![
-            commands::open_repo, commands::recent_repos, commands::repo_status,
+            commands::open_repo, commands::recent_repos, commands::forget_repo, commands::trash_repo, commands::repo_status,
             commands::stage,
             commands::unstage,
             commands::discard,
@@ -65,6 +65,7 @@ pub fn run() {
             commands::github_start,
             commands::github_finish,
             commands::github_user,
+            commands::github_repos,
             commands::github_sign_out,
             commands::ssh_key,
             commands::ssh_key_set,

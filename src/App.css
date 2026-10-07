@@ -186,6 +186,13 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent button > span { display: grid; min-width: 0; }
 .recent strong { font-weight: 600; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; }
 .recent small { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
+.recent li { display: flex; align-items: center; gap: 2px; }
+.recent li > button:first-child { flex: 1; min-width: 0; }
+/* Remove… button: shown on row hover/focus where there is a mouse, always on touch. */
+.recent .icon-btn { flex: none; width: var(--ctl); min-height: var(--ctl); justify-content: center; padding: 0; opacity: 0; transition: opacity 120ms; }
+.recent li:hover .icon-btn, .recent .icon-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .recent .icon-btn { opacity: 1; } }
+.modal .dialog-actions { flex-wrap: wrap; }
 
 .clone, .github .device {
   display: grid; gap: 0.75rem; margin-top: 1rem; max-width: 34rem; padding: 1rem;

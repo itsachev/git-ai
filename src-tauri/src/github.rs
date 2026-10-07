@@ -118,6 +118,51 @@ pub fn user() -> Result<Option<String>, AppError> {
     }
 }
 
+/// A repo the signed-in user can clone.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct GhRepo {
+    /// "owner/name".
+    pub full_name: String,
+    /// HTTPS URL; askpass answers it with the token.
+    pub clone_url: String,
+    pub private: bool,
+    pub description: Option<String>,
+}
+
+/// Repos the user owns, collaborates on or reaches through an org, most recently pushed first.
+/// Empty when signed out.
+pub fn repos() -> Result<Vec<GhRepo>, AppError> {
+    let Some(token) = token() else { return Ok(vec![]) };
+    let mut out = Vec::new();
+    // ponytail: stops at 1000 repos; follow the Link header past that if someone needs it.
+    for page in 1..=10 {
+        let url = format!("https://api.github.com/user/repos?per_page=100&sort=pushed&page={page}");
+        let batch: Vec<Value> = ureq::get(&url)
+            .header("Authorization", format!("Bearer {token}"))
+            .header("User-Agent", "git-ai")
+            .header("Accept", "application/vnd.github+json")
+            .call()
+            .map_err(net)?
+            .body_mut()
+            .read_json()
+            .map_err(net)?;
+        let n = batch.len();
+        out.extend(batch.into_iter().filter_map(|r| {
+            Some(GhRepo {
+                full_name: r["full_name"].as_str()?.into(),
+                clone_url: r["clone_url"].as_str()?.into(),
+                private: r["private"].as_bool().unwrap_or(false),
+                description: r["description"].as_str().map(String::from),
+            })
+        }));
+        if n < 100 {
+            break;
+        }
+    }
+    Ok(out)
+}
+
 pub fn sign_out() -> Result<(), AppError> {
     match keychain()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
