@@ -707,6 +707,54 @@ fn with_paths<'a>(args: &[&'a str], paths: &'a [String]) -> Vec<&'a str> {
     args.iter().copied().chain(paths.iter().map(String::as_str)).collect()
 }
 
+/// The user's global git setup: commit identity and where git keeps HTTPS sign-ins.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct GitSetup {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    /// `credential.helper`, e.g. "manager" (Git Credential Manager). None = git asks every time.
+    pub helper: Option<String>,
+    /// What `set_global` would set as the helper on this OS; None where there's no safe default.
+    pub helper_default: Option<String>,
+}
+
+fn config(scope: &str, key: &str) -> Option<String> {
+    ensure_version().ok()?;
+    run(None, &["config", scope, "--get", key], &[], None).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+// ponytail: Linux has no helper that's both safe and always installed (libsecret varies), so none is offered there.
+const HELPER_DEFAULT: Option<&str> = if cfg!(windows) { Some("manager") } else if cfg!(target_os = "macos") { Some("osxkeychain") } else { None };
+
+pub fn global(key: &str) -> Option<String> {
+    config("--global", key)
+}
+
+/// Git for Windows sets the helper in the system config, so look there too.
+fn helper() -> Option<String> {
+    global("credential.helper").or_else(|| config("--system", "credential.helper"))
+}
+
+pub fn git_setup() -> GitSetup {
+    GitSetup { name: global("user.name"), email: global("user.email"), helper: helper(), helper_default: HELPER_DEFAULT.map(String::from) }
+}
+
+/// Sets the global identity, and the OS credential helper when `helper` is true and none is set.
+pub fn set_global(name: &str, email: &str, helper: bool) -> Result<(), AppError> {
+    ensure_version()?;
+    for (k, v) in [("user.name", name.trim()), ("user.email", email.trim())] {
+        if v.is_empty() {
+            return Err(AppError::new("identity", "Enter both a name and an email."));
+        }
+        run(None, &["config", "--global", k, v], &[], None)?;
+    }
+    if let (true, None, Some(h)) = (helper, self::helper(), HELPER_DEFAULT) {
+        run(None, &["config", "--global", "credential.helper", h], &[], None)?;
+    }
+    Ok(())
+}
+
 /// Checks `git --version` once per process.
 pub fn ensure_version() -> Result<(), AppError> {
     static CHECK: OnceLock<Result<(), String>> = OnceLock::new();

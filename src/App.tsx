@@ -18,7 +18,8 @@ import { FileHistoryDialog } from "./features/graph/FileHistory";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Palette, type Command } from "./features/palette/Palette";
-import { SettingsButton, SettingsDialog, SshNotice, openSettings } from "./features/settings/Settings";
+import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
+import { SetupWizard, openSetup } from "./features/setup/Setup";
 import { UpdateBanner } from "./features/update/Update";
 import "./App.css";
 
@@ -124,7 +125,7 @@ function App() {
       {body}
       <AskpassDialog />
       <SettingsDialog />
-      <SshNotice />
+      <SetupWizard />
       <ConfirmDialog />
       <UpdateBanner />
     </>
@@ -168,7 +169,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   if (log?.[0]) commands.push({ label: `Undo: ${opLabel(log[0])}`, run: () => run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
     if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
-  commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Close repository", run: onClose });
+  commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, { label: "Close repository", run: onClose });
 
   return (
     <div className={`shell${side ? " show-side" : ""}`}>

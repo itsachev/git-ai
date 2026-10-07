@@ -274,6 +274,50 @@ pub fn ssh_key_set(app: AppHandle, path: Option<String>) -> Result<(), AppError>
     Ok(())
 }
 
+#[tauri::command]
+pub fn git_setup() -> cli::GitSetup {
+    cli::git_setup()
+}
+
+#[tauri::command]
+pub fn git_setup_set(name: String, email: String, helper: bool) -> Result<(), AppError> {
+    cli::set_global(&name, &email, helper)
+}
+
+/// Whether the first-run setup was finished or skipped.
+#[tauri::command]
+pub fn setup_done(app: AppHandle) -> bool {
+    app.store(STORE).ok().and_then(|s| s.get("setup_done")).is_some_and(|v| v == json!(true))
+}
+
+#[tauri::command]
+pub fn setup_finish(app: AppHandle) -> Result<(), AppError> {
+    app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?.set("setup_done", json!(true));
+    Ok(())
+}
+
+/// Private keys in ~/.ssh, the default names (id_ed25519, id_ecdsa, id_rsa) first.
+#[tauri::command]
+pub fn ssh_detect(app: AppHandle) -> Vec<String> {
+    use tauri::Manager;
+    let Ok(dir) = app.path().home_dir().map(|h| h.join(".ssh")) else { return vec![] };
+    let mut keys: Vec<String> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.extension().is_none_or(|x| x != "pub")
+                && p.metadata().is_ok_and(|m| m.is_file() && m.len() < 32_000)
+                && std::fs::read_to_string(p).is_ok_and(|t| t.contains("PRIVATE KEY"))
+        })
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    let rank = |k: &String| ["id_ed25519", "id_ecdsa", "id_rsa"].iter().position(|n| k.ends_with(n)).unwrap_or(3);
+    keys.sort_by_key(|k| (rank(k), k.clone()));
+    keys
+}
+
 // AI (Gemini, BYOK).
 #[tauri::command]
 pub fn ai_has_key() -> bool {

@@ -13,6 +13,7 @@ import type { RebaseCommit } from "../bindings/RebaseCommit";
 import type { RebaseStep } from "../bindings/RebaseStep";
 import type { FileCommit } from "../bindings/FileCommit";
 import type { Blame } from "../bindings/Blame";
+import type { GitSetup } from "../bindings/GitSetup";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,6 +146,14 @@ export const githubSignOut = () => invoke<void>("github_sign_out");
 export const sshKey = () => invoke<string | null>("ssh_key");
 /** null clears it. Code "ssh_key" when the file isn't a readable private key. */
 export const sshKeySet = (path: string | null) => invoke<void>("ssh_key_set", { path });
+/** Private keys found in ~/.ssh, default names first. */
+export const sshDetect = () => invoke<string[]>("ssh_detect");
+// Global git setup (identity, credential helper) and the first-run wizard flag.
+export const gitSetup = () => invoke<GitSetup>("git_setup");
+/** helper: also turn on the OS credential helper if none is set. */
+export const gitSetupSet = (name: string, email: string, helper: boolean) => invoke<void>("git_setup_set", { name, email, helper });
+export const setupDone = () => invoke<boolean>("setup_done");
+export const setupFinish = () => invoke<void>("setup_finish");
 // AI (Gemini, bring your own key). The key stays in the OS keychain (or GEMINI_API_KEY in dev).
 export const aiHasKey = () => invoke<boolean>("ai_has_key");
 /** null removes the stored key. */

@@ -278,6 +278,20 @@
 
 - 2026-10-07: Home screen GitHub account: "GitHub: @login" and Sign out stack in a column, aligned to the start (`.github p` in `App.css`, label wrapped in a span in `GitHub.tsx`). Verified: `tsc --noEmit` OK.
 
+- 2026-10-07: Settings dialog spacing: sections separated by a gap + hairline (`.setting + .setting`), button rows get top margin (`.setting .row`), so "Choose key" no longer touches the next heading. CSS only (`App.css`).
+
+- 2026-10-07: Gemini key "asked every time": the key was saved fine (Credential Manager `gemini.git-ai`), but `ai::generate` mapped every HTTP 400/403 to `ai_key`, which opens Settings, so a bad model/request looked like a missing key. Now reads the error body (`http_status_as_error(false)`): only 401 or reason `API_KEY_INVALID` → `ai_key`; 429 → `ai_limit`; anything else → `ai_error` with Gemini's message. Test `ai::tests::only_a_bad_key_blames_the_key`.
+  - SSH autodetect: new command `ssh_detect` (private keys in ~/.ssh, id_ed25519/ecdsa/rsa first). `SshNotice` on launch: key set → nothing; keys found → "We found an SSH key" + Use this key / Not now (select when several); none → the old SSH-only notice.
+  - Verified: cargo test 41 pass, `tsc --noEmit` OK. Not yet seen in `tauri dev`.
+  - Skipped: "don't ask again" for Not now (asks each launch until a key is set).
+
+- 2026-10-07: First-run setup wizard (replaces the launch `SshNotice`). `src/features/setup/Setup.tsx`, mounted in `App`; shown while store key `setup_done` isn't true (commands `setup_done` / `setup_finish`), reopened from the palette ("Run first-time setup") or Settings ("Run setup again"). Esc / "Skip setup" also finish it.
+  - Steps: 1 Git (global user.name/email + turn on the OS credential helper: `manager` on Windows, `osxkeychain` on macOS, none offered on Linux), 2 SSH (detected keys offered inline), 3 Gemini key, 4 Done (summary). Passwords are never read or stored by the app: git's helper asks once and keeps them.
+  - Backend: `cli::git_setup` / `cli::set_global` (`GitSetup` binding), helper read from global then system config (Git for Windows sets it in system). Commands `git_setup`, `git_setup_set`.
+  - Settings now exports `GitIdentity`, `SshKey`, `AiKey` (reused as the wizard steps) and has a Git identity section; `SshKey` offers keys from `ssh_detect` when none is chosen.
+  - Design (via build-awwwards-quality-sites, adapted to an in-app modal, CSS only, no GSAP): stepper drawn as a commit lane, nodes fill, lane fill animates, current node pings; step titles reveal word by word (sr-only full title), panels slide by direction; summary rows stagger. Reduced motion: global rule shows final states. Under 30rem: no badge, no step numbers, primary button stretches.
+  - Verified: cargo test 42 pass, `tsc --noEmit` + `vite build` OK. Not yet seen in `tauri dev`.
+
 ## Next
 - Try interactive rebase in `tauri dev`: History → a commit → Rebase from here…; reorder, reword, squash, drop; a conflicting reorder, resolve, commit to continue; Undo history entry.
 - Try file history + blame in `tauri dev`: History → a commit → hover a file → History; a renamed file, Blame tab, click a blame hash. Time `file_log`/`blame` on a big repo.
