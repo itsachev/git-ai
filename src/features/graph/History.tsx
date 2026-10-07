@@ -7,6 +7,7 @@ import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm } from "../refs/Sidebar";
 import { CommitGraph, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
+import { openRebase } from "./Rebase";
 
 /** Commit graph on top; the picked commit's details, files and file diff below. */
 export function History({ path }: { path: string }) {
@@ -55,6 +56,7 @@ export function History({ path }: { path: string }) {
                 <button className="small" onClick={() => run(() => merge(path, d.oid, true))}>Cherry-pick</button>
                 <button className="small" onClick={() => run(() => merge(path, d.oid, false))}>Merge into current</button>
                 <button className="small" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}>Tag…</button>
+                <button className="small" onClick={() => openRebase(d.oid)} title="Reorder, edit, squash or drop the commits after this one">Rebase from here…</button>
                 <button className="small" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
                   title={hasKey ? "Explain this commit in plain words (message and diff sent to Gemini)" : "Add a Gemini API key in Settings first"}>
                   {explaining === d.oid ? "Explaining…" : "Explain"}

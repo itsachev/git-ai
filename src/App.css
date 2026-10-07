@@ -660,6 +660,22 @@ dialog.write-up { width: min(38rem, calc(100vw - 2rem)); }
 .write-up .nb-hint { margin-top: -0.6rem; }
 .write-up textarea { min-height: 14rem; max-height: 45vh; resize: vertical; font: 0.88rem/1.55 var(--mono); letter-spacing: 0; }
 
+/* Interactive rebase dialog (features/graph/Rebase.tsx), built on the New branch styles. */
+dialog.rebase-dialog { width: min(40rem, calc(100vw - 2rem)); }
+.rb-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.35rem; max-height: 50vh; overflow-y: auto; }
+.rb-list li { display: grid; gap: 0.5rem; padding: 0.45rem 0.55rem; border-radius: 8px; background: var(--sunken); }
+.rb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
+.rb-action { flex: none; width: 6.5rem; }
+.rb-action select { min-height: var(--ctl); font-family: inherit; font-size: 0.85rem; }
+.rb-text { flex: 1 1 10rem; min-width: 0; display: grid; }
+.rb-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rb-text em { font-style: normal; font-weight: 400; color: var(--accent-fg); }
+.rb-text small { color: var(--faint); font-size: 0.8rem; }
+.rb-btns { display: flex; gap: 0.25rem; margin-left: auto; }
+.rb-btns .up .icon { rotate: 180deg; }
+.rb-list li.dropped .rb-text { opacity: 0.45; text-decoration: line-through; }
+.rb-list textarea { min-height: 5rem; resize: vertical; font: 0.88rem/1.5 var(--mono); letter-spacing: 0; }
+
 dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
 .setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
 .setting p { margin: 0 0 0.5rem; }

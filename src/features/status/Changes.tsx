@@ -119,7 +119,9 @@ export function Changes({ path }: { path: string }) {
             <Icon name="warn" />
             <span>
               {data.operation[0].toUpperCase() + data.operation.slice(1)} in progress.{" "}
-              {data.conflicted.length ? "Resolve the conflicts, then commit." : "Commit to finish it."}
+              {data.operation === "rebase"
+                ? data.conflicted.length ? "Resolve the conflicts, then commit to continue." : "Commit to continue."
+                : data.conflicted.length ? "Resolve the conflicts, then commit." : "Commit to finish it."}
             </span>
             <button className="small" onClick={async () => {
               if (await confirm(`Abort the ${data.operation}?`, "Changed files are backed up first (Undo history).", "Abort"))
