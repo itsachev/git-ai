@@ -814,7 +814,10 @@ dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdro
 .palette input:focus-visible { box-shadow: none; outline: none; }
 .palette ul { list-style: none; margin: 0; padding: 0.35rem; max-height: min(24rem, 60vh); overflow: auto; }
 .palette li { display: flex; align-items: center; gap: 0.75rem; min-height: var(--ctl); padding: 0.35rem 0.75rem; border-radius: 10px; font-size: 1.02rem; }
-.palette li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette .cmd-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.palette .cmd-text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette .cmd-text code { font-size: 0.78rem; color: var(--muted); }
+.palette li[aria-selected="true"] .cmd-text code { color: inherit; opacity: 0.75; }
 .palette li[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 .palette li[aria-selected="true"] kbd { color: inherit; background: rgb(255 255 255 / 0.2); }
 .palette li.muted { cursor: default; }

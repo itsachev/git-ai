@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../lib/icons";
 
-/** `keys` like "Ctrl+Shift+F": also a global shortcut. Ctrl means Cmd on macOS too. */
-export type Command = { label: string; keys?: string; run: () => void };
+/** `keys` like "Ctrl+Shift+F": also a global shortcut. Ctrl means Cmd on macOS too. `git`: the terminal equivalent, shown as a hint. */
+export type Command = { label: string; keys?: string; git?: string; run: () => void };
 
 const OPEN = ["Ctrl+K", "Ctrl+Shift+P"];
 const mac = navigator.userAgent.includes("Mac");
@@ -46,7 +46,7 @@ export function Palette({ commands }: { commands: Command[] }) {
   }, [open]);
 
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = commands.filter((c) => terms.every((t) => c.label.toLowerCase().includes(t)));
+  const shown = commands.filter((c) => terms.every((t) => `${c.label} ${c.git ?? ""}`.toLowerCase().includes(t)));
   const at = Math.min(i, shown.length - 1);
   useEffect(() => { document.getElementById(`cmd-${at}`)?.scrollIntoView({ block: "nearest" }); }, [at]);
 
@@ -81,7 +81,10 @@ export function Palette({ commands }: { commands: Command[] }) {
               {shown.map((c, k) => (
                 <li key={c.label} id={`cmd-${k}`} role="option" aria-selected={k === at}
                   onMouseMove={() => setI(k)} onClick={() => pick(c)}>
-                  <span>{c.label}</span>
+                  <span className="cmd-text">
+                    <span>{c.label}</span>
+                    {c.git && <code title="Terminal equivalent">$ {c.git}</code>}
+                  </span>
                   {c.keys && <kbd>{show(c.keys)}</kbd>}
                 </li>
               ))}
