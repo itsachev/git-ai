@@ -77,7 +77,7 @@ export function Sidebar({ path }: { path: string }) {
 
   return (
     <section className="sidebar" aria-label="Branches">
-      <label className="search"><Icon name="search" /><input type="search" placeholder="Filter branches" aria-label="Filter branches"
+      <label className="search"><Icon name="search" /><input type="search" placeholder="Filter" aria-label="Filter branches, tags, stashes and undo history"
         value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
       <details open>
         <summary>
@@ -129,7 +129,7 @@ export function Sidebar({ path }: { path: string }) {
         {creating === "stash" && <NameForm label="Stash message (optional)" button="Stash" optional onCancel={() => setCreating(null)}
           onSubmit={async (msg) => { if (await run(() => stashSave(path, msg))) setCreating(null); }} />}
         <ul className="refs">
-          {data.stashes.map((s, i) => (
+          {data.stashes.map((s, i) => s.name.toLowerCase().includes(f) && (
             <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} actions={[
               ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
               ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
@@ -142,7 +142,7 @@ export function Sidebar({ path }: { path: string }) {
         <details>
           <summary><Icon name="undo" />Undo history <span className="count">{log.length}</span></summary>
           <ul className="refs ops">
-            {log.map((e) => (
+            {log.filter((e) => opLabel(e).toLowerCase().includes(f)).map((e) => (
               <li key={e.id}>
                 <span className="name">
                   <span>{opLabel(e)}</span>
