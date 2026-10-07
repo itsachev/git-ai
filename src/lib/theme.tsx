@@ -14,9 +14,9 @@ const dark = matchMedia("(prefers-color-scheme: dark)");
 function saved(): Theme {
   try {
     const t = localStorage.getItem(KEY);
-    return t === "light" || t === "dark" ? t : "system";
+    return t === "light" || t === "system" ? t : "dark";
   } catch {
-    return "system";
+    return "dark";
   }
 }
 
