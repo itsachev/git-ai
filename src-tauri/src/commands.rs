@@ -302,3 +302,14 @@ pub async fn ai_explain_commit(path: String, oid: String) -> Result<String, AppE
 pub async fn ai_write_range(path: String, base: String, head: String, kind: String) -> Result<String, AppError> {
     crate::ai::write_range(Path::new(&path), &base, &head, &kind)
 }
+
+/// Commits in `base..HEAD` (oldest first) for the interactive rebase dialog.
+#[tauri::command]
+pub fn rebase_commits(path: String, base: String) -> Result<Vec<read::RebaseCommit>, AppError> {
+    read::rebase_commits(Path::new(&path), &base)
+}
+
+#[tauri::command]
+pub fn rebase(path: String, base: String, steps: Vec<cli::RebaseStep>) -> Result<(), AppError> {
+    cli::rebase(Path::new(&path), &base, &steps)
+}

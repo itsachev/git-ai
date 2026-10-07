@@ -9,6 +9,8 @@ import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
 import type { Side } from "../bindings/Side";
 import type { DeviceCode } from "../bindings/DeviceCode";
+import type { RebaseCommit } from "../bindings/RebaseCommit";
+import type { RebaseStep } from "../bindings/RebaseStep";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +28,8 @@ const FAILED: Record<string, (a: Args) => string> = {
   delete_branch: (a) => `Failed to delete branch ${a.name}`,
   merge: (a) => (a.cherryPick ? `Failed to cherry-pick ${short(a.rev)}` : `Failed to merge ${short(a.rev)}`),
   abort: () => "Failed to abort",
+  rebase_commits: () => "Can't rebase from this commit",
+  rebase: () => "Rebase failed",
   create_tag: (a) => `Failed to create tag ${a.name}`,
   delete_tag: (a) => `Failed to delete tag ${a.name}`,
   stash_save: () => "Failed to stash changes",
@@ -91,6 +95,10 @@ export const deleteBranch = (path: string, name: string, force: boolean) => invo
 export const merge = (path: string, rev: string, cherryPick: boolean) => invoke<void>("merge", { path, rev, cherryPick });
 /** Aborts the in-progress merge/cherry-pick (changed files backed up first). */
 export const abortOp = (path: string) => invoke<void>("abort", { path });
+/** Commits after `base` on the current branch, oldest first. Codes "has_merges", "too_many", "not_ancestor". */
+export const rebaseCommits = (path: string, base: string) => invoke<RebaseCommit[]>("rebase_commits", { path, base });
+/** Rewrites the commits after `base` as `steps` (all of them, oldest first). Code "conflicts" = stopped; commit continues it. Undoable. */
+export const rebase = (path: string, base: string, steps: RebaseStep[]) => invoke<void>("rebase", { path, base, steps });
 /** Annotated when `message` isn't empty. */
 export const createTag = (path: string, name: string, target: string, message: string) =>
   invoke<void>("create_tag", { path, name, target, message });

@@ -173,6 +173,9 @@ pub fn commit(repo: &Path, message: &str, amend: bool) -> Result<(), AppError> {
     let Some(op) = op else {
         return git(repo, &["commit", "-q", "-m", message]).map(drop);
     };
+    if op == "rebase" {
+        return continue_rebase(repo);
+    }
     let mut args = vec!["commit", "-q"];
     if amend {
         args.push("--amend");
@@ -210,9 +213,100 @@ pub fn merge(repo: &Path, rev_name: &str, cherry_pick: bool) -> Result<(), AppEr
 /// When git stopped halfway (the op is still in progress), says so instead of git's raw error.
 fn stopped(repo: &Path, op: &str, e: AppError) -> AppError {
     match crate::git::read::operation(repo) {
+        Ok(Some(_)) if op == "rebase" => AppError::new("conflicts", "The rebase stopped at a conflict. Resolve it in File Status, then commit to continue (or abort the rebase)."),
         Ok(Some(_)) => AppError::new("conflicts", format!("The {op} has conflicts. Resolve them in File Status, then commit (or abort the {op}).")),
         _ => e,
     }
+}
+
+/// What to do with one commit in an interactive rebase.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, TS)]
+#[ts(export)]
+pub enum RebaseAction {
+    Pick,
+    /// Meld into the commit above, keeping both messages.
+    Squash,
+    /// Meld into the commit above, dropping this message.
+    Fixup,
+    Drop,
+}
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct RebaseStep {
+    pub oid: String,
+    pub action: RebaseAction,
+    /// New message for the resulting commit (for squash: the combined one); None keeps git's.
+    pub message: Option<String>,
+}
+
+/// Rewrites `base..HEAD` as `steps` (oldest first; must list exactly those commits, in any order).
+/// Rewording runs `git commit --amend -F` from an `exec` line, so git never opens an editor. Changed
+/// files are carried with `--autostash`. Conflicts leave the rebase in progress; `commit` continues it.
+pub fn rebase(repo: &Path, base: &str, steps: &[RebaseStep]) -> Result<(), AppError> {
+    ref_arg(base)?;
+    let mut want: Vec<String> = crate::git::read::rebase_commits(repo, base)?.into_iter().map(|c| c.oid).collect();
+    let mut got: Vec<String> = steps.iter().map(|s| s.oid.clone()).collect();
+    want.sort();
+    got.sort();
+    if want != got {
+        return Err(AppError::new("stale", "The branch changed since the list was made. Open the rebase again."));
+    }
+    let kept: Vec<&RebaseStep> = steps.iter().filter(|s| s.action != RebaseAction::Drop).collect();
+    if kept.first().is_some_and(|s| s.action != RebaseAction::Pick) {
+        return Err(AppError::new("bad_squash", "The first commit can't be squashed: there is nothing above it to meld into."));
+    }
+    let dir = crate::oplog::git_ai_dir(repo)?;
+    let quoted = |p: &Path| {
+        let s = p.to_string_lossy().replace('\\', "/");
+        if s.contains('\'') {
+            return Err(AppError::new("bad_path", "The repository path contains ', which the rebase can't handle."));
+        }
+        Ok(format!("'{s}'"))
+    };
+    // A reword runs after the last squash/fixup that melds into the same commit.
+    let mut todo = String::new();
+    let mut pending: Option<String> = None;
+    for (i, s) in steps.iter().enumerate() {
+        let word = match s.action {
+            RebaseAction::Pick => "pick",
+            RebaseAction::Squash => "squash",
+            RebaseAction::Fixup => "fixup",
+            RebaseAction::Drop => "drop",
+        };
+        if matches!(s.action, RebaseAction::Pick) {
+            todo.push_str(&pending.take().unwrap_or_default());
+        }
+        todo.push_str(&format!("{word} {}\n", s.oid));
+        if let (Some(msg), true) = (&s.message, s.action != RebaseAction::Drop) {
+            let file = dir.join(format!("rebase-msg-{i}"));
+            std::fs::write(&file, msg).map_err(|e| AppError::new("io", e.to_string()))?;
+            pending = Some(format!("exec git commit --amend -q --allow-empty -F {}\n", quoted(&file)?));
+        }
+    }
+    todo.push_str(&pending.unwrap_or_default());
+    let todo_file = dir.join("rebase-todo");
+    std::fs::write(&todo_file, todo).map_err(|e| AppError::new("io", e.to_string()))?;
+    // git runs the editors through its own sh: the todo editor copies ours over git's, `true` keeps squash messages.
+    let seq = std::ffi::OsString::from(format!("cp {}", quoted(&todo_file)?));
+    let env = [("GIT_SEQUENCE_EDITOR", seq.as_os_str()), ("GIT_EDITOR", OsStr::new("true"))];
+    log_head_move(repo, "rebase", || {
+        git_env(repo, &["rebase", "-i", "--autostash", "--empty=drop", base], &env).map(drop).map_err(|e| stopped(repo, "rebase", e))
+    })
+}
+
+/// Continues a stopped rebase with the staged resolution, keeping the commit's message. Logs the
+/// whole rebase for undo once it finishes.
+fn continue_rebase(repo: &Path) -> Result<(), AppError> {
+    let orig = git(repo, &["rev-parse", "--git-path", "rebase-merge/orig-head"])
+        .ok()
+        .and_then(|p| std::fs::read_to_string(repo.join(p.trim())).ok())
+        .map(|s| s.trim().to_string());
+    git_env(repo, &["rebase", "--continue"], &[("GIT_EDITOR", OsStr::new("true"))]).map_err(|e| stopped(repo, "rebase", e))?;
+    if crate::git::read::operation(repo)?.is_some() {
+        return Ok(());
+    }
+    crate::oplog::record(repo, crate::oplog::OpEntry::new("rebase", orig, Some(rev(repo, "HEAD")?)))
 }
 
 /// Network git: credential prompts go to the app UI (see `askpass`), common failures are explained.

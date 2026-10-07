@@ -163,7 +163,7 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
     record(repo, u)
 }
 
-fn git_ai_dir(repo: &Path) -> Result<PathBuf, AppError> {
+pub(crate) fn git_ai_dir(repo: &Path) -> Result<PathBuf, AppError> {
     let dir = PathBuf::from(git(repo, &["rev-parse", "--absolute-git-dir"])?.trim()).join("git-ai");
     fs::create_dir_all(&dir).map_err(io)?;
     Ok(dir)
@@ -536,5 +536,67 @@ mine
         assert!(crate::git::read::refs(q).unwrap().stashes.is_empty());
         let _ = fs::remove_dir_all(&dir);
         let _ = fs::remove_dir_all(&dir2);
+    }
+
+    /// Interactive rebase: reorder, reword, squash, fixup, drop, undo; then a conflict continued by commit.
+    #[test]
+    fn interactive_rebase() {
+        use cli::{RebaseAction::*, RebaseStep};
+        let dir = temp_repo("rebase");
+        let p = dir.as_path();
+        let commit = |file: &str, text: &str, msg: &str| {
+            fs::write(dir.join(file), text).unwrap();
+            cli::stage(p, &[file.to_string()]).unwrap();
+            cli::commit(p, msg, false).unwrap();
+            cli::rev(p, "HEAD").unwrap()
+        };
+        let base = commit("a.txt", "a\n", "base");
+        let [c1, c2, c3, c4, c5] = [("1", "one"), ("2", "two"), ("3", "three"), ("4", "four"), ("5", "five")]
+            .map(|(f, m)| commit(&format!("{f}.txt"), f, m));
+        let step = |oid: &str, action, message: Option<&str>| RebaseStep { oid: oid.into(), action, message: message.map(Into::into) };
+        let log = || git(p, &["log", "--format=%B--", &format!("{base}..HEAD")]).unwrap().replace('\n', "|");
+        let before = cli::rev(p, "HEAD").unwrap();
+
+        // A stale list (missing c5) is refused.
+        let steps = vec![step(&c1, Pick, None)];
+        assert_eq!(cli::rebase(p, &base, &steps).unwrap_err().code, "stale");
+        assert_eq!(cli::rebase(p, &base, &[step(&c1, Squash, None), step(&c2, Pick, None), step(&c3, Pick, None), step(&c4, Pick, None), step(&c5, Pick, None)]).unwrap_err().code, "bad_squash");
+
+        fs::write(dir.join("a.txt"), "dirty\n").unwrap(); // carried by --autostash
+        let steps = [
+            step(&c3, Pick, Some("THREE")),
+            step(&c1, Pick, None),
+            step(&c2, Squash, Some("one+two")),
+            step(&c4, Fixup, None),
+            step(&c5, Drop, None),
+        ];
+        cli::rebase(p, &base, &steps).unwrap();
+        assert_eq!(log(), "one+two|--|THREE|--|");
+        assert!(dir.join("4.txt").exists() && !dir.join("5.txt").exists());
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "dirty\n");
+        assert_eq!(super::entries(p, 1).unwrap()[0].op, "rebase");
+        super::undo(p, &super::entries(p, 1).unwrap()[0].id).unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), before);
+        git(p, &["reset", "-q", "--hard"]).unwrap();
+
+        // Swapping two edits of the same line conflicts; resolving and committing continues the rebase.
+        let x1 = commit("a.txt", "x1\n", "x1");
+        let x2 = commit("a.txt", "x2\n", "x2");
+        let head = cli::rev(p, "HEAD").unwrap();
+        let steps = [step(&x2, Pick, None), step(&x1, Pick, Some("x1 again"))];
+        assert_eq!(cli::rebase(p, &before, &steps).unwrap_err().code, "conflicts");
+        assert_eq!(cli::status(p).unwrap().operation.as_deref(), Some("rebase"));
+        // Resolved as "x2"; continuing then stops at x1.
+        fs::write(dir.join("a.txt"), "x2\n").unwrap();
+        cli::stage(p, &["a.txt".into()]).unwrap();
+        assert_eq!(cli::commit(p, "", false).unwrap_err().code, "conflicts");
+        fs::write(dir.join("a.txt"), "x1\n").unwrap();
+        cli::stage(p, &["a.txt".into()]).unwrap();
+        cli::commit(p, "", false).unwrap();
+        assert_eq!(cli::status(p).unwrap().operation, None);
+        assert_eq!(git(p, &["log", "-2", "--format=%s"]).unwrap(), "x1 again\nx2\n");
+        let e = &super::entries(p, 1).unwrap()[0];
+        assert_eq!((e.op.as_str(), e.head.as_deref()), ("rebase", Some(head.as_str())));
+        let _ = fs::remove_dir_all(&dir);
     }
 }

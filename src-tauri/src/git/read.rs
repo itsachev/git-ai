@@ -116,6 +116,48 @@ pub fn range_patch(repo: &Path, base: &str, head: &str, max: usize) -> Result<(V
     Ok((messages, patch_text(&diff)?))
 }
 
+/// A commit of `base..HEAD`, for the interactive rebase list.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct RebaseCommit {
+    pub oid: String,
+    pub message: String,
+    pub author: String,
+    pub time: i64,
+}
+
+/// Commits in `base..HEAD`, oldest first. Fails on merge commits (rebase would flatten them) and on
+/// more than 500 commits.
+pub fn rebase_commits(repo: &Path, base: &str) -> Result<Vec<RebaseCommit>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let base = repo.revparse_single(base)?.peel_to_commit()?.id();
+    let head = repo.head()?.peel_to_commit()?.id();
+    if head != base && !repo.graph_descendant_of(head, base)? {
+        return Err(AppError::new("not_ancestor", "That commit isn't on the current branch."));
+    }
+    let mut walk = repo.revwalk()?;
+    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::REVERSE)?;
+    walk.push(head)?;
+    walk.hide(base)?;
+    let mut out = vec![];
+    for oid in walk {
+        let c = repo.find_commit(oid?)?;
+        if c.parent_count() > 1 {
+            return Err(AppError::new("has_merges", "There are merge commits after that commit. Rebase from a commit after the last merge."));
+        }
+        if out.len() == 500 {
+            return Err(AppError::new("too_many", "More than 500 commits to rebase. Pick a newer commit."));
+        }
+        out.push(RebaseCommit {
+            oid: c.id().to_string(),
+            message: String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(),
+            author: String::from_utf8_lossy(c.author().name_bytes()).into_owned(),
+            time: c.author().when().seconds(),
+        });
+    }
+    Ok(out)
+}
+
 fn patch_text(diff: &git2::Diff) -> Result<String, AppError> {
     let mut out = String::new();
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
