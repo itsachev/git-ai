@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Tauri scaffold in place (create-tauri-app react-ts template). The plan and the step log live in `progress.md`. Read it first, and append an entry for every implementation step.
 
+**Feature docs after QA.** When a feature passes its click-through in `tauri dev`, update in the same change:
+- `FEATURES` in `src/features/about/About.tsx` (the in-app "About git-ai" dialog behind the home screen's bottom-right info button): one plain-language line per user-visible feature.
+- The `## Features` list in `progress.md`.
+
 ## Commands
 
 - `npm install`: install frontend deps.

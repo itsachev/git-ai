@@ -185,11 +185,42 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 @keyframes home-bg-in { from { opacity: 0; } }
 @media (max-width: 40rem) { .bg-float { display: none; } }
 .brand { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 clamp(1.5rem, 6vh, 3.5rem); font: 650 1.05rem var(--display); letter-spacing: -0.03em; }
-.brand .icon-btn { margin-left: auto; }
+/* Home screen controls pinned to the window corners. */
+.corner { position: fixed; z-index: 1; --gap: clamp(0.75rem, 2vw, 1.5rem); }
+.corner.top-right { top: var(--gap); right: var(--gap); }
+.corner.bottom-left { bottom: var(--gap); left: var(--gap); }
+.corner.bottom-right { bottom: var(--gap); right: var(--gap); }
+/* Glass pill: icon + label. Below 40rem the label hides and it becomes a round 2.75rem touch target. */
+.corner-btn {
+  gap: 0.55rem; min-height: 2.75rem; padding: 0 1.1rem 0 0.85rem; border-radius: 999px; font-size: 0.95rem;
+  color: var(--fg); background: color-mix(in srgb, var(--panel) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); backdrop-filter: blur(10px);
+  transition: background 150ms, border-color 150ms;
+}
+.corner-btn:hover { background: color-mix(in srgb, var(--panel) 90%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.corner-btn .icon { width: 1.45rem; height: 1.45rem; color: var(--accent); }
+@media (max-width: 40rem) {
+  .corner-btn { width: 2.75rem; padding: 0; justify-content: center; }
+  .corner-btn span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .corner-btn { transition: none; } }
 .mark { width: 1.6rem; height: 1.6rem; color: var(--fg); }
 .home h1 {
   font: 650 clamp(2.1rem, 5vw, 3.4rem)/1.02 var(--display); letter-spacing: -0.045em; text-wrap: balance;
 }
+/* The app name (lib/modal.tsx Brand): a size up, heavier, in an indigo → fuchsia → amber gradient that slowly drifts.
+   Mixing the stops with --fg deepens them on light themes and lifts them on dark, so the name keeps its contrast. */
+.brand-name {
+  font: 800 1.18em/1 var(--display); letter-spacing: -0.035em; white-space: nowrap;
+  background: linear-gradient(100deg,
+    var(--accent-fg) 0%, color-mix(in oklab, #a855f7 82%, var(--fg)) 30%, color-mix(in oklab, #ec4899 82%, var(--fg)) 55%,
+    color-mix(in oklab, #f59e0b 78%, var(--fg)) 75%, var(--accent-fg) 100%) 0 0 / 220% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  animation: brand-drift 9s ease-in-out infinite alternate;
+}
+@keyframes brand-drift { to { background-position: 100% 0; } }
+.brand .brand-name { font-size: 1.65rem; }
 .lede { max-width: 30rem; margin: 1.5rem 0 2rem; font-size: 1.1rem; color: var(--muted); text-wrap: pretty; }
 .tiles { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); max-width: 34rem; }
 .tile {
@@ -628,26 +659,135 @@ dialog p { line-height: 1.55; }
 .tone-ok { --tone: var(--add); }
 .tone-warn { --tone: var(--mod); }
 .tone-danger { --tone: var(--danger); }
+/* The dialog itself scrolls; the header and the action bar stick to its edges, so the title and the
+   way out never scroll away. Both bleed into the padding (--pad) to cover the full width. */
 dialog.modal {
-  --tone: var(--accent);
-  width: min(30rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.4rem;
-  background: linear-gradient(color-mix(in srgb, var(--tone) 9%, var(--panel)), var(--panel) 9rem);
-  border-color: color-mix(in srgb, var(--tone) 22%, var(--line));
+  --tone: var(--accent); --pad: clamp(1.2rem, 2.5vw, 1.9rem);
+  /* 80% of the window, never under 30rem (or the full width minus a gutter on phones), capped for line length. */
+  width: clamp(min(30rem, 100vw - 2rem), 80vw, 64rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--pad);
+  border-radius: 20px; scrollbar-gutter: stable; scroll-padding: 6rem 0 5rem;
+  /* A soft tone glow behind the header instead of a flat tint. */
+  background:
+    radial-gradient(120% 9rem at 0 0, color-mix(in srgb, var(--tone) 14%, transparent), transparent 70%) no-repeat,
+    var(--panel);
+  border-color: color-mix(in srgb, var(--tone) 24%, var(--line));
+  box-shadow: var(--shadow), 0 30px 80px -20px color-mix(in srgb, var(--tone) 22%, transparent);
 }
 dialog.modal.tone-accent { --tone: var(--accent); }
 dialog.modal.tone-warn { --tone: var(--mod); }
 dialog.modal.tone-danger { --tone: var(--danger); }
-.modal-head { display: flex; gap: 0.85rem; align-items: flex-start; margin-bottom: 1rem; }
-.modal-head h2 { font-size: 1.3rem; overflow-wrap: anywhere; }
-.modal-head p { margin: 0.1rem 0 0; font-size: 0.92rem; line-height: 1.4; }
+.modal-head {
+  position: sticky; top: calc(-1 * var(--pad)); z-index: 2;
+  display: flex; gap: 0.9rem; align-items: center;
+  margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 1.1rem; padding: var(--pad) var(--pad) 1rem;
+  background: linear-gradient(color-mix(in srgb, var(--tone) 7%, var(--panel)), var(--panel));
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.modal-head h2 { font-size: 1.35rem; overflow-wrap: anywhere; text-wrap: balance; }
+.modal-head p { margin: 0.15rem 0 0; font-size: 0.92rem; line-height: 1.4; }
 .modal-badge {
-  display: grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem; border-radius: 12px;
-  color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 75%, white), var(--tone));
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--tone) 35%, transparent);
+  display: grid; place-items: center; flex: none; width: 2.6rem; height: 2.6rem; border-radius: 13px;
+  color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 70%, white), var(--tone) 55%, color-mix(in srgb, var(--tone) 80%, black));
+  box-shadow: inset 0 1px rgb(255 255 255 / 0.35), 0 0 0 4px color-mix(in srgb, var(--tone) 14%, transparent), 0 6px 18px color-mix(in srgb, var(--tone) 38%, transparent);
 }
 .modal-badge .icon { width: 1.35rem; height: 1.35rem; }
 dialog.modal[open] .modal-badge { animation: pop 380ms var(--spring) 80ms backwards; }
 dialog.modal.tone-danger[open] .modal-badge .icon { animation: nudge 420ms var(--ease) 380ms; }
+/* Cards: About's feature groups and Settings' sections sit on a quiet sunken surface. */
+.about-grid section, dialog.settings .setting {
+  padding: 1rem 1.1rem 1.05rem; border-radius: 14px;
+  background: color-mix(in srgb, var(--sunken) 55%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+/* ---------- About (features/about/About.tsx): a field guide. Side nav of every feature (scroll-spied) beside
+   a hero, a filter and one card per area. Each area has a hue (--h) for its icon, card edge and highlights. ---------- */
+dialog.modal.about { width: min(90vw, 100vw - 2rem); }
+.about-nav > div, .about-jump .chip, .about-grid section { --hc: color-mix(in oklab, oklch(0.62 0.17 var(--h)) 82%, var(--fg)); }
+.about-layout { display: grid; gap: 2rem; }
+.about-nav { display: none; }
+@media (min-width: 60rem) {
+  .about-layout { grid-template-columns: 15.5rem minmax(0, 1fr); }
+  .about-jump { display: none !important; }
+  .about-nav {
+    display: block; position: sticky; top: calc(var(--head, 5rem) - var(--pad) + 0.5rem); align-self: start;
+    max-height: calc(100dvh - 2rem - var(--head, 5rem) - 6rem); overflow-y: auto; overscroll-behavior: contain;
+    margin-left: -0.4rem; padding: 0.1rem 0.4rem 1rem 0; scrollbar-width: thin;
+  }
+}
+.about-nav > div + div { margin-top: 0.55rem; }
+.about-nav-area, .about-nav li button { all: unset; box-sizing: border-box; display: flex; align-items: center; width: 100%; cursor: pointer; }
+.about-nav-area { gap: 0.55rem; padding: 0.3rem 0.4rem; border-radius: 9px; font-size: 0.9rem; font-weight: 700; color: var(--muted); transition: color 160ms, background-color 160ms; }
+.about-nav .on .about-nav-area, .about-nav-area:hover { color: var(--fg); }
+.about-nav-area:hover, .about-nav li button:hover { background: var(--raised); }
+.about-nav-area small { margin-left: auto; font-size: 0.75rem; font-weight: 500; color: var(--faint); font-variant-numeric: tabular-nums; }
+.about-nav ul { margin: 0.15rem 0 0 1.25rem; padding: 0 0 0 0.55rem; list-style: none; border-left: 1px solid var(--line); }
+.about-nav li button {
+  position: relative; display: block; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.84rem; line-height: 1.4; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 160ms, background-color 160ms;
+}
+.about-nav li button[aria-current="true"] { color: var(--fg); font-weight: 600; background: color-mix(in srgb, var(--hc) 13%, transparent); }
+.about-nav li button[aria-current="true"]::before {
+  content: ""; position: absolute; left: calc(-0.55rem - 1.5px); top: 0.3rem; bottom: 0.3rem; width: 2px; border-radius: 2px; background: var(--hc);
+}
+.about-nav-area:focus-visible, .about-nav li button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.about-icon {
+  display: grid; place-items: center; flex: none; width: 1.9rem; height: 1.9rem; border-radius: 9px;
+  color: var(--hc); background: color-mix(in srgb, var(--hc) 15%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 22%, transparent);
+}
+.about-icon .icon { width: 1.05rem; height: 1.05rem; }
+.about-nav .about-icon { width: 1.55rem; height: 1.55rem; border-radius: 7px; }
+.about-nav .about-icon .icon { width: 0.9rem; height: 0.9rem; }
+
+.about-hero { padding: 0.25rem 0 1.5rem; }
+dialog.modal .about-title { margin: 0 0 0.9rem; font: 800 clamp(1.9rem, 1.1rem + 2.6vw, 3.3rem)/1.04 var(--display); letter-spacing: -0.045em; text-wrap: balance; }
+.about-title .brand-name { font-size: 1em; }
+.about-title .word { display: inline-block; white-space: pre; }
+dialog.modal[open] .about-title .word { animation: word-in 620ms var(--ease) backwards; animation-delay: calc(120ms + var(--i) * 70ms); }
+.about-hero p { max-width: 72ch; margin: 0; font-size: 1.02rem; line-height: 1.65; color: var(--muted); text-wrap: pretty; }
+dialog.modal[open] .about-hero p { animation: fade 600ms var(--ease) 420ms backwards; }
+.about-stats { display: flex; flex-wrap: wrap; gap: 0.75rem 2.75rem; margin: 1.4rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--line); }
+.about-stats div { display: grid; gap: 0.1rem; }
+.about-stats dt { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.about-stats dd { margin: 0; font: 750 1.65rem/1.1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+dialog.modal[open] .about-stats div { animation: rise 500ms var(--ease) backwards; animation-delay: calc(480ms + var(--i, 0) * 60ms); }
+.about-stats div:nth-child(2) { --i: 1; } .about-stats div:nth-child(3) { --i: 2; } .about-stats div:nth-child(4) { --i: 3; }
+
+.about-tools { display: grid; gap: 0.7rem; margin-bottom: 1rem; }
+.about-search input { min-height: calc(var(--ctl) + 0.6rem); padding-left: 2.1rem; font-size: 1rem; border-radius: 10px; }
+.about-search .icon { left: 0.7rem; }
+.about-jump { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.about-jump button.chip { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 2rem; padding: 0 0.75rem; font: 600 0.82rem var(--sans); }
+.about-jump .chip .icon { width: 0.9rem; height: 0.9rem; color: var(--hc); }
+.about-jump .chip small { color: var(--faint); font-weight: 500; }
+
+/* One area per row, in nav order, so scrolling reads top to bottom; features flow in columns inside each card. */
+.about-grid { display: grid; gap: 0.9rem; }
+.about-grid section {
+  background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, color-mix(in srgb, var(--sunken) 55%, var(--panel));
+  transition: box-shadow 200ms var(--ease);
+}
+.about-grid section:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 35%, var(--line)); }
+dialog.modal[open] .about-grid section { animation: rise 460ms var(--ease) backwards; animation-delay: calc(200ms + var(--i) * 50ms); }
+.about-grid h3 { display: flex; gap: 0.6rem; align-items: center; margin: 0 0 0.5rem; }
+.about-grid ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr)); column-gap: 1.6rem; }
+.about-grid li { display: grid; gap: 0.35rem; align-content: start; margin: 0 -0.6rem; padding: 0.75rem 0.6rem; border-radius: 10px; box-shadow: inset 0 1px color-mix(in srgb, var(--line) 80%, transparent); }
+.about-grid li.lit { animation: lit 1.6s var(--ease); }
+@keyframes lit { from, 30% { background: color-mix(in srgb, var(--hc) 16%, transparent); } }
+.about-grid li strong { font-size: 0.98rem; }
+.about-grid li p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
+/* Where to find it: steps as pills joined by chevrons, shortcuts as keys. */
+.feat-how { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font-size: 0.79rem; color: var(--fg); }
+.feat-how > span:not(.arr):not(.sr-only) { padding: 0.12rem 0.5rem; border-radius: 6px; background: color-mix(in srgb, var(--hc) 9%, var(--pick)); }
+.feat-how .arr { color: var(--hc); font-weight: 700; }
+.feat-how kbd { font-size: 0.74rem; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line-strong), inset 0 0 0 1px var(--line); }
+.about-grid mark { color: inherit; background: color-mix(in srgb, var(--hc) 30%, transparent); border-radius: 3px; padding: 0 0.1em; }
+.about-none { padding: 2rem 0; text-align: center; color: var(--muted); }
+/* 90% wide like About; sections flow into two columns once each can get ~26rem. */
+dialog.modal.settings { width: min(90vw, 100vw - 2rem); }
+.settings-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(max(min(26rem, 100%), 34%), 1fr)); } /* 34% floor caps it at two */
+dialog.settings .setting + .setting { padding-top: 1rem; border-top: 0; }
+/* Section titles inside any modal: larger and heavier than body text so sections scan at a glance. */
+dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg); }
 .modal-text { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
 button.danger {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, white), var(--danger));
@@ -655,6 +795,12 @@ button.danger {
 }
 button.danger:hover:not(:disabled) { background: var(--danger); box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 4px 14px color-mix(in srgb, var(--danger) 40%, transparent); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
+.modal .dialog-actions {
+  position: sticky; bottom: calc(-1 * var(--pad)); z-index: 2;
+  margin: 1.25rem calc(-1 * var(--pad)) calc(-1 * var(--pad)); padding: 0.85rem var(--pad) var(--pad);
+  background: color-mix(in srgb, var(--panel) 86%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
 @media (max-width: 30rem) { .modal .dialog-actions button { flex: 1; } }
 /* Near the top, full width minus a gutter on phones. Backdrop clicks close it via the global handler in main.tsx. */
 dialog.palette {
@@ -702,7 +848,8 @@ dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdro
 
 /* ---------- New branch dialog (features/refs/NewBranch.tsx) ---------- */
 .new-branch-dialog form { display: grid; gap: 1.1rem; }
-.new-branch-dialog .modal-head, .new-branch-dialog .dialog-actions { margin: 0; }
+.new-branch-dialog .modal-head { margin-bottom: 0; }
+.new-branch-dialog .dialog-actions { margin-top: 0; }
 .nb-field { display: grid; gap: 0.4rem; }
 .nb-field > label { font-size: 0.85rem; font-weight: 700; }
 .nb-field input, .select select { min-height: calc(var(--ctl) + 0.4rem); font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0; }
@@ -752,13 +899,12 @@ button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--ac
 .nb-cmd::before { content: "$ "; color: var(--faint); }
 
 /* AI write-up dialog (features/refs/WriteUp.tsx), built on the New branch styles. */
-dialog.write-up { width: min(38rem, calc(100vw - 2rem)); }
+
 .wu-range { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; }
 .write-up .nb-hint { margin-top: -0.6rem; }
 .write-up textarea { min-height: 14rem; max-height: 45vh; resize: vertical; font: 0.88rem/1.55 var(--mono); letter-spacing: 0; }
 
 /* Interactive rebase dialog (features/graph/Rebase.tsx), built on the New branch styles. */
-dialog.rebase-dialog { width: min(40rem, calc(100vw - 2rem)); }
 .rb-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.35rem; max-height: 50vh; overflow-y: auto; }
 .rb-list li { display: grid; gap: 0.5rem; padding: 0.45rem 0.55rem; border-radius: 8px; background: var(--sunken); }
 .rb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
@@ -776,7 +922,8 @@ dialog.rebase-dialog { width: min(40rem, calc(100vw - 2rem)); }
 /* File history + blame: wide, tall modal; commit list beside the diff, stacked when narrow. */
 dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, calc(100dvh - 2rem)); }
 .fh { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 0.9rem; }
-.fh .modal-head, .fh .dialog-actions { margin: 0; }
+.fh .modal-head { margin-bottom: 0; }
+.fh .dialog-actions { margin-top: 0; }
 .fh-split { min-height: 0; display: grid; gap: 0.75rem; grid-template-rows: minmax(0, 14rem) minmax(0, 1fr); }
 @media (min-width: 48rem) { .fh-split { grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); } }
 .fh .diff:not(.muted):not(.error) { min-height: 0; display: flex; flex-direction: column; }
@@ -801,8 +948,7 @@ dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, 
 .fh-blame .who .link { color: var(--muted); text-decoration: none; }
 .fh-blame .who .link:hover { color: var(--accent); text-decoration: underline; }
 
-dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
-.setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.setting h3 { margin: 0 0 0.35rem; }
 .setting p { margin: 0 0 0.5rem; }
 .setting + .setting { margin-top: 1.25rem; padding-top: 1.1rem; border-top: 1px solid var(--line); }
 .setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
@@ -831,7 +977,7 @@ label.check input { flex: none; width: 1.05rem; height: 1.05rem; margin: 0.12rem
 
 /* ---------- First-run setup (features/setup/Setup.tsx) ----------
    The stepper is a commit graph: one lane, a node per step; the lane fills to the current node. */
-dialog.setup { width: min(36rem, calc(100vw - 2rem)); padding: 1.5rem 1.6rem 1.3rem; }
+dialog.setup { --pad: 1.5rem; }
 .setup-lane {
   --node: 1.35rem; --p: 0;
   position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 1.5rem; padding: 0; list-style: none;
@@ -901,7 +1047,7 @@ dialog.setup { width: min(36rem, calc(100vw - 2rem)); padding: 1.5rem 1.6rem 1.3
 .setup-actions .ghost:hover { color: var(--fg); background: var(--raised); }
 .setup-actions .ghost .icon { width: 0.95rem; height: 0.95rem; }
 @media (max-width: 30rem) {
-  dialog.setup { padding: 1.2rem 1rem 1rem; }
+  dialog.setup { --pad: 1.1rem; }
   .setup-lane .lbl small { display: none; }
   .setup-step { min-height: 0; }
   .setup-head .modal-badge { display: none; }

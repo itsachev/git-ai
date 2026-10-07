@@ -48,12 +48,13 @@ export function useTheme() {
 export const themeCommands = (theme: Theme, set: (t: Theme) => void) =>
   THEMES.filter((t) => t !== theme).map((t) => ({ label: `Theme: ${NAME[t]}`, run: () => set(t) }));
 
-/** Cycles System → Light → Dark. */
-export function ThemeButton({ theme, onChange }: { theme: Theme; onChange: (t: Theme) => void }) {
+/** Cycles System → Light → Dark. `labeled`: show the theme name next to the icon. */
+export function ThemeButton({ theme, onChange, labeled }: { theme: Theme; onChange: (t: Theme) => void; labeled?: boolean }) {
   const label = `Theme: ${NAME[theme]}. Switch to ${NAME[NEXT[theme]]}`;
   return (
-    <button className="icon-btn" onClick={() => onChange(NEXT[theme])} aria-label={label} title={label}>
+    <button className={labeled ? "corner-btn" : "icon-btn"} onClick={() => onChange(NEXT[theme])} aria-label={label} title={label}>
       <Icon name={ICON[theme]} />
+      {labeled && <span>{NAME[theme]} theme</span>}
     </button>
   );
 }

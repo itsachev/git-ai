@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Icon } from "../../lib/icons";
+import { Brand } from "../../lib/modal";
 
 // Checks GitHub Releases once at startup. Offline, dev builds and missing
 // releases fail the check; that is not worth bothering the user about.
@@ -38,7 +39,7 @@ export function UpdateBanner() {
     <aside className="update toast tone-accent" role="status">
       <span className="modal-badge tone-accent"><Icon name="restart" /></span>
       <span className="toast-text">
-        <strong>git-ai {update.version} is available</strong>
+        <strong><Brand /> {update.version} is available</strong>
         {state && <small className={state.startsWith("Update failed") ? "error" : "muted"}>{state}</small>}
       </span>
       {!state && (

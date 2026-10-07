@@ -17,6 +17,9 @@ export function ModalHead({ id, icon, tone = "accent", title, sub }: { id: strin
   );
 }
 
+/** The app name, set larger in the brand gradient wherever it shows up in visible text. */
+export const Brand = () => <span className="brand-name">git-ai</span>;
+
 // In-app replacement for the native confirm box, so confirms look like every other modal.
 type Ask = { title: string; message: string; ok: string; tone: Tone; resolve: (yes: boolean) => void };
 let asking: Ask | null = null;

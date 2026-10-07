@@ -17,10 +17,11 @@ const subs = new Set<() => void>();
 const set = (v: boolean) => { open = v; subs.forEach((f) => f()); };
 export const openSettings = () => set(true);
 
-export function SettingsButton() {
+export function SettingsButton({ labeled }: { labeled?: boolean }) {
   return (
-    <button className="icon-btn" onClick={openSettings} aria-label="Settings" title="Settings">
+    <button className={labeled ? "corner-btn" : "icon-btn"} onClick={openSettings} aria-label="Settings" title="Settings">
       <Icon name="settings" />
+      {labeled && <span>Settings</span>}
     </button>
   );
 }
@@ -36,7 +37,7 @@ export function SettingsDialog() {
   return (
     <dialog ref={dialog} className="modal settings" aria-labelledby="settings-title" onCancel={(e) => { e.preventDefault(); set(false); }}>
       <ModalHead id="settings-title" icon="settings" title="Settings" sub="Stored on this computer only." />
-      {isOpen && <><GitIdentity /><SshKey /><AiKey /></>}
+      {isOpen && <div className="settings-grid"><GitIdentity /><SshKey /><AiKey /></div>}
       <div className="dialog-actions">
         <button type="button" className="link setup-again" onClick={() => { set(false); openSetup(); }}>Run setup again</button>
         <button onClick={() => set(false)}>Close</button>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { setupDone, setupFinish, sshKey } from "../../lib/ipc";
 import { Icon, type IconName } from "../../lib/icons";
+import { Brand } from "../../lib/modal";
 import { ThemeButton, type Theme } from "../../lib/theme";
 import { AiKey, GitIdentity, SshKey, aiKeyQuery, gitSetupQuery, helperName } from "../settings/Settings";
 
@@ -10,9 +11,9 @@ let forced = false;
 const subs = new Set<() => void>();
 export const openSetup = () => { forced = true; subs.forEach((f) => f()); };
 
-const STEPS: { label: string; icon: IconName; title: string; lede: string }[] = [
+const STEPS: { label: string; icon: IconName; title: string; lede: React.ReactNode }[] = [
   { label: "Git", icon: "branch", title: "Who are you in the history?", lede: "Set the name and email on your commits, and let git remember your sign-ins." },
-  { label: "SSH", icon: "remote", title: "Connect to your remotes", lede: "git-ai talks to GitHub and friends over SSH. Pick the key that opens them." },
+  { label: "SSH", icon: "remote", title: "Connect to your remotes", lede: <><Brand /> talks to GitHub and friends over SSH. Pick the key that opens them.</> },
   { label: "AI", icon: "sparkle", title: "Bring your own AI key", lede: "Optional. A Gemini key writes commit messages and explains commits for you." },
   { label: "Done", icon: "check", title: "You're ready to commit", lede: "Everything below lives in Settings, so you can change it any time." },
 ];
