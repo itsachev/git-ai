@@ -12,6 +12,7 @@ import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQue
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
 import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs/NewBranch";
+import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Palette, type Command } from "./features/palette/Palette";
@@ -153,6 +154,8 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "Go to History", keys: "Ctrl+2", run: () => show("history") },
     { label: "Toggle branches", keys: "Ctrl+B", run: () => setSide((v) => !v) },
     { label: "New branch", keys: "Ctrl+Shift+B", run: () => openNewBranch() },
+    { label: "Write PR description (AI)", run: () => openWriteUp("pr") },
+    { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], run: o.go })),
@@ -200,6 +203,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         <Notice />
         <OpErrorDialog />
         <NewBranchDialog path={path} />
+        <WriteUpDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
         <footer className="statusbar"><Palette commands={commands} /></footer>
       </main>

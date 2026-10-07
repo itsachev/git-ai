@@ -18,6 +18,17 @@ message and diff, say in plain words what the commit changes and, if the code sh
 sentence summary, then at most 5 short \"- \" bullets for the notable changes. Mention risky or surprising \
 changes. Plain text only: no Markdown headings, no bold, no code fences.";
 
+const PR_PROMPT: &str = "You write pull request descriptions. From the commit messages and the combined diff \
+of a branch, write: a title of at most 72 characters on the first line, a blank line, then a description \
+with a short \"## Summary\" paragraph (what and why) and a \"## Changes\" list of \"- \" bullets. Add a \
+\"## Notes\" list only for risky changes, migrations or follow-ups the reviewer should know. GitHub Markdown, \
+no code fences around the whole answer.";
+
+const CHANGELOG_PROMPT: &str = "You write release changelogs for users of the software. From the commit messages \
+and the combined diff of a release, write Markdown \"- \" bullets grouped under \"### Added\", \"### Changed\", \
+\"### Fixed\" and \"### Removed\" (leave out empty groups). One line per user-visible change, in plain words; \
+merge related commits, skip pure refactors, tests and CI unless they matter to users. No title, no code fences.";
+
 fn keychain() -> Result<keyring::Entry, AppError> {
     keyring::Entry::new("git-ai", "gemini").map_err(|e| AppError::new("keychain", e.to_string()))
 }
@@ -83,6 +94,25 @@ pub fn explain_commit(repo: &Path, oid: &str) -> Result<String, AppError> {
         input += "\n[diff cut here, too long]";
     }
     Ok(generate(EXPLAIN_PROMPT, &input)?.trim().to_string())
+}
+
+/// PR title + description (`kind` "pr") or changelog (`kind` "changelog") for what `head` adds on top of `base`.
+pub fn write_range(repo: &Path, base: &str, head: &str, kind: &str) -> Result<String, AppError> {
+    let prompt = match kind {
+        "pr" => PR_PROMPT,
+        "changelog" => CHANGELOG_PROMPT,
+        _ => return Err(AppError::new("bad_kind", format!("Unknown kind {kind}."))),
+    };
+    let (messages, diff) = read::range_patch(repo, base, head, 300)?;
+    if messages.is_empty() {
+        return Err(AppError::new("nothing_in_range", format!("{head} has no commits that aren't already in {base}.")));
+    }
+    let (diff, cut) = clip(&diff, MAX_DIFF);
+    let mut input = format!("Commit messages, oldest first:\n{}\n\nCombined diff:\n{diff}", messages.join("\n---\n"));
+    if cut {
+        input += "\n[diff cut here, too long]";
+    }
+    Ok(generate(prompt, &input)?.trim().to_string())
 }
 
 fn generate(system: &str, input: &str) -> Result<String, AppError> {

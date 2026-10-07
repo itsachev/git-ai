@@ -89,6 +89,33 @@ pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError
     Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
 }
 
+/// What `head` adds on top of `base` (refs or oids), like a PR: the messages of the non-merge commits
+/// in `base..head`, oldest first (at most `max`), and the patch from their merge base to `head`.
+pub fn range_patch(repo: &Path, base: &str, head: &str, max: usize) -> Result<(Vec<String>, String), AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let base = repo.revparse_single(base)?.peel_to_commit()?.id();
+    let head = repo.revparse_single(head)?.peel_to_commit()?;
+    let mut walk = repo.revwalk()?;
+    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::REVERSE)?;
+    walk.push(head.id())?;
+    walk.hide(base)?;
+    let mut messages = vec![];
+    for oid in walk {
+        let c = repo.find_commit(oid?)?;
+        if c.parent_count() < 2 {
+            messages.push(String::from_utf8_lossy(c.message_bytes()).trim_end().to_string());
+        }
+    }
+    // Keep the newest when there are too many.
+    let messages = messages.split_off(messages.len().saturating_sub(max));
+    let from = repo.find_commit(repo.merge_base(base, head.id())?)?.tree()?;
+    let mut opts = git2::DiffOptions::new();
+    opts.max_size(1 << 20);
+    let mut diff = repo.diff_tree_to_tree(Some(&from), Some(&head.tree()?), Some(&mut opts))?;
+    diff.find_similar(None)?;
+    Ok((messages, patch_text(&diff)?))
+}
+
 fn patch_text(diff: &git2::Diff) -> Result<String, AppError> {
     let mut out = String::new();
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
@@ -292,6 +319,10 @@ mod tests {
 
         let (msg, patch) = super::commit_patch(&dir, &first.id().to_string()).unwrap();
         assert!(msg == "msg\n\nbody" && patch.contains("+++ b/a.txt") && patch.ends_with("+three\n"), "{patch}");
+
+        let (msgs, patch) = super::range_patch(&dir, &first.id().to_string(), "HEAD", 10).unwrap();
+        assert!(msgs == ["msg\n\nbody"] && patch.contains("rename to b.txt"), "{patch}");
+        assert!(super::range_patch(&dir, "HEAD", "HEAD", 10).unwrap().0.is_empty());
 
         assert_eq!(super::recent_subjects(&dir, 10).unwrap(), ["msg", "msg"]);
         // Commits above bypass the index; load HEAD's tree so nothing counts as staged.
