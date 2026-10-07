@@ -163,6 +163,11 @@ pub fn merge(path: String, rev: String, cherry_pick: bool) -> Result<(), AppErro
 }
 
 #[tauri::command]
+pub fn rebase_onto(path: String, onto: String) -> Result<(), AppError> {
+    cli::rebase_onto(Path::new(&path), &onto)
+}
+
+#[tauri::command]
 pub fn abort(path: String) -> Result<(), AppError> {
     cli::abort(Path::new(&path))
 }

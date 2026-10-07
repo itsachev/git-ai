@@ -108,6 +108,8 @@ export const createBranch = (path: string, name: string, from: string | null, ch
 export const deleteBranch = (path: string, name: string, force: boolean) => invoke<void>("delete_branch", { path, name, force });
 /** Merges `rev` into the current branch, or with `cherryPick` applies that one commit. Code "conflicts" = stopped halfway. */
 export const merge = (path: string, rev: string, cherryPick: boolean) => invoke<void>("merge", { path, rev, cherryPick });
+/** Rebases the current branch onto `onto`. Code "conflicts" = paused, continue from File Status. Undoable. */
+export const rebaseOnto = (path: string, onto: string) => invoke<void>("rebase_onto", { path, onto });
 /** Aborts the in-progress merge/cherry-pick (changed files backed up first). */
 export const abortOp = (path: string) => invoke<void>("abort", { path });
 /** Commits after `base` on the current branch, oldest first. Codes "has_merges", "too_many", "not_ancestor". */

@@ -44,6 +44,7 @@ pub fn run() {
             commands::create_branch,
             commands::delete_branch,
             commands::merge,
+            commands::rebase_onto,
             commands::abort,
             commands::rebase_commits,
             commands::rebase,

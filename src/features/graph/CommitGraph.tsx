@@ -3,6 +3,7 @@ import { useQueries } from "@tanstack/react-query";
 import { graphRows } from "../../lib/ipc";
 import type { GraphRow } from "../../bindings/GraphRow";
 import { errorText } from "../status/Changes";
+import { RefMenu, showMenu, useRefActions } from "../refs/Sidebar";
 
 const ROW = 24; // px, fixed so row i sits at i * ROW
 const PAGE = 500;
@@ -130,7 +131,7 @@ export function CommitGraph({ path, sel, onSelect }: Props) {
               style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })}>
               <span />
               <span className="desc">
-                {r.refs.map((n) => <span key={n} className="ref">{n}</span>)}
+                {r.refs.map((n) => <RefChip key={n} name={n} path={path} />)}
                 <span className="sum">{r.summary}</span>
               </span>
               <span className="c-date">{dateFmt.format(r.time * 1000)}</span>
@@ -141,5 +142,17 @@ export function CommitGraph({ path, sel, onSelect }: Props) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Branch/tag label on a commit; right-click for the same actions as the sidebar. */
+function RefChip({ name, path }: { name: string; path: string }) {
+  const pop = useRef<HTMLDivElement>(null);
+  const actions = useRefActions(path)(name);
+  return (
+    <>
+      <span className="ref" title={`${name} (right-click for actions)`} onContextMenu={(e) => showMenu(pop.current, e)}>{name}</span>
+      {actions.length > 0 && <RefMenu pop={pop} label={name} actions={actions} />}
+    </>
   );
 }
