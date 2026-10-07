@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_store::StoreExt;
 
 const STORE: &str = "settings.json";
-const MAX_RECENT: usize = 10;
+const MAX_RECENT: usize = 100;
 
 #[tauri::command]
 pub fn open_repo(app: AppHandle, path: String) -> Result<read::RepoInfo, AppError> {
@@ -32,6 +32,12 @@ pub fn recent_repos(app: AppHandle) -> Vec<String> {
         .and_then(|s| s.get("recent"))
         .and_then(|v: Value| serde_json::from_value(v).ok())
         .unwrap_or_default()
+}
+
+/// Recent repos whose folder no longer exists (deleted or moved outside the app).
+#[tauri::command]
+pub fn missing_repos(app: AppHandle) -> Vec<String> {
+    recent_repos(app).into_iter().filter(|p| !Path::new(p).exists()).collect()
 }
 
 /// Drops `path` from the recent list; the folder stays on disk.
