@@ -11,3 +11,5 @@ Thumbs.db
 .idea/
 dist-ssr/
 *.local
+
+progress.md
