@@ -17,6 +17,7 @@ import { RebaseDialog } from "./features/graph/Rebase";
 import { FileHistoryDialog } from "./features/graph/FileHistory";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
+import { Backdrop } from "./features/home/Backdrop";
 import { Palette, type Command } from "./features/palette/Palette";
 import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { SetupWizard, openSetup } from "./features/setup/Setup";
@@ -130,6 +131,7 @@ function App() {
   const shown = recent.filter((p) => p.toLowerCase().includes(f));
   const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} theme={theme} setTheme={setTheme} /> : (
     <main className="home">
+      <Backdrop />
       <section className="home-intro">
         <p className="brand"><Mark /> git-ai <ThemeButton theme={theme} onChange={setTheme} /><SettingsButton /></p>
         <h1>Git, in plain sight.</h1>
