@@ -23,15 +23,16 @@ pub struct DeviceCode {
     pub expires_in: u32,
 }
 
-/// The OAuth app's client id (public, not a secret): runtime env first, then the one baked in at build.
+/// The "git-ai (dev)" OAuth app (device flow on, token expiry off). Client ids are public, not secrets.
+const DEFAULT_CLIENT_ID: &str = "Ov23liH9TwxL45A2cYEZ";
+
+/// Runtime env first, then the one baked in at build, then the default app.
 fn client_id() -> Result<String, AppError> {
-    std::env::var("GITAI_GITHUB_CLIENT_ID")
+    Ok(std::env::var("GITAI_GITHUB_CLIENT_ID")
         .ok()
         .or(option_env!("GITAI_GITHUB_CLIENT_ID").map(String::from))
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| {
-            AppError::new("github_not_configured", "GitHub sign-in isn't set up in this build (GITAI_GITHUB_CLIENT_ID is missing).")
-        })
+        .unwrap_or_else(|| DEFAULT_CLIENT_ID.into()))
 }
 
 fn net(e: ureq::Error) -> AppError {
