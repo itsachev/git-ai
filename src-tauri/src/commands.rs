@@ -96,7 +96,7 @@ pub fn apply_lines(path: String, file: String, op: cli::LineOp, lines: Vec<usize
 
 #[tauri::command]
 pub fn op_log(path: String) -> Result<Vec<oplog::OpEntry>, AppError> {
-    oplog::entries(Path::new(&path), 20)
+    oplog::entries(Path::new(&path), 500)
 }
 
 /// Async: undoing a remote branch delete pushes.

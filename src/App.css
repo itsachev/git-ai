@@ -305,8 +305,13 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 @container stage (min-width: 38rem) { .changes > .split, .history-bottom > .split { display: block; } }
 
 /* ---------- Sidebar: branches, remotes, tags, stashes ---------- */
-.sidebar { flex: 1; min-height: 0; overflow: auto; padding: 0.6rem 0.5rem 10px; }
-.sidebar > .search { margin-bottom: 0.25rem; }
+.sidebar { flex: 1; min-height: 0; overflow: auto; padding: 0 0.5rem 10px; }
+.sidebar > .search { margin: 0.6rem 0 0.25rem; }
+/* Section headers stay put while their section scrolls by; each list scrolls on its own past ~10 rows,
+   so 200 tags can't push Stashes/Undo history off the bottom. Scroll chaining stays on: at a list's end
+   the wheel carries on to the sidebar. */
+.sidebar > details > summary { position: sticky; top: 0; z-index: 1; background: var(--rail); }
+.sidebar .refs { max-height: min(17rem, 40vh); overflow-y: auto; }
 .sidebar summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.45rem;
   min-height: var(--ctl); margin-top: 0.5rem; padding: 0 0.25rem 0 0.4rem; border-radius: var(--r);
