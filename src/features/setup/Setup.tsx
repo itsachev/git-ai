@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { setupDone, setupFinish, sshKey } from "../../lib/ipc";
 import { Icon, type IconName } from "../../lib/icons";
+import { ThemeButton, type Theme } from "../../lib/theme";
 import { AiKey, GitIdentity, SshKey, aiKeyQuery, gitSetupQuery, helperName } from "../settings/Settings";
 
 // First-run setup: shown once on launch until finished or skipped; the palette can open it again.
@@ -66,7 +67,7 @@ function Summary() {
   );
 }
 
-export function SetupWizard() {
+export function SetupWizard({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void }) {
   const qc = useQueryClient();
   const isForced = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => forced);
   const done = useQuery({ queryKey: ["setup-done"], queryFn: setupDone, staleTime: Infinity }).data;
@@ -121,6 +122,7 @@ export function SetupWizard() {
         ) : !last && (
           <button type="button" className="ghost" onClick={() => go(step - 1)}><Icon name="back" /> Back</button>
         )}
+        <ThemeButton theme={theme} onChange={setTheme} />
         {step === 0 && <button className="primary" type="submit" form="setup-git">Continue</button>}
         {(step === 1 || step === 2) && (
           <button className="primary" onClick={() => go(step + 1)}>{skippable ? "Skip for now" : "Continue"}</button>

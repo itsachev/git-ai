@@ -193,7 +193,7 @@ function App() {
       {body}
       <AskpassDialog />
       <SettingsDialog />
-      <SetupWizard />
+      <SetupWizard theme={theme} setTheme={setTheme} />
       <ConfirmDialog />
       <UpdateBanner />
     </>
