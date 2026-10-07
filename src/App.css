@@ -676,6 +676,34 @@ dialog.rebase-dialog { width: min(40rem, calc(100vw - 2rem)); }
 .rb-list li.dropped .rb-text { opacity: 0.45; text-decoration: line-through; }
 .rb-list textarea { min-height: 5rem; resize: vertical; font: 0.88rem/1.5 var(--mono); letter-spacing: 0; }
 
+/* File history + blame: wide, tall modal; commit list beside the diff, stacked when narrow. */
+dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, calc(100dvh - 2rem)); }
+.fh { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 0.9rem; }
+.fh .modal-head, .fh .dialog-actions { margin: 0; }
+.fh-split { min-height: 0; display: grid; gap: 0.75rem; grid-template-rows: minmax(0, 14rem) minmax(0, 1fr); }
+@media (min-width: 48rem) { .fh-split { grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); } }
+.fh .diff:not(.muted):not(.error) { min-height: 0; display: flex; flex-direction: column; }
+.fh .diff pre { flex: 1; min-height: 0; max-height: none; }
+.fh-list { margin: 0; padding: 0; list-style: none; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 0.15rem; }
+.fh-list .row { all: unset; box-sizing: border-box; width: 100%; min-height: var(--ctl); display: grid; align-content: center; gap: 0.1rem; padding: 0.35rem 0.6rem; border-radius: 8px; cursor: pointer; }
+.fh-list .row:hover { background: var(--raised); }
+.fh-list .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fh-list .row[aria-pressed="true"] { background: var(--active); box-shadow: inset 3px 0 var(--active-bar); }
+.fh-list .row[aria-pressed="true"] strong { color: var(--accent-fg); }
+.fh-list strong, .fh-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fh-list small { color: var(--faint); font-size: 0.8rem; }
+/* Blame rows: who (on the first line of each run), line number, text. Runs alternate shading. */
+.fh-blame .ln { position: static; }
+.fh-blame .alt, .fh-blame .alt .ln { background: var(--sunken); }
+.fh-blame .first:not(:first-child) { box-shadow: inset 0 1px var(--line); }
+.fh-blame .who {
+  display: inline-block; vertical-align: top; width: clamp(12ch, 28vw, 26ch); padding: 0 0.6rem;
+  overflow: hidden; text-overflow: ellipsis; user-select: none;
+  font-family: var(--sans); font-size: 0.78rem; line-height: calc(0.82rem * 1.65);
+}
+.fh-blame .who .link { color: var(--muted); text-decoration: none; }
+.fh-blame .who .link:hover { color: var(--accent); text-decoration: underline; }
+
 dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
 .setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
 .setting p { margin: 0 0 0.5rem; }
