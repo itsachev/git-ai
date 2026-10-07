@@ -6,6 +6,7 @@ import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
+import { openWriteUp } from "./WriteUp";
 import { confirm } from "../../lib/modal";
 
 /** Checkout that offers to bring conflicting local changes along instead of just failing. */
@@ -87,9 +88,10 @@ export function Sidebar({ path }: { path: string }) {
           {local.map((b) => {
             const cur = b.name === data.head;
             const branchOff: [string, () => void] = ["New branch from here", () => openNewBranch(b.name)];
+            const pr: [string, () => void] = ["Write PR description (AI)", () => openWriteUp("pr", null, b.name)];
             return (
               <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => switchTo(path, b.name, false))}
-                actions={cur ? [branchOff] : [["Checkout", () => run(() => switchTo(path, b.name, false))], branchOff, ["Merge", () => mergeIn(b.name)], ["Delete", () => remove(b.name)]]} />
+                actions={cur ? [branchOff, pr] : [["Checkout", () => run(() => switchTo(path, b.name, false))], branchOff, pr, ["Merge", () => mergeIn(b.name)], ["Delete", () => remove(b.name)]]} />
             );
           })}
         </ul>
@@ -112,7 +114,7 @@ export function Sidebar({ path }: { path: string }) {
         <summary><Icon name="tag" />Tags <span className="count">{data.tags.length}</span></summary>
         <ul className="refs">
           {match(data.tags).map((t) => (
-            <Row key={t.name} item={t} actions={[["New branch from here", () => openNewBranch(t.name)], ["Push",() => run(() => pushTag(path, t.name), `Pushed tag ${t.name}`)], ["Delete", async () => {
+            <Row key={t.name} item={t} actions={[["New branch from here", () => openNewBranch(t.name)], ["Changelog since this tag (AI)", () => openWriteUp("changelog", t.name)], ["Push",() => run(() => pushTag(path, t.name), `Pushed tag ${t.name}`)], ["Delete", async () => {
               if (await confirm("Delete tag", `Delete tag ${t.name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))
                 run(() => deleteTag(path, t.name));
             }]]} />

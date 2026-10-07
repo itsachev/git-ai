@@ -296,3 +296,9 @@ pub async fn ai_commit_message(path: String) -> Result<String, AppError> {
 pub async fn ai_explain_commit(path: String, oid: String) -> Result<String, AppError> {
     crate::ai::explain_commit(Path::new(&path), &oid)
 }
+
+/// Sends a commit range (messages + combined diff) to Gemini for a PR description or changelog.
+#[tauri::command]
+pub async fn ai_write_range(path: String, base: String, head: String, kind: String) -> Result<String, AppError> {
+    crate::ai::write_range(Path::new(&path), &base, &head, &kind)
+}

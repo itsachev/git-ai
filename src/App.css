@@ -654,6 +654,12 @@ button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--ac
 }
 .nb-cmd::before { content: "$ "; color: var(--faint); }
 
+/* AI write-up dialog (features/refs/WriteUp.tsx), built on the New branch styles. */
+dialog.write-up { width: min(38rem, calc(100vw - 2rem)); }
+.wu-range { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; }
+.write-up .nb-hint { margin-top: -0.6rem; }
+.write-up textarea { min-height: 14rem; max-height: 45vh; resize: vertical; font: 0.88rem/1.55 var(--mono); letter-spacing: 0; }
+
 dialog.settings { width: min(34rem, calc(100vw - 2rem)); }
 .setting h3 { margin: 0 0 0.35rem; font-size: 1rem; }
 .setting p { margin: 0 0 0.5rem; }
