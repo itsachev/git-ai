@@ -144,7 +144,16 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
     } else if e.head.is_some() || e.new_head.is_some() {
         // Compare-and-swap back to `head`: "" as the old value means "must not exist", -d deletes.
         let r = e.ref_name.as_deref().unwrap_or("HEAD");
+        // Rebase, pull, merge: files must follow HEAD back. `reset --keep` keeps local edits and
+        // refuses when they'd be overwritten. Amend only moves HEAD (its changes stay staged).
+        let files = r == "HEAD" && e.op.trim_start_matches("undo ") != "amend";
         let res = match (&e.head, &e.new_head) {
+            (Some(old), Some(new)) if files && git(repo, &["rev-parse", "HEAD"])?.trim() == new => {
+                git(repo, &["reset", "-q", "--keep", old]).map_err(|_| {
+                    AppError::new("dirty", "Your uncommitted changes touch files this undo would change. Commit, stash or discard them first.")
+                })?;
+                Ok(String::new())
+            }
             (Some(old), new) => git(repo, &["update-ref", "-m", "git-ai: undo", r, old, new.as_deref().unwrap_or("")]),
             (None, Some(new)) => git(repo, &["update-ref", "-m", "git-ai: undo", "-d", r, new]),
             (None, None) => unreachable!(),
@@ -217,6 +226,7 @@ mod tests {
         // Conflicting merge stays in progress; abort restores main and backs up the conflicted file.
         assert_eq!(cli::merge(p, "feat", false).unwrap_err().code, "conflicts");
         assert_eq!(cli::status(p).unwrap().operation.as_deref(), Some("merge"));
+        assert_eq!(cli::status(p).unwrap().step.as_deref(), Some("Merge branch 'feat'"));
         cli::abort(p).unwrap();
         assert_eq!(cli::status(p).unwrap().operation, None);
         assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "main
@@ -577,6 +587,8 @@ mine
         assert_eq!(super::entries(p, 1).unwrap()[0].op, "rebase");
         super::undo(p, &super::entries(p, 1).unwrap()[0].id).unwrap();
         assert_eq!(cli::rev(p, "HEAD").unwrap(), before);
+        // Files follow HEAD back (5.txt returns), the local edit stays.
+        assert_eq!(git(p, &["status", "--porcelain"]).unwrap(), " M a.txt\n");
         git(p, &["reset", "-q", "--hard"]).unwrap();
 
         // Swapping two edits of the same line conflicts; resolving and committing continues the rebase.
@@ -586,6 +598,8 @@ mine
         let steps = [step(&x2, Pick, None), step(&x1, Pick, Some("x1 again"))];
         assert_eq!(cli::rebase(p, &before, &steps).unwrap_err().code, "conflicts");
         assert_eq!(cli::status(p).unwrap().operation.as_deref(), Some("rebase"));
+        let st = cli::status(p).unwrap().step.unwrap();
+        assert!(st.starts_with("commit 1 of ") && st.ends_with(": “x2”"), "{st}");
         // Resolved as "x2"; continuing then stops at x1.
         fs::write(dir.join("a.txt"), "x2\n").unwrap();
         cli::stage(p, &["a.txt".into()]).unwrap();

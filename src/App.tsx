@@ -195,6 +195,13 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
 
   const show = (t: typeof tab) => { setTab(t); setSide(false); };
+  // A merge/rebase/... that just paused at conflicts: go where they get resolved.
+  const nConflicts = status?.conflicted.length ?? 0;
+  const hadConflicts = useRef(nConflicts > 0);
+  useEffect(() => {
+    if (nConflicts && !hadConflicts.current) setTab("status");
+    hadConflicts.current = nConflicts > 0;
+  }, [nConflicts]);
   const commands: Command[] = [
     { label: "Go to File Status", keys: "Ctrl+1", run: () => show("status") },
     { label: "Go to History", keys: "Ctrl+2", run: () => show("history") },
@@ -226,10 +233,11 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         </div>
         <nav className="views" aria-label="Views">
           {views.map(([id, label, icon]) => (
-            <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => show(id)}>
+            <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => show(id)}
+              className={id === "status" && status?.conflicted.length ? "conflict" : undefined}>
               <Icon name={icon} />
               <span>{label}</span>
-              {id === "status" && changed > 0 && <span className="count" aria-label={`${changed} changed files`}>{changed}</span>}
+              {id === "status" && changed > 0 && <span className="count" aria-label={`${changed} changed files${status?.conflicted.length ? `, ${status.conflicted.length} with conflicts` : ""}`}>{changed}</span>}
             </button>
           ))}
         </nav>

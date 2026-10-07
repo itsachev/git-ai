@@ -3,4 +3,4 @@
 /**
  * Which side of a conflict to keep.
  */
-export type Side = "Ours" | "Theirs";
+export type Side = "Ours" | "Theirs" | "OursThenTheirs" | "TheirsThenOurs";

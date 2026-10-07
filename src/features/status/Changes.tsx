@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { aiCommitMessage, abortOp, applyLines, commit, discard, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile } from "../../lib/ipc";
+import { aiCommitMessage, abortOp, applyLines, commit, discard, editors, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile } from "../../lib/ipc";
+import type { Side } from "../../bindings/Side";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
@@ -14,7 +15,8 @@ export const statusQuery = (path: string) => ({ queryKey: ["status", path], quer
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
 
 type Selection = { file: string; staged: boolean };
-export type Run = (op: () => Promise<unknown>, done?: string) => Promise<boolean>;
+/** `done`: the success notice, or a function called after success (undefined = no notice). */
+export type Run = (op: () => Promise<unknown>, done?: string | (() => string | undefined)) => Promise<boolean>;
 
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
@@ -25,7 +27,7 @@ const confirmDiscard = (what: string) =>
 /** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
  * A failure shows in `OpErrorDialog` until OK. */
 let opGen = 0;
-let opError: { title: string; text: string } | null = null;
+let opError: { title: string; text: string; warn?: boolean } | null = null;
 const opSubs = new Set<() => void>();
 const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
 
@@ -34,19 +36,23 @@ let notice: { text: string; gen: number } | null = null;
 
 export function useRun() {
   const qc = useQueryClient();
-  async function run(op: () => Promise<unknown>, done?: string) {
+  async function run(op: () => Promise<unknown>, done?: string | (() => string | undefined)) {
     const mine = ++opGen;
     notice = null;
     opSubs.forEach((f) => f());
     try {
       await op();
-      if (done && mine === opGen) {
-        notice = { text: done, gen: mine };
+      const text = typeof done === "function" ? done() : done;
+      if (text && mine === opGen) {
+        notice = { text, gen: mine };
         opSubs.forEach((f) => f());
       }
       return true;
     } catch (e) {
-      opError = { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e) };
+      // "conflicts" = the op paused halfway (still in progress), not a failure.
+      opError = (e as AppError).code === "conflicts"
+        ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
+        : { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e) };
       opSubs.forEach((f) => f());
       return false;
     } finally {
@@ -69,10 +75,10 @@ export function OpErrorDialog() {
   }, [err]);
   const close = () => { opError = null; opSubs.forEach((f) => f()); };
   return (
-    <dialog ref={dialog} className="modal tone-danger" role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
+    <dialog ref={dialog} className={`modal tone-${last.current?.warn ? "warn" : "danger"}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
       onCancel={(e) => { e.preventDefault(); close(); }}>
       <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
-        <ModalHead id="op-error-title" icon="warn" tone="danger" title={last.current?.title} />
+        <ModalHead id="op-error-title" icon="warn" tone={last.current?.warn ? "warn" : "danger"} title={last.current?.title} />
         <p id="op-error-text" className="modal-text">{last.current?.text}</p>
         <div className="dialog-actions"><button className="primary" autoFocus>OK</button></div>
       </form>
@@ -118,10 +124,10 @@ export function Changes({ path }: { path: string }) {
           <div className="banner" role="status">
             <Icon name="warn" />
             <span>
-              {data.operation[0].toUpperCase() + data.operation.slice(1)} in progress.{" "}
-              {data.operation === "rebase"
-                ? data.conflicted.length ? "Resolve the conflicts, then commit to continue." : "Commit to continue."
-                : data.conflicted.length ? "Resolve the conflicts, then commit." : "Commit to finish it."}
+              <strong>{cap(data.operation)} in progress</strong>{data.step && <>, {data.step}</>}.{" "}
+              {data.conflicted.length
+                ? `Resolve ${data.conflicted.length === 1 ? "the conflict" : `${data.conflicted.length} conflicts`}, then ${finishLabel(data.operation)}.`
+                : `${finishLabel(data.operation)[0].toUpperCase() + finishLabel(data.operation).slice(1)} below.`}
             </span>
             <button className="small" onClick={async () => {
               if (await confirm(`Abort the ${data.operation}?`, "Changed files are backed up first (Undo history).", "Abort"))
@@ -143,19 +149,32 @@ export function Changes({ path }: { path: string }) {
           </>
         )}
         </div>
-        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={!!data.operation} run={run}
-          onCommit={(msg, amend) => run(() => commit(path, msg, amend))} />
+        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={data.operation} conflicts={data.conflicted.length} run={run}
+          onCommit={(msg, amend) => {
+            // Committing during a merge/rebase may finish it; say so once nothing is left in progress.
+            const op = amend ? null : data.operation;
+            let finished = false;
+            return run(async () => {
+              await commit(path, msg, amend);
+              finished = !!op && !(await repoStatus(path)).operation;
+            }, () => finished ? `${cap(op!)} finished` : undefined);
+          }} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />
-      {conflicted ? <Conflict path={path} file={sel.file} run={run} /> : <Diff path={path} sel={shown ? sel : null} run={run} />}
+      {conflicted ? <Conflict path={path} file={sel.file} op={data.operation} run={run} /> : <Diff path={path} sel={shown ? sel : null} run={run} />}
     </div>
   );
 }
 
-/** `finishing`: a merge/cherry-pick is in progress; committing finishes it, an empty message uses git's. */
-type CommitProps = { path: string; canCommit: boolean; finishing: boolean; run: Run; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+/** `finishing`: the merge/rebase/... in progress; committing finishes (or continues) it, an empty message uses git's.
+ *  `conflicts`: unresolved files, which block that. */
+type CommitProps = { path: string; canCommit: boolean; finishing: string | null; conflicts: number; run: Run; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
 
-function CommitBox({ path, canCommit, finishing, run, onCommit }: CommitProps) {
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+/** What the Commit button does while `op` is in progress. */
+const finishLabel = (op: string) => op === "rebase" ? "continue the rebase" : `finish the ${op}`;
+
+function CommitBox({ path, canCommit, finishing, conflicts, run, onCommit }: CommitProps) {
   const [msg, setMsg] = useState("");
   const [amend, setAmend] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -178,7 +197,7 @@ function CommitBox({ path, canCommit, finishing, run, onCommit }: CommitProps) {
   const head = useQuery({ queryKey: ["head", path], queryFn: () => headMessage(path) }).data;
   // Amend may just reword, so it doesn't need staged changes.
   // A merge commit may have nothing staged (all conflicts resolved to "ours").
-  const ready = amend ? msg.trim() !== "" : finishing || (canCommit && msg.trim() !== "");
+  const ready = amend ? msg.trim() !== "" : finishing ? !conflicts : canCommit && msg.trim() !== "";
   const ok = ready && !busy;
   function toggleAmend(on: boolean) {
     setAmend(on);
@@ -206,15 +225,17 @@ function CommitBox({ path, canCommit, finishing, run, onCommit }: CommitProps) {
         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
       />
       <div className="commit-row">
-        <button type="button" className="small" disabled={!canCommit || amend || finishing || writing} onClick={generate}
+        <button type="button" className="small" disabled={!canCommit || amend || !!finishing || writing} onClick={generate}
           title={hasKey ? "Write a message from the staged changes (sent to Gemini)" : "Add a Gemini API key in Settings first"}>
           {writing ? "Writing…" : "Generate message"}
         </button>
         <label className="check">
-          <input type="checkbox" checked={amend} disabled={!head || finishing} onChange={(e) => toggleAmend(e.target.checked)} />
+          <input type="checkbox" checked={amend} disabled={!head || !!finishing} onChange={(e) => toggleAmend(e.target.checked)} />
           Amend last commit
         </label>
-        <button className="primary" disabled={!ok}>{busy ? "Committing…" : amend ? "Amend" : "Commit"}</button>
+        <button className="primary" disabled={!ok} title={finishing && conflicts ? "Resolve the conflicts first" : undefined}>
+          {busy ? "Working…" : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`) : "Commit"}
+        </button>
       </div>
     </form>
   );
@@ -265,23 +286,71 @@ function FileList({ title, files, staged, action, onAction, onDiscard, sel, onSe
 }
 
 /** A conflicted file with its markers, plus whole-file resolutions. Edits in between happen in an editor. */
-function Conflict({ path, file, run }: { path: string; file: string; run: Run }) {
+function Conflict({ path, file, op, run }: { path: string; file: string; op: string | null; run: Run }) {
+  // "Mine" = your work. During a rebase git swaps the sides: its "ours" is the branch rebased so far
+  // and its "theirs" is your commit being replayed.
+  const rebasing = op === "rebase";
+  const mine: Side = rebasing ? "Theirs" : "Ours";
+  const theirs: Side = rebasing ? "Ours" : "Theirs";
   const { data, error } = useQuery({ queryKey: ["work", path, file], queryFn: () => workFile(path, file) });
+  const eds = useQuery({ queryKey: ["editors"], queryFn: editors, staleTime: Infinity });
+  const [editor, setEditor] = useState<string | null>(null);
+  const chosen = editor ?? eds.data?.chosen ?? "";
+  const menu = useRef<HTMLDivElement>(null);
+  // Edited in an editor: once the markers seen here are all gone, mark the file resolved.
+  // Never on first sight (a delete/modify conflict has no markers at all).
+  const hadMarkers = useRef(false);
+  useEffect(() => {
+    if (typeof data !== "string") return;
+    if (/^(<{7}|>{7})( |$)/m.test(data)) hadMarkers.current = true;
+    else if (hadMarkers.current) {
+      hadMarkers.current = false;
+      run(() => stage(path, [file]), `Resolved ${file}`);
+    }
+  }, [data]);
+  const open = (n: string) => run(() => openFile(path, file, n || null).then(() => void eds.refetch()));
   let side: "" | "ours" | "base" | "theirs" = "";
   return (
     <section className="diff">
       <div className="diff-bar">
-        <span>Conflict in <strong>{file}</strong></span>
-        <button className="small" onClick={() => run(() => resolve(path, [file], "Ours"))}
-          title="Keep the current branch's version (backed up first)">Take ours</button>
-        <button className="small" onClick={() => run(() => resolve(path, [file], "Theirs"))}
-          title="Keep the incoming version (backed up first)">Take theirs</button>
-        <button className="small" onClick={() => run(() => openFile(path, file))}>Open file</button>
-        <button className="small" onClick={() => run(() => stage(path, [file]))}>Mark resolved</button>
+        <span className="conflict-file">Conflict in <strong>{file}</strong></span>
+        <span className="conflict-actions">
+          <button className="small" onClick={() => run(() => resolve(path, [file], mine))}
+            title={`Keep ${rebasing ? "your commit's" : "your branch's"} version (backed up first)`}>Keep mine</button>
+          <button className="small" onClick={() => run(() => resolve(path, [file], theirs))}
+            title={`Keep the ${rebasing ? "branch you're rebasing onto" : "incoming"} version (backed up first)`}>Keep theirs</button>
+          <button className="small" onClick={() => run(() => resolve(path, [file], rebasing ? "TheirsThenOurs" : "OursThenTheirs"))}
+            title="Keep both sides of every conflict, mine first (backed up first)">Mine, then theirs</button>
+          <button className="small" onClick={() => run(() => resolve(path, [file], rebasing ? "OursThenTheirs" : "TheirsThenOurs"))}
+            title="Keep both sides of every conflict, theirs first (backed up first)">Theirs, then mine</button>
+          {/* Split button: the main part opens in the remembered editor, the chevron picks another (and opens in it). */}
+          <span className="split-btn">
+            <button className="small" title="Open the file to edit the conflict by hand" onClick={() => open(chosen)}>
+              <span>{chosen === "Other app…" ? "Open with…" : `Open in ${chosen || "default app"}`}</span>
+            </button>
+            <button className="small split-menu" aria-label="Choose editor" title="Choose editor" aria-haspopup="menu" onClick={(e) => {
+              const el = menu.current!, r = e.currentTarget.getBoundingClientRect();
+              el.showPopover();
+              el.style.left = `${Math.max(4, Math.min(r.right - el.offsetWidth, innerWidth - el.offsetWidth - 4))}px`;
+              el.style.top = `${Math.min(r.bottom + 4, innerHeight - el.offsetHeight - 4)}px`;
+              el.querySelector<HTMLElement>("[aria-checked=true]")?.focus();
+            }}><Icon name="chevron" /></button>
+            <div ref={menu} popover="auto" className="row-menu editor-menu" role="menu" aria-label="Open in">
+              {["", ...(eds.data?.found ?? [])].map((n) => (
+                <button key={n} role="menuitemradio" aria-checked={n === chosen}
+                  onClick={() => { menu.current!.hidePopover(); setEditor(n); open(n); }}>
+                  <span className="check">{n === chosen && <Icon name="check" />}</span>{n || "Default app"}
+                </button>
+              ))}
+            </div>
+          </span>
+        </span>
       </div>
       <p className="muted legend">
-        <span className="ours">Ours</span> = current branch, <span className="theirs">theirs</span> = incoming.
-        Edit the file to combine them, then Mark resolved.
+        {rebasing
+          ? <><span className="theirs">Mine</span> = your commit being replayed, <span className="ours">theirs</span> = the branch you're rebasing onto.</>
+          : <><span className="ours">Mine</span> = your branch, <span className="theirs">theirs</span> = incoming.</>}{" "}
+        Edit the file to combine them; once no markers are left and it is saved, it is marked resolved.
       </p>
       {error ? <p className="error" role="alert">{errorText(error)}</p>
         : data === null ? <p className="muted">Binary file or larger than 1 MB, take a side or open it.</p>

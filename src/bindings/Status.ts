@@ -13,4 +13,8 @@ unstaged: Array<FileChange>, conflicted: Array<FileChange>,
 /**
  * Merge/cherry-pick/... waiting for commit or abort, see `read::operation`.
  */
-operation: string | null, };
+operation: string | null, 
+/**
+ * What that operation is applying right now, see `read::op_step`.
+ */
+step: string | null, };

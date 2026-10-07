@@ -41,6 +41,30 @@ pub fn operation(repo: &Path) -> Result<Option<String>, AppError> {
     .map(String::from))
 }
 
+/// What the in-progress `op` is applying, for the banner: "commit 2 of 4: “subject”" (rebase),
+/// the merge message's first line, or the picked/reverted commit's subject. None if git left no clue.
+pub fn op_step(repo: &Path, op: &str) -> Option<String> {
+    let repo = git2::Repository::discover(repo).ok()?;
+    let read = |f: &str| std::fs::read_to_string(repo.path().join(f)).ok().map(|s| s.trim().to_string());
+    let subject = |r: &str| {
+        let c = repo.revparse_single(r).ok()?.peel_to_commit().ok()?;
+        Some(format!("“{}”", c.summary().ok()??))
+    };
+    match op {
+        "rebase" => {
+            let cur = subject("REBASE_HEAD");
+            match (read("rebase-merge/msgnum"), read("rebase-merge/end")) {
+                (Some(n), Some(end)) => Some(format!("commit {n} of {end}{}", cur.map(|c| format!(": {c}")).unwrap_or_default())),
+                _ => cur,
+            }
+        }
+        "merge" => read("MERGE_MSG")?.lines().next().map(String::from),
+        "cherry-pick" => subject("CHERRY_PICK_HEAD"),
+        "revert" => subject("REVERT_HEAD"),
+        _ => None,
+    }
+}
+
 /// Unified diff of one file: staged (HEAD → index) or unstaged (index → working tree, untracked included).
 /// None when the file is binary or over 1 MB (libgit2 treats blobs above `max_size` as binary).
 pub fn file_diff(repo: &Path, file: &str, staged: bool) -> Result<Option<String>, AppError> {
