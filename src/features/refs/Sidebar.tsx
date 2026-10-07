@@ -88,7 +88,7 @@ export function Sidebar({ path }: { path: string }) {
           {local.map((b) => {
             const cur = b.name === data.head;
             const branchOff: [string, () => void] = ["New branch from here", () => openNewBranch(b.name)];
-            const pr: [string, () => void] = ["Write PR description (AI)", () => openWriteUp("pr", null, b.name)];
+            const pr: [string, () => void] = ["Create pull request…", () => openWriteUp("pr", null, b.name)];
             return (
               <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => switchTo(path, b.name, false))}
                 actions={cur ? [branchOff, pr] : [["Checkout", () => run(() => switchTo(path, b.name, false))], branchOff, pr, ["Merge", () => mergeIn(b.name)], ["Delete", () => remove(b.name)]]} />

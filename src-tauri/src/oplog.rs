@@ -334,6 +334,14 @@ mod tests {
         cli::push_tag(a, "v1").unwrap();
         assert_eq!(cli::rev(&bare, "refs/tags/v1").unwrap(), cli::rev(a, "HEAD").unwrap());
 
+        // PR target: a local branch is pushed (and tracks), a remote branch is used as is.
+        cli::create_branch(a, "pr", None, false).unwrap();
+        assert_eq!(cli::pr_branches(a, "pr", "origin/main").unwrap(), (bare_s.to_string(), "pr".into(), "main".into()));
+        assert_eq!(cli::rev(&bare, "refs/heads/pr").unwrap(), cli::rev(a, "pr").unwrap());
+        assert_eq!(cli::pr_branches(a, "origin/pr", "main").unwrap().1, "pr");
+        assert_eq!(cli::pr_branches(a, "", "pr").unwrap().1, "main");
+        assert_eq!(cli::pr_branches(a, "v1", "main").unwrap_err().code, "not_branch");
+
         // Remote branch delete; undo pushes it back; that undo itself can't be undone.
         git(a, &["push", "-q", "origin", "main:refs/heads/feat"]).unwrap();
         let tip = cli::rev(a, "origin/feat").unwrap();

@@ -164,6 +164,52 @@ pub fn repos() -> Result<Vec<GhRepo>, AppError> {
     Ok(out)
 }
 
+/// "owner/name" of a github.com remote URL (https, ssh:// or scp-like git@github.com:owner/name).
+fn repo_slug(url: &str) -> Option<String> {
+    fn after_host(u: &str, sep: char) -> Option<&str> {
+        let (host, rest) = u.split_once(sep)?;
+        let host = host.rsplit_once('@').map_or(host, |(_, h)| h);
+        host.eq_ignore_ascii_case("github.com").then_some(rest)
+    }
+    let rest = match url.split_once("://") {
+        Some(("https" | "ssh", u)) => after_host(u, '/')?,
+        Some(_) => return None,
+        None => after_host(url, ':')?,
+    };
+    let slug = rest.trim_end_matches('/').trim_end_matches(".git");
+    let mut parts = slug.split('/');
+    let ok = parts.next().is_some_and(|p| !p.is_empty()) && parts.next().is_some_and(|p| !p.is_empty()) && parts.next().is_none();
+    ok.then(|| slug.to_string())
+}
+
+/// Opens a pull request of `head` into `base` on the GitHub repo behind `remote_url`; returns its web URL.
+pub fn create_pr(remote_url: &str, head: &str, base: &str, title: &str, body: &str) -> Result<String, AppError> {
+    let slug = repo_slug(remote_url)
+        .ok_or_else(|| AppError::new("not_github", format!("The remote ({remote_url}) isn't a github.com repository.")))?;
+    let token = token().ok_or_else(|| AppError::new("signed_out", "Sign in to GitHub first."))?;
+    let mut res = ureq::post(&format!("https://api.github.com/repos/{slug}/pulls"))
+        .config()
+        .http_status_as_error(false)
+        .build()
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "git-ai")
+        .header("Accept", "application/vnd.github+json")
+        .send_json(serde_json::json!({ "title": title, "head": head, "base": base, "body": body }))
+        .map_err(net)?;
+    let status = res.status().as_u16();
+    let v: Value = res.body_mut().read_json().unwrap_or_default();
+    if let Some(url) = v["html_url"].as_str().filter(|_| status == 201) {
+        return Ok(url.into());
+    }
+    // 422 puts the reason ("A pull request already exists for …", "No commits between …") in errors[].message.
+    let msg = v["errors"][0]["message"].as_str().or(v["message"].as_str()).unwrap_or("unexpected response");
+    Err(match status {
+        401 => AppError::new("signed_out", "GitHub no longer accepts your sign-in. Sign in again."),
+        403 | 404 => AppError::new("github", format!("GitHub refused: {msg}. Check that your account can push to {slug}.")),
+        _ => AppError::new("github", format!("GitHub refused the pull request: {msg}")),
+    })
+}
+
 pub fn sign_out() -> Result<(), AppError> {
     match keychain()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
@@ -192,7 +238,21 @@ fn github_prompt(prompt: &str) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::github_prompt;
+    use super::{github_prompt, repo_slug};
+
+    #[test]
+    fn slugs() {
+        let s = |u| repo_slug(u);
+        assert_eq!(s("https://github.com/itsachev/git-ai.git").as_deref(), Some("itsachev/git-ai"));
+        assert_eq!(s("https://x-access-token@GitHub.com/a/b/").as_deref(), Some("a/b"));
+        assert_eq!(s("git@github.com:a/b.git").as_deref(), Some("a/b"));
+        assert_eq!(s("ssh://git@github.com/a/b").as_deref(), Some("a/b"));
+        assert_eq!(s("https://u:p@github.com/a/b").as_deref(), Some("a/b"));
+        assert_eq!(s("https://gitlab.com/a/b.git"), None);
+        assert_eq!(s("https://github.com.evil.io/a/b"), None);
+        assert_eq!(s("http://github.com/a/b"), None);
+        assert_eq!(s("https://github.com/a"), None);
+    }
 
     #[test]
     fn prompts() {

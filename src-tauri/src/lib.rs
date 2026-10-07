@@ -68,6 +68,7 @@ pub fn run() {
             commands::github_finish,
             commands::github_user,
             commands::github_repos,
+            commands::github_create_pr,
             commands::github_sign_out,
             commands::ssh_key,
             commands::ssh_key_set,

@@ -232,7 +232,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "Go to History", keys: "Ctrl+2", run: () => show("history") },
     { label: "Toggle branches", keys: "Ctrl+B", run: () => setSide((v) => !v) },
     { label: "New branch", keys: "Ctrl+Shift+B", run: () => openNewBranch() },
-    { label: "Write PR description (AI)", run: () => openWriteUp("pr") },
+    { label: "Create pull request…", run: () => openWriteUp("pr") },
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
