@@ -553,6 +553,8 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .graph-body:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: -2px; }
 .grow { position: absolute; left: 0; right: 0; font-size: 0.9rem; }
 .grow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Row separator; a pseudo-element so it survives the hover/head/sel backgrounds and box-shadows. The lane canvas draws over it. */
+.grow::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: var(--line); pointer-events: none; }
 .grow { transition: background-color 120ms; }
 .grow:hover { background: var(--raised); }
 .grow.head:not(.sel) { background: var(--active); box-shadow: var(--active-bar); }
@@ -654,7 +656,7 @@ button.danger {
 button.danger:hover:not(:disabled) { background: var(--danger); box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 4px 14px color-mix(in srgb, var(--danger) 40%, transparent); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
 @media (max-width: 30rem) { .modal .dialog-actions button { flex: 1; } }
-/* Near the top, full width minus a gutter on phones. No padding: a click on the dialog itself is the backdrop. */
+/* Near the top, full width minus a gutter on phones. Backdrop clicks close it via the global handler in main.tsx. */
 dialog.palette {
   width: min(40rem, calc(100vw - 2rem)); margin-top: 14vh; padding: 0; overflow: hidden; border-radius: 16px;
   background: var(--glass); -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8);

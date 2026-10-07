@@ -71,9 +71,7 @@ export function Palette({ commands }: { commands: Command[] }) {
         <span className="btn-label">Commands</span>
         <kbd>{show("Ctrl+K")}</kbd>
       </button>
-      {/* No padding on the dialog, so a click on the dialog itself is a click on the backdrop. */}
-      <dialog ref={dialog} className="palette" onCancel={(e) => { e.preventDefault(); setOpen(false); }}
-        onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
+      <dialog ref={dialog} className="palette" onCancel={(e) => { e.preventDefault(); setOpen(false); }}>
         {open && (
           <>
             <label className="palette-field"><Icon name="search" /><input role="combobox" aria-expanded aria-controls="cmd-list" aria-label="Command" placeholder="Type a command"
