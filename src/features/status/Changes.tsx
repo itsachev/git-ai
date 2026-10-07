@@ -506,5 +506,14 @@ export function opLabel(e: OpEntry): string {
   return labels[e.op] ?? e.op;
 }
 
+/** Roughly what undoing `e` runs, for the palette's terminal hint. */
+export function undoHint(e: OpEntry): string | undefined {
+  const short = (oid: string) => oid.slice(0, 7);
+  if (e.backup) return `git restore --source ${e.backup} --worktree -- ${e.paths.join(" ")}`;
+  const r = e.ref_name ?? "HEAD";
+  if (!e.head) return e.new_head ? `git update-ref -d ${r}` : undefined;
+  return r === "HEAD" ? `git reset --keep ${short(e.head)}` : `git update-ref ${r} ${short(e.head)}`;
+}
+
 // Two letters = conflict; "?" = untracked (shown like an add).
 export const kindClass = (k: string) => (k.length > 1 ? "k-X" : k === "?" ? "k-A" : `k-${k}`);

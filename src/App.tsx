@@ -8,7 +8,7 @@ import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
-import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQuery, useRun } from "./features/status/Changes";
+import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
 import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs/NewBranch";
@@ -205,6 +205,7 @@ function App() {
 }
 
 const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+Shift+L", Push: "Ctrl+Shift+U" };
+const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pull: "git pull --no-rebase", Push: "git push" };
 
 type RepoProps = { repo: RepoInfo; onClose: () => void; theme: Theme; setTheme: (t: Theme) => void };
 
@@ -232,22 +233,23 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     hadConflicts.current = nConflicts > 0;
   }, [nConflicts]);
   const commands: Command[] = [
-    { label: "Go to File Status", keys: "Ctrl+1", run: () => show("status") },
-    { label: "Go to History", keys: "Ctrl+2", run: () => show("history") },
-    { label: "Toggle branches", keys: "Ctrl+B", run: () => setSide((v) => !v) },
-    { label: "New branch", keys: "Ctrl+Shift+B", run: () => openNewBranch() },
-    { label: "Create pull request…", run: () => openWriteUp("pr") },
+    { label: "Go to File Status", keys: "Ctrl+1", git: "git status", run: () => show("status") },
+    { label: "Go to History", keys: "Ctrl+2", git: "git log --graph --oneline --all", run: () => show("history") },
+    { label: "Toggle branches", keys: "Ctrl+B", git: "git branch -a", run: () => setSide((v) => !v) },
+    { label: "New branch", keys: "Ctrl+Shift+B", git: "git switch -c <name>", run: () => openNewBranch() },
+    { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     // The textarea mounts after the tab switch renders.
-    { label: "Write commit message", keys: "Ctrl+Shift+M", run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
-    ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], run: o.go })),
+    { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
+    ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
   ];
   if (status?.unstaged.length)
-    commands.push({ label: "Stage all changes", keys: "Ctrl+Shift+S", run: () => run(() => stage(path, pathsOf(status.unstaged))) });
-  if (status?.staged.length) commands.push({ label: "Unstage all", run: () => run(() => unstage(path, pathsOf(status.staged))) });
-  if (log?.[0]) commands.push({ label: `Undo: ${opLabel(log[0])}`, run: () => run(() => undo(path, log[0].id)) });
+    commands.push({ label: "Stage all changes", keys: "Ctrl+Shift+S", git: "git add -A", run: () => run(() => stage(path, pathsOf(status.unstaged))) });
+  if (status?.staged.length) commands.push({ label: "Unstage all", git: "git reset", run: () => run(() => unstage(path, pathsOf(status.staged))) });
+  // The label is what the new entry will be: undoing an undo is a redo.
+  if (log?.[0]) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: () => run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
-    if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
+    if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, git: `git switch ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
   commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, { label: "Close repository", run: onClose });
 
   return (
