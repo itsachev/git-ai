@@ -29,6 +29,7 @@ tauri-plugin-store = "2.5.0"
 notify-debouncer-mini = "0.7.0"
 ureq = { version = "3", features = ["json"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+trash = "5.2.9"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

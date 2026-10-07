@@ -14,6 +14,7 @@ import type { RebaseStep } from "../bindings/RebaseStep";
 import type { FileCommit } from "../bindings/FileCommit";
 import type { Blame } from "../bindings/Blame";
 import type { GitSetup } from "../bindings/GitSetup";
+import type { GhRepo } from "../bindings/GhRepo";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,6 +47,8 @@ const FAILED: Record<string, (a: Args) => string> = {
   delete_remote_branch: (a) => `Failed to delete ${a.name} on the remote`,
   resolve: () => "Failed to resolve the conflict",
   open_file: (a) => `Failed to open ${a.file}`,
+  forget_repo: () => "Failed to remove the repository",
+  trash_repo: () => "Failed to delete the repository",
   ai_set_key: () => "Failed to save the API key",
   ai_commit_message: () => "Failed to write a commit message",
   ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
@@ -62,6 +65,10 @@ async function invoke<T>(cmd: string, args?: Args): Promise<T> {
 
 export const openRepo = (path: string) => invoke<RepoInfo>("open_repo", { path });
 export const recentRepos = () => invoke<string[]>("recent_repos");
+/** Drops a repo from the recent list; the folder stays. */
+export const forgetRepo = (path: string) => invoke<void>("forget_repo", { path });
+/** Moves a recent repo's folder to the OS trash and forgets it. */
+export const trashRepo = (path: string) => invoke<void>("trash_repo", { path });
 export const repoStatus = (path: string) => invoke<Status>("repo_status", { path });
 export const stage = (path: string, paths: string[]) => invoke<void>("stage", { path, paths });
 export const unstage = (path: string, paths: string[]) => invoke<void>("unstage", { path, paths });
@@ -141,7 +148,9 @@ export const githubStart = () => invoke<DeviceCode>("github_start");
 export const githubFinish = (code: DeviceCode) => invoke<string>("github_finish", { code });
 /** null = signed out. */
 export const githubUser = () => invoke<string | null>("github_user");
-export const githubSignOut = () => invoke<void>("github_sign_out");
+/** Repos the signed-in user can clone, most recently pushed first; [] when signed out. */
+export const githubRepos = () => invoke<GhRepo[]>("github_repos");
+export const githubSignOut =() => invoke<void>("github_sign_out");
 // SSH key used for fetch/pull/push/clone. null = ssh's defaults (~/.ssh/id_*, ssh-agent).
 export const sshKey = () => invoke<string | null>("ssh_key");
 /** null clears it. Code "ssh_key" when the file isn't a readable private key. */

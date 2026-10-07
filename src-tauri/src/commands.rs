@@ -34,6 +34,31 @@ pub fn recent_repos(app: AppHandle) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Drops `path` from the recent list; the folder stays on disk.
+#[tauri::command]
+pub fn forget_repo(app: AppHandle, path: String) -> Result<(), AppError> {
+    let mut recent = recent_repos(app.clone());
+    recent.retain(|p| p != &path);
+    let store = app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?;
+    store.set("recent", json!(recent));
+    Ok(())
+}
+
+/// Moves a recent repo's folder to the OS trash (recoverable from there), then forgets it.
+/// Only paths already in the recent list, so IPC can't trash arbitrary folders.
+#[tauri::command]
+pub fn trash_repo(app: AppHandle, path: String) -> Result<(), AppError> {
+    if !recent_repos(app.clone()).contains(&path) {
+        return Err(AppError::new("not_recent", "That folder isn't in your recent repositories."));
+    }
+    watch::stop(&app);
+    if Path::new(&path).exists() {
+        trash::delete(&path)
+            .map_err(|e| AppError::new("trash", format!("Couldn't move the folder to the trash. Is a file in it open in another program? ({e})")))?;
+    }
+    forget_repo(app, path)
+}
+
 #[tauri::command]
 pub fn repo_status(path: String) -> Result<cli::Status, AppError> {
     cli::status(Path::new(&path))
@@ -235,6 +260,11 @@ pub async fn github_finish(code: crate::github::DeviceCode) -> Result<String, Ap
 #[tauri::command]
 pub async fn github_user() -> Result<Option<String>, AppError> {
     crate::github::user()
+}
+
+#[tauri::command]
+pub async fn github_repos() -> Result<Vec<crate::github::GhRepo>, AppError> {
+    crate::github::repos()
 }
 
 #[tauri::command]

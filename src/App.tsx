@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openRepo, recentRepos, stage, undo, unstage } from "./lib/ipc";
+import { forgetRepo, openRepo, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
-import { ConfirmDialog } from "./lib/modal";
+import { ConfirmDialog, ModalHead } from "./lib/modal";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
@@ -35,12 +35,51 @@ function Mark() {
   );
 }
 
+/** Remove a recent repo from the list, or also move its folder to the OS trash. */
+function RemoveRepoDialog({ path, onClose, onDone }: { path: string | null; onClose: () => void; onDone: (error: string | null) => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [busy, setBusy] = useState(false);
+  // Keep the text through the close transition.
+  const last = useRef(path);
+  if (path) last.current = path;
+  useEffect(() => {
+    if (path) dialog.current?.showModal();
+    else dialog.current?.close();
+  }, [path]);
+  async function go(fn: (p: string) => Promise<void>) {
+    if (!path) return;
+    setBusy(true);
+    let err: string | null = null;
+    try { await fn(path); } catch (e) { err = (e as AppError).message ?? String(e); }
+    setBusy(false);
+    onClose();
+    onDone(err);
+  }
+  const p = last.current ?? "";
+  return (
+    <dialog ref={dialog} className="modal tone-danger" aria-labelledby="remove-title" aria-describedby="remove-text"
+      onCancel={(e) => { e.preventDefault(); if (!busy) onClose(); }}>
+      <ModalHead id="remove-title" icon="warn" tone="danger" title={`Remove ${p.split(/[\\/]/).pop()}?`} sub={p} />
+      <p id="remove-text" className="modal-text">
+        Remove it from this list only, or also move the folder to the {navigator.userAgent.includes("Windows") ? "Recycle Bin" : "Trash"}.
+        Deleting from disk loses anything not pushed (unpushed commits, stashes, uncommitted changes) unless you restore the folder from there.
+      </p>
+      <div className="dialog-actions">
+        <button type="button" autoFocus disabled={busy} onClick={onClose}>Cancel</button>
+        <button type="button" className="primary" disabled={busy} onClick={() => go(forgetRepo)}>Remove from list</button>
+        <button type="button" className="danger" disabled={busy} onClick={() => go(trashRepo)}>{busy ? "Deleting…" : "Delete from disk"}</button>
+      </div>
+    </dialog>
+  );
+}
+
 function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
   const [filter, setFilter] = useState("");
+  const [removing, setRemoving] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
 
   useEffect(() => {
@@ -113,10 +152,14 @@ function App() {
                   <small>{p}</small>
                 </span>
               </button>
+              <button className="icon-btn" onClick={() => setRemoving(p)} title="Remove…" aria-label={`Remove ${p}`}>
+                <Icon name="more" />
+              </button>
             </li>
           ))}
         </ul>
       </section>
+      <RemoveRepoDialog path={removing} onClose={() => setRemoving(null)} onDone={(e) => { setError(e); recentRepos().then(setRecent); }} />
     </main>
   );
   // One askpass dialog for both screens: clone runs from the welcome screen.

@@ -5,7 +5,7 @@ import { githubFinish, githubSignOut, githubStart, githubUser } from "../../lib/
 import type { DeviceCode } from "../../bindings/DeviceCode";
 import { errorText } from "../status/Changes";
 
-const userQuery = { queryKey: ["github-user"], queryFn: githubUser, staleTime: Infinity, retry: false };
+export const userQuery = { queryKey: ["github-user"], queryFn: githubUser, staleTime: Infinity, retry: false };
 
 /** Sign in to GitHub (device flow): shows the one-time code, opens github.com/login/device, waits for approval. */
 export function GitHubAccount() {

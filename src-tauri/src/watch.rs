@@ -24,3 +24,8 @@ pub fn watch(app: &AppHandle, path: &str) -> Result<(), AppError> {
     *app.state::<RepoWatcher>().0.lock().unwrap() = Some(debouncer);
     Ok(())
 }
+
+/// Stops watching, releasing the folder handle (Windows won't move a watched folder).
+pub fn stop(app: &AppHandle) {
+    *app.state::<RepoWatcher>().0.lock().unwrap() = None;
+}
