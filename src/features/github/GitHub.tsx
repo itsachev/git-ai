@@ -48,7 +48,8 @@ export function GitHubAccount() {
     <section className="github">
       {user.data ? (
         <p>
-          GitHub: <strong>@{user.data}</strong> <button onClick={signOut}>Sign out</button>
+          <span>GitHub: <strong>@{user.data}</strong></span>
+          <button onClick={signOut}>Sign out</button>
         </p>
       ) : code ? (
         <div className="device" role="status">
