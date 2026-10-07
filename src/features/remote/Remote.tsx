@@ -9,7 +9,7 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { refsQuery } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
-import { ModalHead } from "../../lib/modal";
+import { Brand, ModalHead } from "../../lib/modal";
 
 export type Sync = ReturnType<typeof useSync>;
 
@@ -159,7 +159,7 @@ export function AskpassDialog() {
     <dialog ref={dialog} className="modal askpass" aria-labelledby="askpass-title" onCancel={(e) => { e.preventDefault(); answer(null); }}>
       {cur && (
         <form onSubmit={(e) => { e.preventDefault(); answer(value); }}>
-          <ModalHead id="askpass-title" icon="remote" title="Git needs your input" sub="Your answer goes straight to git. git-ai doesn't store it." />
+          <ModalHead id="askpass-title" icon="remote" title="Git needs your input" sub={<>Your answer goes straight to git. <Brand /> doesn't store it.</>} />
           <p id="askpass-prompt" className="modal-text">{cur.prompt.trim()}</p>
           <input autoFocus key={cur.id} type={plain ? "text" : "password"} aria-labelledby="askpass-prompt"
             autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} />

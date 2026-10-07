@@ -4,7 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { forgetRepo, missingRepos, openRepo, recentRepos,stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
-import { ConfirmDialog, ModalHead } from "./lib/modal";
+import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
@@ -18,6 +18,7 @@ import { FileHistoryDialog } from "./features/graph/FileHistory";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
+import { AboutButton } from "./features/about/About";
 import { Palette, type Command } from "./features/palette/Palette";
 import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { SetupWizard, openSetup } from "./features/setup/Setup";
@@ -63,7 +64,7 @@ function RemoveRepoDialog({ path, missing, onClose, onDone }: { path: string | n
       <ModalHead id="remove-title" icon="warn" tone="danger" title={missing ? `${p.split(/[\\/]/).pop()} was deleted` : `Remove ${p.split(/[\\/]/).pop()}?`} sub={p} />
       {missing ? (
         <p id="remove-text" className="modal-text">
-          This folder no longer exists on disk. It was deleted or moved outside git-ai.
+          This folder no longer exists on disk. It was deleted or moved outside <Brand />.
           Remove it from this list. If you moved it, use Open repository to add it from its new place.
         </p>
       ) : (
@@ -133,7 +134,7 @@ function App() {
     <main className="home">
       <Backdrop />
       <section className="home-intro">
-        <p className="brand"><Mark /> git-ai <ThemeButton theme={theme} onChange={setTheme} /><SettingsButton /></p>
+        <p className="brand"><Mark /> <Brand /></p>
         <h1>Git, in plain sight.</h1>
         <p className="lede">Local-first. Discards, branch deletes and merges are recorded, so each one can be undone.</p>
         <div className="tiles">
@@ -184,6 +185,9 @@ function App() {
           })}
         </ul>
       </section>
+      <div className="corner top-right"><SettingsButton labeled /></div>
+      <div className="corner bottom-left"><ThemeButton theme={theme} onChange={setTheme} labeled /></div>
+      <div className="corner bottom-right"><AboutButton /></div>
       <RemoveRepoDialog path={removing} missing={!!removing && missing.includes(removing)} onClose={() => setRemoving(null)} onDone={(e) => { setError(e); refresh(); }} />
     </main>
   );
