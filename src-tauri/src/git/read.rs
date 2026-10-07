@@ -158,6 +158,110 @@ pub fn rebase_commits(repo: &Path, base: &str) -> Result<Vec<RebaseCommit>, AppE
     Ok(out)
 }
 
+/// A commit that changed a file, for the file history list.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct FileCommit {
+    pub oid: String,
+    /// The file's path in this commit (an older name before a rename).
+    pub path: String,
+    pub subject: String,
+    pub author: String,
+    #[ts(type = "number")]
+    pub time: i64,
+}
+
+/// Commits reachable from `rev` that changed `file`, newest first, following renames, at most `max`.
+/// A merge counts only when the file differs from every parent (like `git log -- file`).
+pub fn file_log(repo: &Path, rev: &str, file: &str, max: usize) -> Result<Vec<FileCommit>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let mut walk = repo.revwalk()?;
+    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
+    walk.push(repo.revparse_single(rev)?.peel_to_commit()?.id())?;
+    let blob = |c: &git2::Commit, p: &str| c.tree().ok()?.get_path(Path::new(p)).ok().map(|e| e.id());
+    // ponytail: one tracked path, like `git log --follow`; a side branch that still uses the old name
+    // after the rename is missed.
+    let mut path = file.to_string();
+    let mut out = vec![];
+    for oid in walk {
+        let c = repo.find_commit(oid?)?;
+        let Some(id) = blob(&c, &path) else { continue };
+        let parents: Vec<_> = c.parents().map(|p| blob(&p, &path)).collect();
+        if parents.contains(&Some(id)) {
+            continue;
+        }
+        out.push(FileCommit {
+            oid: c.id().to_string(),
+            path: path.clone(),
+            subject: c.summary_bytes().map(|s| String::from_utf8_lossy(s).into_owned()).unwrap_or_default(),
+            author: String::from_utf8_lossy(c.author().name_bytes()).into_owned(),
+            time: c.author().when().seconds(),
+        });
+        if out.len() == max {
+            break;
+        }
+        // Added here: if it was renamed from another path, keep following the old one.
+        if !parents.is_empty() && parents.iter().all(Option::is_none) {
+            let diff = commit_diff_all(&repo, &c)?;
+            let old = diff.deltas().find(|d| {
+                d.status() == git2::Delta::Renamed && d.new_file().path().is_some_and(|p| p.to_string_lossy().replace('\\', "/") == path)
+            });
+            match old.and_then(|d| d.old_file().path().map(|p| p.to_string_lossy().replace('\\', "/"))) {
+                Some(p) => path = p,
+                None => break,
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Lines `start..start + lines` (1-based) of the blamed file came from commit `oid`.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct BlameHunk {
+    pub oid: String,
+    pub start: u32,
+    pub lines: u32,
+    pub subject: String,
+    pub author: String,
+    #[ts(type = "number")]
+    pub time: i64,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct Blame {
+    /// The file's text at the blamed commit; None when binary or over 1 MB (no hunks then).
+    pub text: Option<String>,
+    pub hunks: Vec<BlameHunk>,
+}
+
+/// Who last changed each line of `file` as of `rev`.
+pub fn blame(repo: &Path, rev: &str, file: &str) -> Result<Blame, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let c = repo.revparse_single(rev)?.peel_to_commit()?;
+    let blob = repo.find_blob(c.tree()?.get_path(Path::new(file))?.id())?;
+    if blob.size() > 1 << 20 || blob.is_binary() {
+        return Ok(Blame { text: None, hunks: vec![] });
+    }
+    let mut opts = git2::BlameOptions::new();
+    opts.newest_commit(c.id());
+    let blame = repo.blame_file(Path::new(file), Some(&mut opts))?;
+    let mut seen = std::collections::HashMap::new();
+    let mut hunks = vec![];
+    for h in blame.iter() {
+        let oid = h.final_commit_id();
+        if !seen.contains_key(&oid) {
+            let c = repo.find_commit(oid)?;
+            let subject = c.summary_bytes().map(|s| String::from_utf8_lossy(s).into_owned()).unwrap_or_default();
+            seen.insert(oid, (subject, String::from_utf8_lossy(c.author().name_bytes()).into_owned(), c.author().when().seconds()));
+        }
+        let (subject, author, time) = seen[&oid].clone();
+        hunks.push(BlameHunk { oid: oid.to_string(), start: h.final_start_line() as u32, lines: h.lines_in_hunk() as u32, subject, author, time });
+    }
+    Ok(Blame { text: Some(String::from_utf8_lossy(blob.content()).into_owned()), hunks })
+}
+
 fn patch_text(diff: &git2::Diff) -> Result<String, AppError> {
     let mut out = String::new();
     diff.print(git2::DiffFormat::Patch, |_, _, line| {
@@ -383,6 +487,40 @@ mod tests {
         let page = crate::git::graph::rows(&Default::default(), &dir, 0, 500).unwrap();
         assert_eq!((page.total, page.lanes), (2, 1));
         assert!(page.rows[0].head && page.rows[0].oid == second.id().to_string());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn file_history_and_blame() {
+        let dir = std::env::temp_dir().join(format!("git-ai-blame-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let repo = git2::Repository::init(&dir).unwrap();
+        let sig = git2::Signature::now("T", "t@example.com").unwrap();
+        let commit = |files: &[(&str, &str)], msg: &str| {
+            let mut tb = repo.treebuilder(None).unwrap();
+            for (name, text) in files {
+                tb.insert(name, repo.blob(text.as_bytes()).unwrap(), 0o100644).unwrap();
+            }
+            let tree = repo.find_tree(tb.write().unwrap()).unwrap();
+            let parent = repo.head().ok().map(|h| h.peel_to_commit().unwrap());
+            repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &parent.iter().collect::<Vec<_>>()).unwrap()
+        };
+        let text = "one\ntwo\nthree\nfour\nfive\nsix\n";
+        let add = commit(&[("a.txt", text), ("x.txt", "x")], "add a");
+        commit(&[("a.txt", text), ("x.txt", "y")], "only x");
+        commit(&[("b.txt", text), ("x.txt", "y")], "rename to b");
+        let edit = commit(&[("b.txt", &text.replace("two", "TWO")), ("x.txt", "y")], "edit b");
+
+        let log = super::file_log(&dir, "HEAD", "b.txt", 100).unwrap();
+        let got: Vec<_> = log.iter().map(|c| (c.subject.as_str(), c.path.as_str())).collect();
+        assert_eq!(got, [("edit b", "b.txt"), ("rename to b", "b.txt"), ("add a", "a.txt")]);
+        assert_eq!(super::file_log(&dir, "HEAD", "b.txt", 1).unwrap().len(), 1);
+
+        let b = super::blame(&dir, "HEAD", "b.txt").unwrap();
+        assert_eq!(b.text.as_deref(), Some(text.replace("two", "TWO").as_str()));
+        let spans: Vec<_> = b.hunks.iter().map(|h| (h.start, h.lines, h.oid == edit.to_string())).collect();
+        assert_eq!(spans, [(1, 1, false), (2, 1, true), (3, 4, false)]);
+        assert_eq!(b.hunks[0].oid, add.to_string(), "blame follows the rename back to a.txt");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

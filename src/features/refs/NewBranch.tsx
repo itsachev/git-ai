@@ -23,7 +23,7 @@ export function NewBranchButton() {
 
 const PREFIXES = ["feature/", "fix/", "chore/"];
 const rel = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-function ago(secs: number) {
+export function ago(secs: number) {
   const s = secs - Date.now() / 1000;
   for (const [unit, n] of [["year", 31536000], ["month", 2592000], ["day", 86400], ["hour", 3600], ["minute", 60]] as const)
     if (Math.abs(s) >= n) return rel.format(Math.round(s / n), unit);

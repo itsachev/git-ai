@@ -309,6 +309,18 @@ pub fn rebase_commits(path: String, base: String) -> Result<Vec<read::RebaseComm
     read::rebase_commits(Path::new(&path), &base)
 }
 
+/// Async: walks the whole history reachable from `rev`.
+#[tauri::command]
+pub async fn file_log(path: String, rev: String, file: String) -> Result<Vec<read::FileCommit>, AppError> {
+    read::file_log(Path::new(&path), &rev, &file, 2000)
+}
+
+/// Async: libgit2 blame can take seconds on a long-lived file.
+#[tauri::command]
+pub async fn blame(path: String, rev: String, file: String) -> Result<read::Blame, AppError> {
+    read::blame(Path::new(&path), &rev, &file)
+}
+
 #[tauri::command]
 pub fn rebase(path: String, base: String, steps: Vec<cli::RebaseStep>) -> Result<(), AppError> {
     cli::rebase(Path::new(&path), &base, &steps)

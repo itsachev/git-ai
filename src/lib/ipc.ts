@@ -11,6 +11,8 @@ import type { Side } from "../bindings/Side";
 import type { DeviceCode } from "../bindings/DeviceCode";
 import type { RebaseCommit } from "../bindings/RebaseCommit";
 import type { RebaseStep } from "../bindings/RebaseStep";
+import type { FileCommit } from "../bindings/FileCommit";
+import type { Blame } from "../bindings/Blame";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +32,8 @@ const FAILED: Record<string, (a: Args) => string> = {
   abort: () => "Failed to abort",
   rebase_commits: () => "Can't rebase from this commit",
   rebase: () => "Rebase failed",
+  file_log: (a) => `Failed to load the history of ${a.file}`,
+  blame: (a) => `Failed to blame ${a.file}`,
   create_tag: (a) => `Failed to create tag ${a.name}`,
   delete_tag: (a) => `Failed to delete tag ${a.name}`,
   stash_save: () => "Failed to stash changes",
@@ -99,6 +103,10 @@ export const abortOp = (path: string) => invoke<void>("abort", { path });
 export const rebaseCommits = (path: string, base: string) => invoke<RebaseCommit[]>("rebase_commits", { path, base });
 /** Rewrites the commits after `base` as `steps` (all of them, oldest first). Code "conflicts" = stopped; commit continues it. Undoable. */
 export const rebase = (path: string, base: string, steps: RebaseStep[]) => invoke<void>("rebase", { path, base, steps });
+/** Commits from `rev` back that changed `file`, newest first, following renames (at most 2000). */
+export const fileLog = (path: string, rev: string, file: string) => invoke<FileCommit[]>("file_log", { path, rev, file });
+/** Who last changed each line of `file` at `rev`; text null = binary or over 1 MB. */
+export const blame = (path: string, rev: string, file: string) => invoke<Blame>("blame", { path, rev, file });
 /** Annotated when `message` isn't empty. */
 export const createTag = (path: string, name: string, target: string, message: string) =>
   invoke<void>("create_tag", { path, name, target, message });

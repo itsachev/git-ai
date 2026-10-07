@@ -46,6 +46,8 @@ pub fn run() {
             commands::abort,
             commands::rebase_commits,
             commands::rebase,
+            commands::file_log,
+            commands::blame,
             commands::create_tag,
             commands::delete_tag,
             commands::stash_save,

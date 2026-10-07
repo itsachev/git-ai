@@ -8,6 +8,7 @@ import { NameForm } from "../refs/Sidebar";
 import { CommitGraph, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
+import { openFileHistory } from "./FileHistory";
 
 /** Commit graph on top; the picked commit's details, files and file diff below. */
 export function History({ path }: { path: string }) {
@@ -92,6 +93,9 @@ export function History({ path }: { path: string }) {
                           {slash > 0 && <small>{f.path.slice(0, slash)}</small>}
                         </span>
                       </button>
+                      {/* A deleted file is gone in this commit: show it as of the parent. */}
+                      <button className="small" title={`History and blame of ${f.path}`}
+                        onClick={() => openFileHistory(f.kind === "D" ? d.parents[0] : d.oid, f.path)}>History</button>
                     </li>
                   );
                 })}
@@ -106,7 +110,7 @@ export function History({ path }: { path: string }) {
   );
 }
 
-function CommitDiff({ path, oid, file }: { path: string; oid: string; file: string }) {
+export function CommitDiff({ path, oid, file }: { path: string; oid: string; file: string }) {
   // A commit never changes, so its diffs never need a refetch.
   const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file], queryFn: () => commitFileDiff(path, oid, file) });
   if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
