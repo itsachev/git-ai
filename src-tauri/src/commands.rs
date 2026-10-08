@@ -406,7 +406,13 @@ pub async fn ai_explain_commit(path: String, oid: String) -> Result<String, AppE
     crate::ai::explain_commit(Path::new(&path), &oid)
 }
 
-/// Sends a commit range (messages + combined diff) to Gemini for a PR description or changelog.
+/// Sends one stash's changes (untracked files too) to Gemini.
+#[tauri::command]
+pub async fn ai_explain_stash(path: String, oid: String) -> Result<String, AppError> {
+    crate::ai::explain_stash(Path::new(&path), &oid)
+}
+
+/// Sends a commit range (messages + combined diff) to Gemini for a PR description, changelog or explanation.
 #[tauri::command]
 pub async fn ai_write_range(path: String, base: String, head: String, kind: String) -> Result<String, AppError> {
     crate::ai::write_range(Path::new(&path), &base, &head, &kind)

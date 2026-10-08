@@ -239,6 +239,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "New branch", keys: "Ctrl+Shift+B", git: "git switch -c <name>", run: () => openNewBranch() },
     { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
+    { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),

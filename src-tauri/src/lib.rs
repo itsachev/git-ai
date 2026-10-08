@@ -82,6 +82,7 @@ pub fn run() {
             commands::ai_set_key,
             commands::ai_commit_message,
             commands::ai_explain_commit,
+            commands::ai_explain_stash,
             commands::ai_write_range,
         ])
         .run(tauri::generate_context!())

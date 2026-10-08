@@ -54,7 +54,8 @@ const FAILED: Record<string, (a: Args) => string> = {
   ai_commit_message: () => "Failed to write a commit message",
   ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
   github_create_pr: () => "Failed to open the pull request",
-  ai_write_range: (a) => a.kind === "pr" ? "Failed to write a PR description" : "Failed to write a changelog",
+  ai_explain_stash: () => "Failed to explain the stash",
+  ai_write_range: (a) => a.kind === "pr" ? "Failed to write a PR description" : a.kind === "explain" ? "Failed to explain the branch" : "Failed to write a changelog",
 };
 async function invoke<T>(cmd: string, args?: Args): Promise<T> {
   try {
@@ -182,5 +183,7 @@ export const aiSetKey = (key: string | null) => invoke<void>("ai_set_key", { key
 export const aiCommitMessage = (path: string) => invoke<string>("ai_commit_message", { path });
 /** Explains one commit from its message and diff (sent to Gemini). Codes as above, minus "nothing_staged". */
 export const aiExplainCommit = (path: string, oid: string) => invoke<string>("ai_explain_commit", { path, oid });
-export const aiWriteRange = (path: string, base: string, head: string, kind: "pr" | "changelog") =>
+/** Explains a stash: tracked changes plus untracked files (sent to Gemini). */
+export const aiExplainStash = (path: string, oid: string) => invoke<string>("ai_explain_stash", { path, oid });
+export const aiWriteRange = (path: string, base: string, head: string, kind: "pr" | "changelog" | "explain") =>
   invoke<string>("ai_write_range", { path, base, head, kind });

@@ -113,6 +113,19 @@ pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError
     Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
 }
 
+/// A stash's message and patch: tracked changes (vs. the commit it was made on) plus untracked files
+/// (`stash -u` keeps them in a third parent).
+pub fn stash_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError> {
+    let (message, mut patch) = commit_patch(repo, oid)?;
+    let git = git2::Repository::open(repo)?;
+    if let Ok(untracked) = git.find_commit(git2::Oid::from_str(oid)?)?.parent(2) {
+        let mut opts = git2::DiffOptions::new();
+        opts.max_size(1 << 20);
+        patch += &patch_text(&git.diff_tree_to_tree(None, Some(&untracked.tree()?), Some(&mut opts))?)?;
+    }
+    Ok((message, patch))
+}
+
 /// What `head` adds on top of `base` (refs or oids), like a PR: the messages of the non-merge commits
 /// in `base..head`, oldest first (at most `max`), and the patch from their merge base to `head`.
 pub fn range_patch(repo: &Path, base: &str, head: &str, max: usize) -> Result<(Vec<String>, String), AppError> {
@@ -545,6 +558,25 @@ mod tests {
         let spans: Vec<_> = b.hunks.iter().map(|h| (h.start, h.lines, h.oid == edit.to_string())).collect();
         assert_eq!(spans, [(1, 1, false), (2, 1, true), (3, 4, false)]);
         assert_eq!(b.hunks[0].oid, add.to_string(), "blame follows the rename back to a.txt");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn stash_patch_has_untracked_files() {
+        let dir = std::env::temp_dir().join(format!("git-ai-stash-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| crate::git::cli::git(&dir, args).unwrap();
+        git(&["init", "-q"]);
+        std::fs::write(dir.join("a.txt"), "one\n").unwrap();
+        git(&["add", "--", "a.txt"]);
+        git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "init"]);
+        std::fs::write(dir.join("a.txt"), "ONE\n").unwrap();
+        std::fs::write(dir.join("new.txt"), "fresh\n").unwrap();
+        git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "stash", "push", "-q", "-u", "-m", "wip"]);
+        let oid = git(&["rev-parse", "refs/stash"]);
+        let (msg, patch) = super::stash_patch(&dir, oid.trim()).unwrap();
+        assert!(msg.ends_with("wip") && patch.contains("+ONE") && patch.contains("+fresh"), "{patch}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

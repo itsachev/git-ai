@@ -6,7 +6,7 @@ import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
-import { openWriteUp } from "./WriteUp";
+import { openExplainStash, openWriteUp } from "./WriteUp";
 import { confirm } from "../../lib/modal";
 
 /** Checkout that offers to bring conflicting local changes along instead of just failing. */
@@ -39,8 +39,9 @@ export function useRefActions(path: string) {
     ] : [];
     if (data.local.some((b) => b.name === name)) {
       const pr: Action = ["Create pull request…", () => openWriteUp("pr", null, name)];
-      if (name === head) return [branchOff, pr];
-      return [["Checkout", () => run(() => switchTo(path, name, false))], branchOff, pr, ...onto, ["Delete", async () => {
+      const explain: Action = ["Explain branch (AI)", () => openWriteUp("explain", null, name)];
+      if (name === head) return [branchOff, pr, explain];
+      return [["Checkout", () => run(() => switchTo(path, name, false))], branchOff, pr, explain, ...onto, ["Delete", async () => {
         if (!(await confirm("Delete branch", `Delete branch ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))) return;
         run(async () => {
           try {
@@ -169,6 +170,7 @@ export function Sidebar({ path }: { path: string }) {
             <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} actions={[
               ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
               ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
+              ["Explain (AI)", () => openExplainStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Drop", () => dropStash(i, s)],
             ]} />
           ))}
