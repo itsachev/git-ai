@@ -250,6 +250,21 @@ mod tests {
 ");
         assert_eq!(top().op, "cherry-pick");
 
+        // Clean merge by commit id (History's "Merge into current"): merge commit, logged, undoable.
+        cli::create_branch(p, "side", None, true).unwrap();
+        commit("c.txt", "c\n", "add c");
+        let side = cli::rev(p, "HEAD").unwrap();
+        cli::checkout(p, "main", false, false).unwrap();
+        commit("d.txt", "d\n", "add d");
+        let before = cli::rev(p, "HEAD").unwrap();
+        cli::merge(p, &side, false).unwrap();
+        assert_eq!(git(p, &["rev-list", "--parents", "-n1", "HEAD"]).unwrap().split_whitespace().count(), 3);
+        assert_eq!(fs::read_to_string(dir.join("c.txt")).unwrap(), "c\n");
+        assert_eq!(top().op, "merge");
+        super::undo(p, &top().id).unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), before);
+        git(p, &["reset", "-q", "--hard"]).unwrap();
+
         // Tags: annotated delete + undo brings back the same tag object.
         cli::create_tag(p, "v1", &main, "release").unwrap();
         let tag = cli::rev(p, "refs/tags/v1").unwrap();
