@@ -76,7 +76,7 @@ pub fn reply(id: u32, answer: Option<String>) {
 }
 
 fn ask(app: &AppHandle, prompt: String) -> Option<String> {
-    if let Some(answer) = crate::github::askpass_answer(&prompt) {
+    if let Some(answer) = crate::github::askpass_answer(&prompt).or_else(|| crate::gitlab::askpass_answer(&prompt)) {
         return Some(answer);
     }
     static NEXT: AtomicU32 = AtomicU32::new(0);

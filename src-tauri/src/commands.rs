@@ -318,6 +318,32 @@ pub fn github_sign_out() -> Result<(), AppError> {
     crate::github::sign_out()
 }
 
+// GitLab sign-in, same shape as GitHub's.
+#[tauri::command]
+pub async fn gitlab_start() -> Result<crate::github::DeviceCode, AppError> {
+    crate::gitlab::start()
+}
+
+#[tauri::command]
+pub async fn gitlab_finish(code: crate::github::DeviceCode) -> Result<String, AppError> {
+    crate::gitlab::finish(&code)
+}
+
+#[tauri::command]
+pub async fn gitlab_user() -> Result<Option<String>, AppError> {
+    crate::gitlab::user()
+}
+
+#[tauri::command]
+pub async fn gitlab_repos() -> Result<Vec<crate::github::GhRepo>, AppError> {
+    crate::gitlab::repos()
+}
+
+#[tauri::command]
+pub async fn gitlab_sign_out() -> Result<(), AppError> {
+    crate::gitlab::sign_out()
+}
+
 // SSH key for network git (path only; the key file stays where it is).
 #[tauri::command]
 pub fn ssh_key(app: AppHandle) -> Option<String> {

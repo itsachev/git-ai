@@ -9,10 +9,11 @@ type Feature = [string, string, string];
 const FEATURES: [IconName, string, Feature[]][] = [
   ["folder", "Repositories", [
     ["Open a repository", "Home → Open repository", "Pick any folder that contains a .git folder. It is added to Recent, so next time it is one click away."],
-    ["Clone", "Home → Clone", "Copies a repository from a URL into a folder you choose, with live progress. Signed in to GitHub, pick one of your own repos from a list instead of pasting the URL."],
+    ["Clone", "Home → Clone", "Copies a repository from a URL into a folder you choose, with live progress. Signed in to GitHub or GitLab, pick one of your own repos from a list instead of pasting the URL."],
     ["Recent repositories", "Home → Recent", "Every repository you have opened, with a filter box. Folders that were deleted or moved outside the app are flagged."],
     ["Remove from the list", "Right-click a recent repo, or its ⋯ button", "Takes the repository off the list, or also moves its folder to the Recycle Bin / Trash. You are warned first, because unpushed work goes with the folder."],
     ["GitHub sign-in", "Home → Sign in to GitHub", "Connects your GitHub account so you can clone your repos from a list and create pull requests. The token stays in your OS keychain."],
+    ["GitLab sign-in", "Home → Sign in to GitLab", "Connects your gitlab.com account so you can clone your projects from a list and push without typing a password. The token stays in your OS keychain and renews itself."],
   ]],
   ["changes", "File Status", [
     ["See what changed", "File Status tab · Ctrl+1", "Lists your Staged files, unstaged Changes and Conflicts, and shows the diff of the file you click. Refreshes by itself the moment anything changes on disk."],

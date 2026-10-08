@@ -223,26 +223,29 @@ pub fn sign_out() -> Result<(), AppError> {
 
 /// Answers git's "Username/Password for 'https://github.com'" prompts with the token, if signed in.
 pub fn askpass_answer(prompt: &str) -> Option<String> {
-    let is_user = github_prompt(prompt)?;
+    let is_user = https_prompt(prompt, "github.com")?;
     let token = token()?;
     // GitHub ignores the username when the password is a token.
     Some(if is_user { "x-access-token".into() } else { token })
 }
 
-/// Some(true) for a github.com username prompt, Some(false) for a password prompt, else None.
-fn github_prompt(prompt: &str) -> Option<bool> {
+/// Some(true) for an https://`host` username prompt, Some(false) for a password prompt, else None.
+pub(crate) fn https_prompt(prompt: &str, host_name: &str) -> Option<bool> {
     let is_user = prompt.starts_with("Username for '");
     if !is_user && !prompt.starts_with("Password for '") {
         return None;
     }
     let host = prompt.split('\'').nth(1)?.strip_prefix("https://")?.split('/').next()?;
     let host = host.rsplit_once('@').map_or(host, |(_, h)| h);
-    host.eq_ignore_ascii_case("github.com").then_some(is_user)
+    host.eq_ignore_ascii_case(host_name).then_some(is_user)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{github_prompt, repo_slug};
+    use super::{https_prompt, repo_slug};
+    fn github_prompt(p: &str) -> Option<bool> {
+        https_prompt(p, "github.com")
+    }
 
     #[test]
     fn slugs() {
@@ -266,6 +269,8 @@ mod tests {
         assert_eq!(github_prompt("Password for 'https://github.com.evil.io': "), None);
         assert_eq!(github_prompt("Password for 'https://github.com@evil.io': "), None);
         assert_eq!(github_prompt("Password for 'http://github.com': "), None);
+        assert_eq!(https_prompt("Username for 'https://gitlab.com': ", "gitlab.com"), Some(true));
+        assert_eq!(https_prompt("Password for 'https://github.com': ", "gitlab.com"), None);
         assert_eq!(github_prompt("Enter passphrase for key '/home/u/.ssh/id_ed25519': "), None);
     }
 }
