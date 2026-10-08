@@ -26,7 +26,7 @@
   --glass: rgb(246 246 248 / 0.78);
   /* Push buttons, same in both themes: dark top-lit gradient, white text. */
   --tool: linear-gradient(#3c3c3f, #2a2a2d);
-  --tool-hover: linear-gradient(#4a4a4d, #363639);
+  --veil: inset 0 0 0 100vmax rgb(255 255 255 / 0.08); /* hover: a light wash over a gradient fill */
   --tool-ink: #f5f5f7;
   --tool-lit: inset 0 0.5px 0 rgb(255 255 255 / 0.16);
   /* Light: the dark theme's black edge and drop shadow read as a heavy outline on a pale
@@ -107,11 +107,24 @@ button {
   min-height: var(--ctl); padding: 0 0.75rem;
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   white-space: nowrap;
-  transition: background-color 140ms, color 140ms, filter 140ms, scale 160ms var(--spring), box-shadow 160ms;
+  /* No opacity/transform here: GSAP reveals tween those per frame, and a CSS transition on them makes the reveal lag. */
+  transition: background-color 180ms var(--ease), color 180ms var(--ease), box-shadow 240ms var(--ease),
+    translate 280ms var(--spring), scale 200ms var(--spring);
 }
-button:hover { background: var(--tool-hover); }
+/* Gradient fills can't transition, so hover washes a veil (inset shadow) over them instead of swapping the
+   gradient. :where() keeps this weaker than any class that restyles a button. */
+button:where(:hover:not(:disabled)) { box-shadow: var(--tool-lit), var(--tool-edge), var(--veil); }
 button kbd { color: inherit; opacity: 0.7; background: rgb(255 255 255 / 0.12); }
 button:active:not(:disabled) { filter: brightness(0.9); scale: 0.97; transition-duration: 60ms; }
+/* Filled actions lift on hover and settle back when pressed. */
+button:is(.primary, .danger, .tile):hover:not(:disabled):not(:active) { translate: 0 -1px; }
+/* Filled actions: a light sheen sweeps across on hover (jumps back unseen on leave). */
+button:is(.primary, .danger) { position: relative; overflow: hidden; }
+button:is(.primary, .danger)::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; translate: -101% 0;
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
+}
+button:is(.primary, .danger):hover:not(:disabled)::after { translate: 101% 0; transition: translate 750ms var(--ease); }
 button:disabled { opacity: 0.45; }
 button.primary {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
@@ -119,12 +132,11 @@ button.primary {
   box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 70%, black), 0 0.5px 1.5px rgb(0 0 0 / 0.18);
 }
 button.primary:hover:not(:disabled) {
-  background: var(--accent);
-  box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 70%, black), 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 70%, black), var(--veil), 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 button.small { min-height: calc(var(--ctl) - 0.35rem); padding: 0 0.55rem; font-size: 0.92em; flex-shrink: 0; }
 .icon-btn { padding: 0; width: var(--ctl); background: none; box-shadow: none; color: var(--muted); }
-.icon-btn:hover { color: var(--fg); background: var(--pick); }
+.icon-btn:hover:not(:disabled) { color: var(--fg); background: var(--pick); }
 .icon-btn .icon { width: 1.3em; height: 1.3em; }
 input, textarea {
   font: inherit; color: var(--fg); background: var(--panel);
@@ -153,14 +165,15 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 }
 @media (min-width: 60rem) { .home { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-content: center; } }
 /* Backdrop (features/home/Backdrop.tsx): radial ground, canvas network + fan, floating cards. */
-.home { position: relative; isolation: isolate; }
+.home { position: relative; isolation: isolate; overflow-x: clip; } /* reveals slide in from the edges: no page-wide scrollbar flash */
 .home::before {
   content: ""; position: fixed; inset: 0; z-index: -2;
-  background: radial-gradient(ellipse 75% 65% at 45% 38%, #fdfdff, #ebebf1 60%, #dcdce4);
+  background: #0e1014 url("./assets/app_bg.jpg") center / cover no-repeat;
+  filter: invert(1) hue-rotate(180deg); /* light: the dark artwork flipped to a light one */
 }
-/* Dark: the static artwork already draws the network, fan and cards, so it stands in for the canvas backdrop. */
-:root[data-theme="dark"] .home::before { background: #0e1014 url("./assets/app_bg.jpg") center / cover no-repeat; }
-:root[data-theme="dark"] .home-bg { display: none; }
+:root[data-theme="dark"] .home::before { filter: none; }
+/* The static artwork draws the network, fan and cards, so it stands in for the canvas backdrop in both themes. */
+.home-bg { display: none; }
 .home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; animation: home-bg-in 1.4s var(--ease) both; }
 .home-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .home-bg { --glass: color-mix(in srgb, var(--fg) 8%, transparent); --glass-edge: color-mix(in srgb, var(--fg) 18%, transparent); }
@@ -196,19 +209,24 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   color: var(--fg); background: color-mix(in srgb, var(--panel) 65%, transparent);
   border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); backdrop-filter: blur(10px);
-  transition: background 150ms, border-color 150ms;
+  transition: background-color 200ms var(--ease), border-color 200ms var(--ease), box-shadow 260ms var(--ease), translate 300ms var(--spring), scale 200ms var(--spring);
 }
-.corner-btn:hover { background: color-mix(in srgb, var(--panel) 90%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-.corner-btn .icon { width: 1.45rem; height: 1.45rem; color: var(--accent); }
+.corner-btn:hover {
+  translate: 0 -2px; background: color-mix(in srgb, var(--panel) 90%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.22), 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.corner-btn:active { translate: 0 0; }
+.corner-btn .icon { width: 1.45rem; height: 1.45rem; color: var(--accent); transition: scale 320ms var(--spring), rotate 420ms var(--spring); }
+.corner-btn:hover .icon { scale: 1.12; rotate: -8deg; }
 @media (max-width: 40rem) {
   .corner-btn { width: 2.75rem; padding: 0; justify-content: center; }
   .corner-btn span { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .corner-btn { transition: none; } }
 .mark { width: 1.6rem; height: 1.6rem; color: var(--fg); }
 .home h1 {
   font: 650 clamp(2.1rem, 5vw, 3.4rem)/1.02 var(--display); letter-spacing: -0.045em; text-wrap: balance;
 }
+.home h1 .w-mask { padding-bottom: 0.12em; margin-bottom: -0.12em; } /* SplitText word masks (App.tsx intro): keep descenders */
 /* The app name (lib/modal.tsx Brand): a size up, heavier, in an indigo → fuchsia → amber gradient that slowly drifts.
    Mixing the stops with --fg deepens them on light themes and lifts them on dark, so the name keeps its contrast. */
 .brand-name {
@@ -227,7 +245,9 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   justify-content: flex-start; gap: 0.85rem; text-align: left; white-space: normal;
   min-height: 4.25rem; padding: 0.75rem 1rem; border-radius: 10px;
 }
-.tile .icon { width: 1.6rem; height: 1.6rem; color: var(--accent); }
+.tile .icon { width: 1.6rem; height: 1.6rem; color: var(--accent); transition: scale 320ms var(--spring), translate 320ms var(--spring); }
+.tile:hover:not(:disabled) .icon { scale: 1.12; translate: 0 -1px; }
+.tile:not(.primary):hover:not(:disabled) { box-shadow: var(--tool-lit), var(--tool-edge), var(--veil), 0 10px 26px rgb(0 0 0 / 0.2); }
 .tile.primary .icon { color: inherit; }
 .tile span { display: grid; }
 .tile strong { font-size: 1.05rem; }
@@ -241,7 +261,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 /* Scrolls on its own past ~10 rows (up to 100 recents); the filter and header stay put. */
 .recent {
   list-style: none; margin: 0; padding: 0; display: grid; gap: 2px;
-  max-height: min(36rem, 65vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
+  max-height: min(36rem, 65vh); overflow: hidden auto; overscroll-behavior: contain; scrollbar-gutter: stable; /* x hidden: rows slide in from the right */
 }
 /* Hairline between rows, inset past the folder icon, fading at the right; hidden next to the hovered row. */
 .recent li + li::before {
@@ -256,7 +276,8 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent button:hover { background: var(--pick); }
 .recent button .icon { width: 1.4rem; height: 1.4rem; color: var(--faint); transition: color 120ms; }
 .recent button:hover .icon { color: var(--accent); }
-.recent button > span { display: grid; min-width: 0; }
+.recent button > span { display: grid; min-width: 0; transition: translate 280ms var(--ease); }
+.recent li > button:first-child:hover > span { translate: 3px 0; }
 .recent strong { font-weight: 600; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; }
 .recent small { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
 .recent li { position: relative; display: flex; align-items: center; gap: 2px; }
@@ -266,7 +287,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent .missing button .icon, .recent .missing button:hover .icon { color: var(--danger); }
 .recent .missing em { font-style: normal; font-family: var(--sans); font-weight: 700; color: var(--danger); }
 /* Remove… button: shown on row hover/focus where there is a mouse, always on touch. */
-.recent .icon-btn { flex: none; width: var(--ctl); min-height: var(--ctl); justify-content: center; padding: 0; opacity: 0; transition: opacity 120ms; }
+.recent .icon-btn { flex: none; width: var(--ctl); min-height: var(--ctl); justify-content: center; padding: 0; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms, scale 200ms var(--spring); }
 .recent li:hover .icon-btn, .recent .icon-btn:focus-visible { opacity: 1; }
 @media (hover: none) { .recent .icon-btn { opacity: 1; } }
 .modal .dialog-actions { flex-wrap: wrap; }
@@ -295,8 +316,13 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   background: var(--rail); border-right: 1px solid var(--line);
 }
 .rail-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 0.6rem 0.5rem; }
-.repo-id { display: grid; gap: 0.2rem; min-width: 0; }
-.repo-id strong { font: 650 1.1rem/1.3 var(--display); letter-spacing: -0.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Back arrow + repo name: one quiet button; the arrow nudges left on hover. */
+.rail-head .back { min-width: 0; justify-content: flex-start; gap: 0.45rem; padding: 0 0.55rem 0 0.4rem; color: inherit; background: none; box-shadow: none; }
+.rail-head .back:hover { background: var(--pick); }
+.rail-head .back .icon { width: 1.3em; height: 1.3em; color: var(--muted); transition: translate 280ms var(--spring), color 180ms; }
+.rail-head .back:hover .icon { translate: -3px 0; color: var(--fg); }
+.rail-head .back strong { font: 650 1.1rem/1.3 var(--display); letter-spacing: -0.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-head .branch-chip { flex-shrink: 1; }
 /* Current branch: a filled signal pill, in the rail head and the toolbar. */
 .branch-chip {
   display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0; max-width: 100%; justify-self: start;
@@ -328,6 +354,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .stage-body { flex: 1; min-height: 0; overflow: auto; padding: 0.75rem; animation: rise 260ms var(--ease); }
 .sync { display: flex; border-radius: var(--r); box-shadow: var(--tool-edge); }
 .sync button { border-radius: 0; box-shadow: var(--tool-lit); }
+.sync button:hover:not(:disabled) { box-shadow: var(--tool-lit), var(--veil); }
 .sync button + button { border-left: 1px solid rgb(0 0 0 / 0.45); }
 .sync button:first-child { border-radius: var(--r) 0 0 var(--r); }
 .sync button:last-child { border-radius: 0 var(--r) var(--r) 0; }
@@ -413,7 +440,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .refs .ab { flex-shrink: 0; color: var(--accent-fg); font-size: 0.78rem; font-weight: 700; }
 /* One ⋯ button opens the row's menu (same as right-click). Opacity, not display: it must stay keyboard focusable. */
 .refs .name { padding-right: 2rem; }
-.refs .more { position: absolute; right: 0.2rem; width: 1.7rem; min-height: 1.7rem; opacity: 0; transition: opacity 120ms; }
+.refs .more { position: absolute; right: 0.2rem; width: 1.7rem; min-height: 1.7rem; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms, scale 200ms var(--spring); }
 .refs li:hover .more, .refs li:focus-within .more { opacity: 1; }
 @media (hover: none) { .refs .more { opacity: 1; } }
 .row-menu {
@@ -452,7 +479,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   color: inherit; background: none; box-shadow: none; text-align: left; padding: 0 0.5rem; min-height: var(--ctl);
 }
 .files .row:hover { background: none; }
-.files li > button.small { opacity: 0; transition: opacity 120ms; }
+.files li > button.small { opacity: 0; transition: opacity 160ms, box-shadow 240ms var(--ease), scale 200ms var(--spring); }
 .files li:hover > button.small, .files li:focus-within > button.small, .files li.sel > button.small { opacity: 1; }
 @media (hover: none) { .files li > button.small { opacity: 1; } }
 .path { min-width: 0; display: flex; align-items: baseline; gap: 0.5rem; overflow: hidden; white-space: nowrap; }
@@ -575,9 +602,9 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--sunken); }
 .seg button {
   min-height: 1.75rem; padding: 0 0.7rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
-  color: var(--muted); background: none; box-shadow: none; transition: color 120ms, background-color 120ms;
+  color: var(--muted); background: none; box-shadow: none; transition: color 160ms, background-color 160ms, box-shadow 200ms, scale 200ms var(--spring);
 }
-.seg button:hover { color: var(--fg); }
+.seg button:hover:not(:disabled) { color: var(--fg); }
 .seg button[aria-pressed="true"] { color: var(--accent-fg); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), inset 0 0 0 1px var(--line); }
 @media (pointer: coarse) { .seg button { min-height: 2.5rem; } }
 .graph {
@@ -633,7 +660,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .commit-info .subject { font: 600 1.3rem/1.25 var(--display); letter-spacing: -0.028em; overflow-wrap: anywhere; }
 .commit-info .message { margin: 0.5rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 .commit-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
-.commit-info .explain { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; background: var(--active); border-left: 3px solid var(--active-bar); border-radius: 6px; }
+.commit-info .explain { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; background: var(--active); border-left: 3px solid var(--accent); border-radius: 6px; }
 .commit-info .explain h3 { margin: 0 0 0.25rem; padding: 0; }
 .commit-info .explain p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .commit-info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.9rem; margin: 0 0 0.75rem; font-size: 0.88rem; }
@@ -658,12 +685,13 @@ dialog {
 }
 dialog[open] { opacity: 1; scale: 1; translate: 0 0; }
 @starting-style { dialog[open] { opacity: 0; scale: 0.95; translate: 0 10px; } }
+/* Fixed blur, faded with opacity: transitioning the blur radius re-renders the whole window every frame and flickers. */
 dialog::backdrop {
-  background: rgb(8 8 16 / 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0);
-  transition: background-color 220ms, backdrop-filter 220ms, display 220ms allow-discrete, overlay 220ms allow-discrete;
+  background: rgb(8 8 16 / 0.38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0;
+  transition: opacity 220ms var(--ease), display 220ms allow-discrete, overlay 220ms allow-discrete;
 }
-dialog[open]::backdrop { background: rgb(8 8 16 / 0.38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-@starting-style { dialog[open]::backdrop { background: rgb(8 8 16 / 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } }
+dialog[open]::backdrop { opacity: 1; }
+@starting-style { dialog[open]::backdrop { opacity: 0; } }
 dialog h2 { font: 650 1.4rem/1.2 var(--display); letter-spacing: -0.03em; }
 dialog p { line-height: 1.55; }
 /* Every modal (features + lib/modal.tsx): same width, padding, tone-tinted top, icon badge header.
@@ -806,7 +834,7 @@ button.danger {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, white), var(--danger));
   color: #fff; font-weight: 500; box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 0.5px 1.5px rgb(0 0 0 / 0.18);
 }
-button.danger:hover:not(:disabled) { background: var(--danger); box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 4px 14px color-mix(in srgb, var(--danger) 40%, transparent); }
+button.danger:hover:not(:disabled) { box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), var(--veil), 0 6px 18px color-mix(in srgb, var(--danger) 45%, transparent); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
 .modal .dialog-actions {
   position: sticky; bottom: calc(-1 * var(--pad)); z-index: 2;
@@ -875,7 +903,7 @@ button.chip {
   min-height: 1.6rem; padding: 0 0.6rem; border-radius: 999px; font: 0.8rem var(--mono); letter-spacing: 0;
   color: var(--muted); background: var(--pick); box-shadow: none;
 }
-button.chip:hover { color: var(--fg); background: var(--sunken); }
+button.chip:hover:not(:disabled) { color: var(--fg); background: var(--sunken); }
 button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--active); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
 .nb-hint { margin: 0; font-size: 0.82rem; line-height: 1.4; color: var(--faint); }
 .nb-hint.error { color: var(--danger); }
@@ -946,9 +974,10 @@ dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, 
 .fh .diff pre { flex: 1; min-height: 0; max-height: none; }
 .fh-list { margin: 0; padding: 0; list-style: none; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 0.15rem; }
 .fh-list .row { all: unset; box-sizing: border-box; width: 100%; min-height: var(--ctl); display: grid; align-content: center; gap: 0.1rem; padding: 0.35rem 0.6rem; border-radius: 8px; cursor: pointer; }
+.fh-list .row { transition: background-color 160ms; }
 .fh-list .row:hover { background: var(--raised); }
 .fh-list .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.fh-list .row[aria-pressed="true"] { background: var(--active); box-shadow: inset 3px 0 var(--active-bar); }
+.fh-list .row[aria-pressed="true"] { background: var(--active); box-shadow: var(--active-bar); }
 .fh-list .row[aria-pressed="true"] strong { color: var(--accent-fg); }
 .fh-list strong, .fh-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fh-list small { color: var(--faint); font-size: 0.8rem; }
@@ -1060,7 +1089,7 @@ dialog.setup { --pad: 1.5rem; }
 .setup-summary strong { overflow-wrap: anywhere; font-size: 0.92rem; }
 .setup-actions { align-items: center; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .setup-actions .ghost { margin-right: auto; background: none; box-shadow: none; color: var(--muted); display: inline-flex; gap: 0.35rem; align-items: center; }
-.setup-actions .ghost:hover { color: var(--fg); background: var(--raised); }
+.setup-actions .ghost:hover:not(:disabled) { color: var(--fg); background: var(--raised); }
 .setup-actions .ghost .icon { width: 0.95rem; height: 0.95rem; }
 @media (max-width: 30rem) {
   dialog.setup { --pad: 1.1rem; }
@@ -1070,7 +1099,11 @@ dialog.setup { --pad: 1.5rem; }
   /* Ghost link stays compact; only the primary action stretches. */
   .modal .setup-actions .ghost { flex: none; }
 }
-button.link { all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+button.link {
+  all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); transition: text-decoration-color 200ms, text-underline-offset 200ms var(--ease);
+}
+button.link:hover { text-decoration-color: currentColor; text-underline-offset: 4px; }
 button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 /* Labels: one bold weight for every heading, column header, field and term label. */
 .graph-head, .section-head h2, .list-head h2, .commit-info h3, .commit-info dt,
