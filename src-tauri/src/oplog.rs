@@ -635,8 +635,10 @@ mine
         fs::write(dir.join("a.txt"), "x2\n").unwrap();
         cli::stage(p, &["a.txt".into()]).unwrap();
         assert_eq!(cli::commit(p, "", false).unwrap_err().code, "conflicts");
-        fs::write(dir.join("a.txt"), "x1\n").unwrap();
-        cli::stage(p, &["a.txt".into()]).unwrap();
+        // Keep mine = git's --theirs during a rebase (the replayed x1); the undo label says "mine".
+        cli::resolve(p, &["a.txt".into()], cli::Side::Theirs).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap().trim_end(), "x1");
+        assert_eq!(super::entries(p, 1).unwrap()[0].op, "take mine");
         cli::commit(p, "", false).unwrap();
         assert_eq!(cli::status(p).unwrap().operation, None);
         assert_eq!(git(p, &["log", "-2", "--format=%s"]).unwrap(), "x1 again\nx2\n");
