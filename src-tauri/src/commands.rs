@@ -235,6 +235,11 @@ pub fn resolve(path: String, paths: Vec<String>, side: cli::Side) -> Result<(), 
 }
 
 #[tauri::command]
+pub fn write_resolved(path: String, file: String, text: String) -> Result<(), AppError> {
+    cli::write_resolved(Path::new(&path), &file, &text)
+}
+
+#[tauri::command]
 pub fn work_file(path: String, file: String) -> Result<Option<String>, AppError> {
     read::work_file(Path::new(&path), &file)
 }
@@ -417,6 +422,12 @@ pub async fn ai_explain_stash(path: String, oid: String) -> Result<String, AppEr
 #[tauri::command]
 pub async fn ai_write_range(path: String, base: String, head: String, kind: String) -> Result<String, AppError> {
     crate::ai::write_range(Path::new(&path), &base, &head, &kind)
+}
+
+/// Sends a conflicted file to Gemini; returns the proposed resolution without writing it.
+#[tauri::command]
+pub async fn ai_resolve_conflict(path: String, file: String) -> Result<String, AppError> {
+    crate::ai::resolve_conflict(Path::new(&path), &file)
 }
 
 /// Commits in `base..HEAD` (oldest first) for the interactive rebase dialog.

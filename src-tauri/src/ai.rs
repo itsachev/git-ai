@@ -40,6 +40,12 @@ and the combined diff of a release, write Markdown \"- \" bullets grouped under 
 \"### Fixed\" and \"### Removed\" (leave out empty groups). One line per user-visible change, in plain words; \
 merge related commits, skip pure refactors, tests and CI unless they matter to users. No title, no code fences.";
 
+const CONFLICT_PROMPT: &str = "You resolve git merge conflicts. The file below contains conflict blocks \
+between <<<<<<< and >>>>>>> markers (a ||||||| section, if present, is the common base). For each block, combine \
+both sides so the intent of each change is kept; if they truly contradict, prefer the side that looks newer and \
+more complete. Leave everything outside the blocks exactly as it is. Reply with the whole resolved file only: no \
+conflict markers, no explanation, no code fences.";
+
 fn keychain() -> Result<keyring::Entry, AppError> {
     keyring::Entry::new("git-ai", "gemini").map_err(|e| AppError::new("keychain", e.to_string()))
 }
@@ -143,6 +149,42 @@ pub fn write_range(repo: &Path, base: &str, head: &str, kind: &str) -> Result<St
     Ok(generate(prompt, &input)?.trim().to_string())
 }
 
+/// A proposed resolution of the conflicted `file` (the whole file, markers gone). Nothing is written.
+pub fn resolve_conflict(repo: &Path, file: &str) -> Result<String, AppError> {
+    let text = read::work_file(repo, file)?
+        .ok_or_else(|| AppError::new("too_big", "Binary files and files over 1 MB can't be resolved with AI."))?;
+    if !has_markers(&text) {
+        return Err(AppError::new("no_markers", format!("{file} has no conflict markers to resolve.")));
+    }
+    if text.len() > MAX_DIFF {
+        return Err(AppError::new("too_big", format!("{file} is too long to send whole; resolve it in an editor.")));
+    }
+    let out = generate(CONFLICT_PROMPT, &format!("File: {file}\n\n{text}"))?;
+    let out = strip_fence(&out);
+    if has_markers(&out) {
+        return Err(AppError::new("ai_error", "Gemini left conflict markers in. Try again or resolve by hand."));
+    }
+    // Keep the file's trailing-newline convention.
+    let mut out = out.trim_end_matches(['\r', '\n']).to_string();
+    if text.ends_with('\n') {
+        out.push_str(if text.ends_with("\r\n") { "\r\n" } else { "\n" });
+    }
+    Ok(out)
+}
+
+fn has_markers(s: &str) -> bool {
+    s.lines().any(|l| (l.starts_with("<<<<<<<") || l.starts_with(">>>>>>>")) && matches!(l.as_bytes().get(7), None | Some(b' ')))
+}
+
+/// Drops a ```lang ... ``` wrapper the model may add despite the prompt.
+fn strip_fence(s: &str) -> &str {
+    let t = s.trim();
+    match (t.strip_prefix("```"), t.ends_with("```")) {
+        (Some(rest), true) if t.len() >= 6 => rest.split_once('\n').map_or("", |(_, body)| body).trim_end().strip_suffix("```").unwrap_or(""),
+        _ => s,
+    }
+}
+
 fn generate(system: &str, input: &str) -> Result<String, AppError> {
     let key = key().ok_or_else(|| AppError::new("ai_no_key", "Add a Gemini API key in Settings to use AI features."))?;
     let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent");
@@ -197,6 +239,14 @@ mod tests {
     }
 
     #[test]
+    fn conflict_output_checks() {
+        assert!(has_markers("a\n<<<<<<< HEAD\nb\n=======\nc\n>>>>>>> x\n"));
+        assert!(!has_markers("a\n<<<<<<<<< not one\n"));
+        assert_eq!(strip_fence("```rust\nfn a() {}\n```"), "fn a() {}\n");
+        assert_eq!(strip_fence("plain\n"), "plain\n");
+    }
+
+    #[test]
     fn only_a_bad_key_blames_the_key() {
         let bad_key = json!({"error": {"message": "API key not valid.", "details": [{"reason": "API_KEY_INVALID"}]}});
         assert_eq!(api_error(400, &bad_key).code, "ai_key");
@@ -206,6 +256,44 @@ mod tests {
         assert!(e.message.contains("is not found"));
         assert_eq!(api_error(400, &json!({})).code, "ai_error");
         assert_eq!(api_error(429, &json!({})).code, "ai_limit");
+    }
+
+    /// Real merge conflict through Gemini, then apply it. Run: `cargo test live_resolve_conflict -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn live_resolve_conflict() {
+        let dir = std::env::temp_dir().join(format!("git-ai-conflict-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| crate::git::cli::git(&dir, args);
+        let commit = |msg: &str| git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-qam", msg]).unwrap();
+        let write = |s: &str| std::fs::write(dir.join("app.js"), s).unwrap();
+        git(&["init", "-q", "-b", "main"]).unwrap();
+        write("function greet(name) {\n  return \"Hello, \" + name;\n}\n\nfunction add(a, b) {\n  return a + b;\n}\n");
+        git(&["add", "--", "app.js"]).unwrap();
+        commit("Initial");
+        git(&["switch", "-qc", "feature"]).unwrap();
+        write("function greet(name) {\n  return `Hello, ${name}!`;\n}\n\nfunction add(a, b) {\n  return Number(a) + Number(b);\n}\n");
+        commit("Template greeting, numeric add");
+        git(&["switch", "-q", "main"]).unwrap();
+        write("function greet(name) {\n  return \"Hi, \" + name.trim();\n}\n\nfunction add(a, b) {\n  return (a + b) | 0;\n}\n");
+        commit("Trim name, integer add");
+        assert!(git(&["merge", "feature"]).is_err(), "merge should conflict");
+
+        let out = resolve_conflict(&dir, "app.js").unwrap();
+        println!("---\n{out}---");
+        assert!(!has_markers(&out) && out.ends_with('\n') && out.contains("function add"));
+        crate::git::cli::write_resolved(&dir, "app.js", &out).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("app.js")).unwrap(), out);
+        let status = git(&["status", "--porcelain"]).unwrap();
+        assert!(status.contains("M  app.js"), "staged, no longer conflicted: {status}");
+        let backups = git(&["for-each-ref", "refs/git-ai/backup/"]).unwrap();
+        assert!(!backups.trim().is_empty(), "backup ref made");
+        let entry = crate::oplog::entries(&dir, 20).unwrap().remove(0);
+        crate::oplog::undo(&dir, &entry.id).unwrap(); // markers and the conflict are back
+        assert!(has_markers(&std::fs::read_to_string(dir.join("app.js")).unwrap()));
+        assert_eq!(crate::git::cli::status(&dir).unwrap().conflicted[0].kind, "UU");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Calls Gemini for real. Run: `GEMINI_API_KEY=… cargo test live_commit_message -- --ignored --nocapture`.
