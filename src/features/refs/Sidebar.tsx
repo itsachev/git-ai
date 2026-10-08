@@ -1,4 +1,5 @@
 ﻿import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, stash, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
@@ -28,15 +29,17 @@ export type Action = [string, () => void];
 export function useRefActions(path: string) {
   const data = useQuery(refsQuery(path)).data;
   const run = useRun();
-  return (name: string): Action[] => {
+  /** `ontoOnly`: just the merge/rebase actions (for branch drag and drop). */
+  return (name: string, ontoOnly = false): Action[] => {
     if (!data) return [];
     const head = data.head;
     const branchOff: Action = ["New branch from here", () => openNewBranch(name)];
     // Merge/rebase need a current branch that isn't this one.
     const onto: Action[] = head && head !== name ? [
-      [`Merge into ${head}`, () => run(() => merge(path, name, false))],
+      [`Merge ${name} into ${head}`, () => run(() => merge(path, name, false), `Merged ${name} into ${head}`)],
       [`Rebase ${head} onto ${name}`, () => run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`)],
     ] : [];
+    if (ontoOnly) return onto;
     if (data.local.some((b) => b.name === name)) {
       const pr: Action = ["Create pull request…", () => openWriteUp("pr", null, name)];
       const explain: Action = ["Explain branch (AI)", () => openWriteUp("explain", null, name)];
@@ -69,11 +72,11 @@ export function useRefActions(path: string) {
   };
 }
 
-/** Opens a `RefMenu` popover: at the pointer on right-click, else under the clicked element. */
+/** Opens a `RefMenu` popover: at the pointer on right-click or drop, else under the clicked element. */
 export function showMenu(el: HTMLElement | null, e: React.MouseEvent<HTMLElement>) {
   e.preventDefault();
   if (!el) return;
-  const r = e.type === "contextmenu" ? { left: e.clientX, bottom: e.clientY } : e.currentTarget.getBoundingClientRect();
+  const r = e.type === "contextmenu" || e.type === "drop" ?{ left: e.clientX, bottom: e.clientY } : e.currentTarget.getBoundingClientRect();
   el.showPopover();
   el.style.left = `${Math.max(4, Math.min(r.left, innerWidth - el.offsetWidth - 4))}px`;
   el.style.top = `${Math.max(4, Math.min(r.bottom, innerHeight - el.offsetHeight - 4))}px`;
@@ -97,6 +100,23 @@ export function Sidebar({ path }: { path: string }) {
   const actions = useRefActions(path);
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState<"stash" | null>(null);
+  // Branch drag and drop: one end must be the current branch; the drop menu offers merge/rebase with the other.
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropActions, setDropActions] = useState<Action[]>([]);
+  const dropPop = useRef<HTMLDivElement>(null);
+  const other = (to: string) => (!dragging || dragging === to ? null : to === data?.head ? dragging : dragging === data?.head ? to : null);
+  const dnd = (name: string): DragProps => ({
+    onDragStart: () => setDragging(name),
+    onDragEnd: () => setDragging(null),
+    canDrop: !!other(name),
+    onDrop: (e) => {
+      const o = other(name);
+      setDragging(null);
+      if (!o) return;
+      flushSync(() => setDropActions(actions(o, true)));
+      showMenu(dropPop.current, e);
+    },
+  });
   // The form lives inside the section, so open the section too (Stashes starts collapsed).
   const toggle = (what: "stash") => (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -133,7 +153,7 @@ export function Sidebar({ path }: { path: string }) {
         <ul className="refs">
           {local.map((b) => {
             const cur = b.name === data.head;
-            return <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => switchTo(path, b.name, false))} actions={actions(b.name)} />;
+            return <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => switchTo(path, b.name, false))} actions={actions(b.name)} dnd={dnd(b.name)} />;
           })}
         </ul>
       </details>
@@ -144,7 +164,7 @@ export function Sidebar({ path }: { path: string }) {
             <summary>{remote}</summary>
             <ul className="refs">
               {items.map((r) => (
-                <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={actions(r.name)[0][1]} actions={actions(r.name)} />
+                <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={actions(r.name)[0][1]} actions={actions(r.name)} dnd={dnd(r.name)} />
               ))}
             </ul>
           </details>
@@ -192,19 +212,28 @@ export function Sidebar({ path }: { path: string }) {
           </ul>
         </details>
       )}
+      <RefMenu pop={dropPop} label="Drop branch" actions={dropActions} />
     </section>
   );
 }
 
 /** `onOpen` runs on double-click; `actions` are [label, handler] items of a popover menu (right-click or the ⋯ button). */
-type RowProps = { item: RefItem; label?: string; cur?: boolean; onOpen?: () => void; actions?: Action[] };
+type DragProps = { onDragStart: () => void; onDragEnd: () => void; canDrop: boolean; onDrop: (e: React.DragEvent<HTMLElement>) => void };
+type RowProps = { item: RefItem; label?: string; cur?: boolean; onOpen?: () => void; actions?: Action[]; dnd?: DragProps };
 
-function Row({ item, label = item.name, cur, onOpen, actions = [] }: RowProps) {
+function Row({ item, label = item.name, cur, onOpen, actions = [], dnd }: RowProps) {
   const title = item.upstream ? `${item.name} (tracks ${item.upstream})` : item.name;
   const pop = useRef<HTMLDivElement>(null);
   const menu = (e: React.MouseEvent<HTMLElement>) => showMenu(pop.current, e);
+  const [over, setOver] = useState(false);
   return (
-    <li className={cur ? "cur" : undefined} onContextMenu={menu}>
+    <li className={[cur && "cur", over && "drop"].filter(Boolean).join(" ") || undefined} onContextMenu={menu}
+      draggable={!!dnd}
+      onDragStart={dnd && ((e) => { e.dataTransfer.setData("text/plain", item.name); e.dataTransfer.effectAllowed = "link"; dnd.onDragStart(); })}
+      onDragEnd={dnd?.onDragEnd}
+      onDragOver={dnd?.canDrop ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "link"; setOver(true); } : undefined}
+      onDragLeave={() => setOver(false)}
+      onDrop={dnd?.canDrop ? (e) => { setOver(false); dnd.onDrop(e); } : undefined}>
       <span className="name" title={title} onDoubleClick={onOpen}>
         {cur && <span className="dot" aria-label="current branch" />}
         <span>{label}</span>
