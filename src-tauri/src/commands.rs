@@ -164,6 +164,11 @@ pub fn merge(path: String, rev: String, cherry_pick: bool) -> Result<(), AppErro
 }
 
 #[tauri::command]
+pub fn reset_to(path: String, rev: String) -> Result<(), AppError> {
+    cli::reset_to(Path::new(&path), &rev)
+}
+
+#[tauri::command]
 pub fn rebase_onto(path: String, onto: String) -> Result<(), AppError> {
     cli::rebase_onto(Path::new(&path), &onto)
 }
@@ -451,4 +456,19 @@ pub async fn blame(path: String, rev: String, file: String) -> Result<read::Blam
 #[tauri::command]
 pub fn rebase(path: String, base: String, steps: Vec<cli::RebaseStep>) -> Result<(), AppError> {
     cli::rebase(Path::new(&path), &base, &steps)
+}
+
+#[tauri::command]
+pub fn lfs(path: String) -> Result<cli::Lfs, AppError> {
+    cli::lfs(Path::new(&path))
+}
+
+#[tauri::command]
+pub fn lfs_track(path: String, pattern: String, track: bool) -> Result<(), AppError> {
+    cli::lfs_track(Path::new(&path), &pattern, track)
+}
+
+#[tauri::command]
+pub async fn lfs_pull(path: String) -> Result<(), AppError> {
+    cli::lfs_pull(Path::new(&path))
 }

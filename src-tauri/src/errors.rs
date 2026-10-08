@@ -16,11 +16,15 @@ impl AppError {
 
     /// A failed git command: known failures get a code and a plain explanation, the rest keep git's text (code "git").
     pub fn from_stderr(stderr: &str) -> Self {
-        if stderr.contains("would be overwritten by") {
+        // The second is `reset --keep` refusing to touch an edited file.
+        if stderr.contains("would be overwritten by") || stderr.contains("not uptodate. Cannot merge") {
             return Self::new("dirty", "You have uncommitted changes. Stash, commit or discard them, then try again.");
         }
         if stderr.contains("[rejected]") && (stderr.contains("(fetch first)") || stderr.contains("(non-fast-forward)")) {
             return Self::new("rejected", "The remote has commits you don't have yet. Pull first, then push again.");
+        }
+        if stderr.contains("git-lfs") && (stderr.contains("not found") || stderr.contains("is not a git command")) {
+            return Self::new("lfs_missing", "This repository uses Git LFS, but Git LFS isn't installed. Install it from git-lfs.com, then try again.");
         }
         Self::new("git", stderr.trim())
     }
@@ -51,6 +55,9 @@ Aborting
         assert!(e.message.starts_with("You have uncommitted changes"), "{}", e.message);
         assert_eq!(AppError::from_stderr("fatal: nope
 ").code, "git");
+        let lfs = "git-lfs filter-process: git-lfs: command not found\nfatal: the remote end hung up unexpectedly\n";
+        assert_eq!(AppError::from_stderr(lfs).code, "lfs_missing");
+        assert_eq!(AppError::from_stderr("This repository is configured for Git LFS but 'git-lfs' was not found on your path.").code, "lfs_missing");
     }
 
     #[test]

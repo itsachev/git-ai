@@ -13,4 +13,8 @@ time: number, committer: string, message: string,
 /**
  * Changes against the first parent (the empty tree for a root commit).
  */
-files: Array<FileChange>, };
+files: Array<FileChange>, 
+/**
+ * Already part of the current branch (merge or cherry-pick would do nothing).
+ */
+in_head: boolean, };

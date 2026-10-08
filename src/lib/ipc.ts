@@ -17,6 +17,7 @@ import type { FileCommit } from "../bindings/FileCommit";
 import type { Blame } from "../bindings/Blame";
 import type { GitSetup } from "../bindings/GitSetup";
 import type { GhRepo } from "../bindings/GhRepo";
+import type { Lfs } from "../bindings/Lfs";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,9 +52,12 @@ const FAILED: Record<string, (a: Args) => string> = {
   write_resolved: (a) => `Failed to apply the resolution to ${a.file}`,
   ai_resolve_conflict: (a) => `Failed to resolve ${a.file} with AI`,
   open_file: (a) => `Failed to open ${a.file}`,
+  lfs_track: (a) => (a.track ? `Failed to track ${a.pattern} with LFS` : `Failed to untrack ${a.pattern}`),
+  lfs_pull: () => "Failed to download LFS files",
   forget_repo: () => "Failed to remove the repository",
   trash_repo: () => "Failed to delete the repository",
   ai_set_key: () => "Failed to save the API key",
+  reset_to: (a) => `Failed to reset to ${a.rev}`,
   ai_commit_message: () => "Failed to write a commit message",
   ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
   github_create_pr: () => "Failed to open the pull request",
@@ -113,7 +117,9 @@ export const deleteBranch = (path: string, name: string, force: boolean) => invo
 /** Merges `rev` into the current branch, or with `cherryPick` applies that one commit. Code "conflicts" = stopped halfway. */
 export const merge = (path: string, rev: string, cherryPick: boolean) => invoke<void>("merge", { path, rev, cherryPick });
 /** Rebases the current branch onto `onto`. Code "conflicts" = paused, continue from File Status. Undoable. */
-export const rebaseOnto = (path: string, onto: string) => invoke<void>("rebase_onto", { path, onto });
+/** Moves the current branch to `rev` (reset --keep); undoable. */
+export const resetTo = (path: string, rev: string) => invoke<void>("reset_to", { path, rev });
+export const rebaseOnto =(path: string, onto: string) => invoke<void>("rebase_onto", { path, onto });
 /** Aborts the in-progress merge/cherry-pick (changed files backed up first). */
 export const abortOp = (path: string) => invoke<void>("abort", { path });
 /** Commits after `base` on the current branch, oldest first. Codes "has_merges", "too_many", "not_ancestor". */
@@ -194,3 +200,9 @@ export const aiWriteRange = (path: string, base: string, head: string, kind: "pr
   invoke<string>("ai_write_range", { path, base, head, kind });
 /** Proposes a resolution for a conflicted file (sent whole to Gemini). Writes nothing; apply it with `writeResolved`. */
 export const aiResolveConflict = (path: string, file: string) => invoke<string>("ai_resolve_conflict", { path, file });
+// Git LFS. Not installed = `installed` false, no patterns.
+export const lfs = (path: string) => invoke<Lfs>("lfs", { path });
+/** Tracks (or untracks) `pattern`; edits .gitattributes only, left unstaged. */
+export const lfsTrack = (path: string, pattern: string, track: boolean) => invoke<void>("lfs_track", { path, pattern, track });
+/** `git lfs pull`: downloads LFS content for the checked-out files. */
+export const lfsPull = (path: string) => invoke<void>("lfs_pull", { path });

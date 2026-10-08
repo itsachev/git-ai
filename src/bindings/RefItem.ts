@@ -12,4 +12,8 @@ upstream: string | null,
 /**
  * Commits ahead of / behind the upstream.
  */
-ahead: number, behind: number, };
+ahead: number, behind: number, 
+/**
+ * Already part of the current branch (merging or rebasing onto it would do nothing).
+ */
+in_head: boolean, };

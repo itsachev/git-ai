@@ -201,6 +201,37 @@ mod tests {
 
     /// Merge (conflict, abort, finish), cherry-pick, tags and stashes, with undo.
     #[test]
+    fn reset_to_and_undo() {
+        let dir = temp_repo("reset");
+        let p = dir.as_path();
+        let commit = |text: &str| {
+            fs::write(dir.join("a.txt"), text).unwrap();
+            cli::stage(p, &["a.txt".to_string()]).unwrap();
+            cli::commit(p, text, false).unwrap();
+        };
+        commit("base\n");
+        let base = cli::rev(p, "HEAD").unwrap();
+        cli::create_branch(p, "other", None, false).unwrap();
+        commit("mine\n");
+        let mine = cli::rev(p, "HEAD").unwrap();
+
+        // An edit to a file the reset changes: refused, nothing moves.
+        fs::write(dir.join("a.txt"), "edit\n").unwrap();
+        assert_eq!(cli::reset_to(p, "other").unwrap_err().code, "dirty");
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), mine);
+        git(p, &["checkout", "--", "a.txt"]).unwrap();
+
+        cli::reset_to(p, "other").unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), base);
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "base\n");
+        let e = super::entries(p, 1).unwrap()[0].clone();
+        assert_eq!(e.op, "reset");
+        super::undo(p, &e.id).unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), mine);
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "mine\n");
+    }
+
+    #[test]
     fn merge_tag_stash() {
         let dir = temp_repo("merge");
         let p = dir.as_path();

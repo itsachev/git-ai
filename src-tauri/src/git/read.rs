@@ -352,6 +352,13 @@ pub struct CommitDetails {
     pub message: String,
     /// Changes against the first parent (the empty tree for a root commit).
     pub files: Vec<FileChange>,
+    /// Already part of the current branch (merge or cherry-pick would do nothing).
+    pub in_head: bool,
+}
+
+/// `oid` is HEAD or one of its ancestors.
+fn in_head(repo: &git2::Repository, oid: git2::Oid) -> bool {
+    repo.head().ok().and_then(|h| h.target()).is_some_and(|h| h == oid || repo.graph_descendant_of(h, oid).unwrap_or(false))
 }
 
 pub fn commit_details(repo: &Path, oid: &str) -> Result<CommitDetails, AppError> {
@@ -382,6 +389,7 @@ pub fn commit_details(repo: &Path, oid: &str) -> Result<CommitDetails, AppError>
         committer: sig(c.committer()),
         message: String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(),
         files,
+        in_head: in_head(&repo, c.id()),
     })
 }
 
@@ -423,6 +431,8 @@ pub struct RefItem {
     /// Commits ahead of / behind the upstream.
     pub ahead: u32,
     pub behind: u32,
+    /// Already part of the current branch (merging or rebasing onto it would do nothing).
+    pub in_head: bool,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -441,12 +451,13 @@ pub struct Refs {
 pub fn refs(repo: &Path) -> Result<Refs, AppError> {
     let mut repo = git2::Repository::open(repo)?;
     let head = repo.head().ok().filter(|h| h.is_branch()).and_then(|h| h.shorthand().ok().map(String::from));
-    let item = |name: String, oid: git2::Oid| RefItem { name, oid: oid.to_string(), upstream: None, ahead: 0, behind: 0 };
+    let item = |name: String, oid: git2::Oid| RefItem { name, oid: oid.to_string(), upstream: None, ahead: 0, behind: 0, in_head: false };
     let (mut local, mut remote, mut tags) = (vec![], vec![], vec![]);
     for r in repo.references()?.flatten() {
         let (Ok(full), Ok(short)) = (r.name(), r.shorthand()) else { continue };
         let Ok(c) = r.peel_to_commit() else { continue };
         let mut it = item(short.to_string(), c.id());
+        it.in_head = in_head(&repo, c.id());
         if full.starts_with("refs/heads/") {
             let up = git2::Branch::wrap(r).upstream().ok();
             if let Some(up) = up.as_ref().and_then(|u| u.get().target()) {
@@ -498,6 +509,17 @@ mod tests {
         assert_eq!((d.files[0].path.as_str(), d.files[0].kind.as_str()), ("a.txt", "A"));
         let d = super::commit_details(&dir, &second.id().to_string()).unwrap();
         assert_eq!((d.files[0].kind.as_str(), d.files[0].orig_path.as_deref()), ("R", Some("a.txt")));
+        // A branch HEAD already contains vs. one with its own commit: only the second can be merged.
+        repo.branch("old", &first, false).unwrap();
+        let side = repo.commit(None, &sig, &sig, "side", &first.tree().unwrap(), &[&second]).unwrap();
+        repo.branch("side", &repo.find_commit(side).unwrap(), false).unwrap();
+        assert!(d.in_head && !super::commit_details(&dir, &side.to_string()).unwrap().in_head);
+        let r = super::refs(&dir).unwrap();
+        let ins = |n: &str| r.local.iter().find(|b| b.name == n).unwrap().in_head;
+        assert!(ins("old") && !ins("side"));
+        for b in ["old", "side"] {
+            repo.find_branch(b, git2::BranchType::Local).unwrap().delete().unwrap();
+        }
         assert!(super::commit_file_diff(&dir, &first.id().to_string(), "a.txt").unwrap().unwrap().ends_with("+one\n+two\n+three\n"));
 
         let (msg, patch) = super::commit_patch(&dir, &first.id().to_string()).unwrap();

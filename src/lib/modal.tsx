@@ -21,16 +21,22 @@ export function ModalHead({ id, icon, tone = "accent", title, sub }: { id: strin
 export const Brand = () => <span className="brand-name">git-ai</span>;
 
 // In-app replacement for the native confirm box, so confirms look like every other modal.
-type Ask = { title: string; message: string; ok: string; tone: Tone; resolve: (yes: boolean) => void };
+/** One option of `choose`: `hint` is a plain line under the label. */
+export type Choice = { label: string; hint?: string; tone?: Tone };
+type Ask = { title: string; message: string; icon: IconName; tone: Tone; choices: Choice[]; resolve: (i: number) => void };
 let asking: Ask | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 
-/** Resolves true on the OK button, false on Cancel or Esc. */
-export function confirm(title: string, message: string, ok = "OK", tone: Tone = "warn") {
-  asking?.resolve(false);
-  return new Promise<boolean>((resolve) => { asking = { title, message, ok, tone, resolve }; emit(); });
+/** Resolves the index of the picked choice, -1 on Cancel or Esc. */
+export function choose(title: string, message: string, choices: Choice[], icon: IconName = "warn", tone: Tone = "accent") {
+  asking?.resolve(-1);
+  return new Promise<number>((resolve) => { asking = { title, message, icon, tone, choices, resolve }; emit(); });
 }
+
+/** Resolves true on the OK button, false on Cancel or Esc. */
+export const confirm = (title: string, message: string, ok = "OK", tone: Tone = "warn") =>
+  choose(title, message, [{ label: ok, tone }], "warn", tone).then((i) => i === 0);
 
 export function ConfirmDialog() {
   const cur = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => asking);
@@ -42,19 +48,29 @@ export function ConfirmDialog() {
     if (cur) dialog.current?.showModal();
     else dialog.current?.close();
   }, [cur]);
-  const answer = (yes: boolean) => { asking?.resolve(yes); asking = null; emit(); };
+  const answer = (i: number) => { asking?.resolve(i); asking = null; emit(); };
   const a = last.current;
+  const one = a?.choices.length === 1 ? a.choices[0] : null;
   return (
     <dialog ref={dialog} className={`modal tone-${a?.tone ?? "warn"}`} role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text"
-      onCancel={(e) => { e.preventDefault(); answer(false); }}>
+      onCancel={(e) => { e.preventDefault(); answer(-1); }}>
       {a && (
-        <form onSubmit={(e) => { e.preventDefault(); answer(true); }}>
-          <ModalHead id="confirm-title" icon="warn" tone={a.tone} title={a.title} />
+        <form onSubmit={(e) => { e.preventDefault(); answer(0); }}>
+          <ModalHead id="confirm-title" icon={a.icon} tone={a.tone} title={a.title} />
           <p id="confirm-text" className="modal-text">{a.message}</p>
+          {!one && (
+            <div className="choices">
+              {a.choices.map((c, i) => (
+                <button key={c.label} type="button" className={`choice tone-${c.tone ?? "accent"}`} onClick={() => answer(i)}>
+                  <strong>{c.label}</strong>{c.hint && <span className="muted">{c.hint}</span>}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="dialog-actions">
             {/* Focus on Cancel: every confirm guards something destructive, so a stray Enter is safe. */}
-            <button type="button" autoFocus onClick={() => answer(false)}>Cancel</button>
-            <button className={a.tone === "danger" ? "danger" : "primary"}>{a.ok}</button>
+            <button type="button" autoFocus onClick={() => answer(-1)}>Cancel</button>
+            {one && <button className={one.tone === "danger" ? "danger" : "primary"}>{one.label}</button>}
           </div>
         </form>
       )}

@@ -222,6 +222,13 @@ pub fn rebase_onto(repo: &Path, onto: &str) -> Result<(), AppError> {
     })
 }
 
+/// Moves the current branch to `rev`, dropping its commits that `rev` lacks ("recreate from the remote").
+/// `reset --keep` keeps local edits and refuses when they'd be overwritten. Logged; undo moves it back.
+pub fn reset_to(repo: &Path, rev_name: &str) -> Result<(), AppError> {
+    ref_arg(rev_name)?;
+    log_head_move(repo, "reset", || git(repo, &["reset", "-q", "--keep", rev_name]).map(drop))
+}
+
 /// When git stopped halfway (the op is still in progress), says so instead of git's raw error.
 fn stopped(repo: &Path, op: &str, e: AppError) -> AppError {
     match crate::git::read::operation(repo) {
@@ -462,6 +469,48 @@ pub fn pr_branches(repo: &Path, head: &str, base: &str, check: UrlCheck) -> Resu
 pub fn push_tag(repo: &Path, name: &str) -> Result<(), AppError> {
     ref_arg(name)?;
     git_net(repo, &["push", "-q", &default_remote(repo)?, &format!("refs/tags/{name}")]).map(drop)
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct Lfs {
+    /// `git lfs` runs (git-lfs is on PATH).
+    pub installed: bool,
+    /// Tracked patterns as `git lfs track` lists them (spaces show as `[[:space:]]`).
+    pub patterns: Vec<String>,
+}
+
+/// Git LFS state of the repo. Not installed = no patterns (git-lfs is what reads them).
+pub fn lfs(repo: &Path) -> Result<Lfs, AppError> {
+    #[derive(Deserialize)]
+    struct Out {
+        patterns: Option<Vec<Pat>>,
+    }
+    #[derive(Deserialize)]
+    struct Pat {
+        pattern: String,
+        tracked: bool,
+    }
+    let Ok(out) = git(repo, &["lfs", "track", "--json"]) else {
+        return Ok(Lfs { installed: false, patterns: vec![] });
+    };
+    let out: Out = serde_json::from_str(&out).map_err(|e| AppError::new("git", format!("Unexpected `git lfs track` output: {e}")))?;
+    let patterns = out.patterns.unwrap_or_default().into_iter().filter(|p| p.tracked).map(|p| p.pattern).collect();
+    Ok(Lfs { installed: true, patterns })
+}
+
+/// Tracks (or untracks) `pattern` with LFS. Only edits `.gitattributes` (left unstaged); files already
+/// committed stay as they are until they change.
+pub fn lfs_track(repo: &Path, pattern: &str, track: bool) -> Result<(), AppError> {
+    if pattern.trim().is_empty() {
+        return Err(AppError::new("bad_pattern", "Enter a pattern, e.g. *.psd"));
+    }
+    git(repo, &["lfs", if track { "track" } else { "untrack" }, "--", pattern]).map(drop)
+}
+
+/// Downloads the LFS content of the checked-out files (after a clone without git-lfs, or skipped smudge).
+pub fn lfs_pull(repo: &Path) -> Result<(), AppError> {
+    git_net(repo, &["lfs", "pull"]).map(drop)
 }
 
 /// Deletes remote branch `name` ("origin/feat") on the remote. The tip is logged, and kept under
@@ -930,6 +979,28 @@ mod tests {
 
     fn change(path: &str, orig: Option<&str>, kind: &str) -> FileChange {
         FileChange { path: path.into(), orig_path: orig.map(String::from), kind: kind.into() }
+    }
+
+    #[test]
+    fn lfs_patterns() {
+        let dir = std::env::temp_dir().join(format!("git-ai-test-lfs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.as_path();
+        git(p, &["init", "-q"]).unwrap();
+        if !lfs(p).unwrap().installed {
+            return eprintln!("git-lfs not installed, skipped");
+        }
+        assert!(lfs(p).unwrap().patterns.is_empty());
+        lfs_track(p, "*.psd", true).unwrap();
+        lfs_track(p, "my file.bin", true).unwrap();
+        lfs_track(p, "-x", true).unwrap(); // `--` keeps it from reading as a flag
+        let pats = lfs(p).unwrap().patterns;
+        assert_eq!(pats, ["*.psd", "my[[:space:]]file.bin", "-x"]);
+        lfs_track(p, &pats[1], false).unwrap();
+        assert_eq!(lfs(p).unwrap().patterns, ["*.psd", "-x"]);
+        assert_eq!(lfs_track(p, " ", true).unwrap_err().code, "bad_pattern");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -10,6 +10,8 @@ import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
 import { openFileHistory } from "./FileHistory";
 
+const inHead = "The current branch already has this commit";
+
 /** Commit graph on top; the picked commit's details, files and file diff below. */
 export function History({ path }: { path: string }) {
   const [sel, setSel] = useState<Picked | null>(null);
@@ -59,8 +61,8 @@ export function History({ path }: { path: string }) {
               <h2 className="subject">{subject}</h2>
               {body && <p className="message">{body}</p>}
               <div className="commit-actions">
-                <button className="small" onClick={() => run(() => merge(path, d.oid, true), `Cherry-picked ${d.oid.slice(0, 7)}`)}>Cherry-pick</button>
-                <button className="small" onClick={() => run(() => merge(path, d.oid, false), `Merged ${d.oid.slice(0, 7)} into the current branch`)}>Merge into current</button>
+                <button className="small" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={() => run(() => merge(path, d.oid, true), `Cherry-picked ${d.oid.slice(0, 7)}`)}>Cherry-pick</button>
+                <button className="small" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={() => run(() => merge(path, d.oid, false), `Merged ${d.oid.slice(0, 7)} into the current branch`)}>Merge into current</button>
                 <button className="small" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}>Tag…</button>
                 <button className="small" onClick={() => openRebase(d.oid)} title="Reorder, edit, squash or drop the commits after this one">Rebase from here…</button>
                 <button className="small" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
