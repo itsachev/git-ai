@@ -93,12 +93,17 @@ export function Notice() {
   const shown = useSyncExternalStore(subscribeOps, () => notice);
   const [hidden, setHidden] = useState<number | null>(null);
   const cur = shown && hidden !== shown.gen ? shown : null;
+  const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (!cur) return;
+    // A popover shown after an open <dialog> stacks above it (and its backdrop blur) in the top layer.
+    const p = ref.current;
+    p?.hidePopover();
+    p?.showPopover();
     const t = setTimeout(() => setHidden(cur.gen), 4000);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); p?.hidePopover(); };
   }, [cur]);
-  return <p className="notice" role="status">{cur && <span key={cur.gen} className="toast tone-ok"><span className="modal-badge tone-ok"><Icon name="check" /></span>{cur.text}</span>}</p>;
+  return <p ref={ref} popover="manual" className="notice" role="status">{cur && <span key={cur.gen} className="toast tone-ok"><span className="modal-badge tone-ok"><Icon name="check" /></span>{cur.text}</span>}</p>;
 }
 
 export function Changes({ path }: { path: string }) {

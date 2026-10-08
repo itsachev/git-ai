@@ -888,7 +888,7 @@ dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdro
 .toast-text small { font-size: 0.82rem; }
 .toast-actions { display: flex; gap: 0.4rem; margin-left: 0.25rem; }
 .update { position: fixed; right: 1rem; bottom: 1rem; z-index: 30; max-width: calc(100vw - 2rem); flex-wrap: wrap; }
-.notice { position: fixed; left: 50%; bottom: 1rem; translate: -50% 0; z-index: 29; margin: 0; max-width: calc(100vw - 2rem); pointer-events: none; }
+.notice { position: fixed; inset: auto auto 1rem 50%; translate: -50% 0; z-index: 29; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; max-width: calc(100vw - 2rem); pointer-events: none; }
 .notice .toast { font-size: 1.05rem; animation: toast-in 460ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
 
 /* ---------- Motion ---------- */
