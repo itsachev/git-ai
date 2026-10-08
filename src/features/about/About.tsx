@@ -23,6 +23,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Amend the last commit", "Commit box → Amend last commit", "Fixes the most recent commit instead of adding a new one: correct its message or add a forgotten file. Recorded, so it can be undone."],
     ["AI commit message", "Commit box → Generate message · Ctrl+Shift+M jumps to the box", "Gemini reads your staged diff and writes the commit message for you to review. Needs your Gemini key in Settings."],
     ["Large and binary files", "Automatic", "No inline diff for binary files or files over 1 MB, and LFS pointer files show as files, so big repositories stay fast."],
+    ["Git LFS", "Ctrl+K → Git LFS… · or Track *.ext with Git LFS… under a big file", "Stores large files on the LFS server and keeps small pointers in the repository. Track or untrack file patterns, and download LFS files that still show as pointers."],
   ]],
   ["history", "History", [
     ["Commit graph", "History tab · Ctrl+2", "Every commit, with lanes that show where branches split and merge, and branch and tag labels. Arrow keys and Page Up / Down move the selection. Fast on 100k+ commits."],
