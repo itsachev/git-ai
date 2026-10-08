@@ -5,6 +5,7 @@ mod editors;
 mod errors;
 mod git;
 mod github;
+mod gitlab;
 mod oplog;
 mod watch;
 
@@ -76,6 +77,11 @@ pub fn run() {
             commands::github_repos,
             commands::github_create_pr,
             commands::github_sign_out,
+            commands::gitlab_start,
+            commands::gitlab_finish,
+            commands::gitlab_user,
+            commands::gitlab_repos,
+            commands::gitlab_sign_out,
             commands::ssh_key,
             commands::ssh_key_set,
             commands::ssh_detect,

@@ -175,6 +175,12 @@ export const githubRepos = () => invoke<GhRepo[]>("github_repos");
 export const githubCreatePr = (path: string, head: string, base: string, title: string, body: string) =>
   invoke<string>("github_create_pr", { path, head, base, title, body });
 export const githubSignOut =() => invoke<void>("github_sign_out");
+// GitLab (gitlab.com) sign-in, same device flow and calls as GitHub's. Code "gitlab" when the build has no client id.
+export const gitlabStart = () => invoke<DeviceCode>("gitlab_start");
+export const gitlabFinish = (code: DeviceCode) => invoke<string>("gitlab_finish", { code });
+export const gitlabUser = () => invoke<string | null>("gitlab_user");
+export const gitlabRepos = () => invoke<GhRepo[]>("gitlab_repos");
+export const gitlabSignOut = () => invoke<void>("gitlab_sign_out");
 // SSH key used for fetch/pull/push/clone. null = ssh's defaults (~/.ssh/id_*, ssh-agent).
 export const sshKey = () => invoke<string | null>("ssh_key");
 /** null clears it. Code "ssh_key" when the file isn't a readable private key. */

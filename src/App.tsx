@@ -17,7 +17,7 @@ import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { RebaseDialog } from "./features/graph/Rebase";
 import { FileHistoryDialog } from "./features/graph/FileHistory";
 import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
-import { GitHubAccount } from "./features/github/GitHub";
+import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
 import { Palette, type Command } from "./features/palette/Palette";
@@ -195,6 +195,7 @@ function App() {
         {cloning && <CloneForm onCloned={cloned} />}
         {error && <p className="error" role="alert">{error}</p>}
         <GitHubAccount />
+        <GitLabAccount />
       </section>
       <section className="home-recent" aria-labelledby="recent-title">
         <div className="section-head">

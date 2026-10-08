@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { askpassReply, cloneRepo, fetchAll, githubRepos, pull, push } from "../../lib/ipc";
-import { userQuery } from "../github/GitHub";
+import { askpassReply, cloneRepo, fetchAll, githubRepos, gitlabRepos, pull, push } from "../../lib/ipc";
+import { gitlabUserQuery, userQuery } from "../github/GitHub";
+import type { GhRepo } from "../../bindings/GhRepo";
 import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
 import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
@@ -71,9 +72,6 @@ export function CloneForm({ onCloned }: { onCloned: (repo: RepoInfo) => void }) 
   const guess = url.trim().replace(/[\/\\]+$/, "").split(/[\/\\:]/).pop()?.replace(/\.git$/, "") ?? "";
   const folder = nameEdited ? name : guess;
   const busy = progress !== null;
-  // Signed in to GitHub: picking one of the user's repos fills in the URL.
-  const login = useQuery(userQuery).data;
-  const repos = useQuery({ queryKey: ["github-repos", login], queryFn: githubRepos, enabled: !!login, staleTime: 5 * 60_000 });
   async function browse() {
     const dir = await open({ directory: true, title: "Clone into folder" });
     if (dir) setParent(dir);
@@ -96,23 +94,8 @@ export function CloneForm({ onCloned }: { onCloned: (repo: RepoInfo) => void }) 
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/user/repo.git"
           autoFocus spellCheck={false} autoComplete="off" disabled={busy} />
       </label>
-      {login && (
-        <label>
-          Your GitHub repos (@{login})
-          {repos.isError ? <span className="error">{errorText(repos.error)}</span> : (
-            <span className="select">
-            <select value={repos.data?.some((r) => r.clone_url === url) ? url : ""} onChange={(e) => setUrl(e.target.value)}
-              disabled={busy || !repos.data?.length}>
-              <option value="">{repos.isPending ? "Loading…" : repos.data?.length ? "Pick a repository…" : "No repositories"}</option>
-              {repos.data?.map((r) => (
-                <option key={r.clone_url} value={r.clone_url}>{r.full_name}{r.private ? " (private)" : ""}</option>
-              ))}
-            </select>
-            <Icon name="chevron" />
-            </span>
-          )}
-        </label>
-      )}
+      <RepoPicker name="GitHub" query={userQuery} list={githubRepos} url={url} setUrl={setUrl} busy={busy} />
+      <RepoPicker name="GitLab" query={gitlabUserQuery} list={gitlabRepos} url={url} setUrl={setUrl} busy={busy} />
       <label>
         Parent folder
         <span className="pick-dir">
@@ -172,5 +155,32 @@ export function AskpassDialog() {
         </form>
       )}
     </dialog>
+  );
+}
+
+/** Signed in to `name`: picking one of the user's repos fills in the clone URL. */
+function RepoPicker({ name, query, list, url, setUrl, busy }: {
+  name: string; query: { queryKey: string[]; queryFn: () => Promise<string | null> }; list: () => Promise<GhRepo[]>;
+  url: string; setUrl: (u: string) => void; busy: boolean;
+}) {
+  const login = useQuery(query).data;
+  const repos = useQuery({ queryKey: [...query.queryKey, "repos", login], queryFn: list, enabled: !!login, staleTime: 5 * 60_000 });
+  if (!login) return null;
+  return (
+    <label>
+      Your {name} repos (@{login})
+      {repos.isError ? <span className="error">{errorText(repos.error)}</span> : (
+        <span className="select">
+          <select value={repos.data?.some((r) => r.clone_url === url) ? url : ""} onChange={(e) => setUrl(e.target.value)}
+            disabled={busy || !repos.data?.length}>
+            <option value="">{repos.isPending ? "Loading…" : repos.data?.length ? "Pick a repository…" : "No repositories"}</option>
+            {repos.data?.map((r) => (
+              <option key={r.clone_url} value={r.clone_url}>{r.full_name}{r.private ? " (private)" : ""}</option>
+            ))}
+          </select>
+          <Icon name="chevron" />
+        </span>
+      )}
+    </label>
   );
 }
