@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { aiCommitMessage, abortOp, applyLines, commit, discard, editors, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile } from "../../lib/ipc";
+import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile, writeResolved } from "../../lib/ipc";
 import type { Side } from "../../bindings/Side";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
@@ -167,7 +167,7 @@ export function Changes({ path }: { path: string }) {
           }} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />
-      {conflicted || resolved ? <Conflict path={path} file={cur.file} op={data.operation} resolved={resolved} run={run} /> : <Diff path={path} sel={cur} run={run} />}
+      {conflicted || resolved ? <Conflict key={cur.file} path={path} file={cur.file} op={data.operation} resolved={resolved} run={run} /> : <Diff path={path} sel={cur} run={run} />}
     </div>
   );
 }
@@ -317,6 +317,39 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
     }
   }, [data, resolved]);
   const open = (n: string) => run(() => openFile(path, file, n || null).then(() => void eds.refetch()));
+  // AI proposal: shown for review; nothing is written until Apply.
+  const hasKey = useQuery(aiKeyQuery).data;
+  const [proposal, setProposal] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  async function askAi() {
+    if (!hasKey) return openSettings();
+    setAsking(true);
+    await run(async () => {
+      try {
+        setProposal(await aiResolveConflict(path, file));
+      } catch (e) {
+        if ((e as AppError).code === "ai_key") openSettings();
+        throw e;
+      }
+    });
+    setAsking(false);
+  }
+  if (proposal !== null) return (
+    <section className="diff">
+      <div className="diff-bar">
+        <span className="conflict-file">AI proposal for <strong>{file}</strong></span>
+        <span className="conflict-actions">
+          <button className="small primary" onClick={async () => { if (await run(() => writeResolved(path, file, proposal), `Resolved ${file}`)) setProposal(null); }}
+            title="Write this to the file (backed up first) and mark it resolved">Apply</button>
+          <button className="small" onClick={() => setProposal(null)}>Discard</button>
+        </span>
+      </div>
+      <p className="muted legend">Check it before applying: AI can drop or mix up changes. Undo history restores the file with its markers.</p>
+      <pre aria-label={`AI proposal for ${file}`}>
+        {proposal.replace(/\n$/, "").split("\n").map((l, i) => <div key={i}>{l || " "}</div>)}
+      </pre>
+    </section>
+  );
   let side: "" | "ours" | "base" | "theirs" = "";
   return (
     <section className="diff">
@@ -324,6 +357,9 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
         <span className="conflict-file">{resolved ? "Resolved" : "Conflict in"} <strong>{file}</strong></span>
         <span className="conflict-actions">
           {!resolved && <>
+          <button className="small" disabled={asking || typeof data !== "string"} onClick={askAi}
+            title={hasKey ? "Propose a merge of both sides (file sent to Gemini); you review it before it's applied" : "Add a Gemini API key in Settings first"}>
+            <Icon name="sparkle" />{asking ? "Resolving…" : "Resolve with AI"}</button>
           <button className="small" onClick={() => run(() => resolve(path, [file], mine))}
             title={`Keep ${rebasing ? "your commit's" : "your branch's"} version (backed up first)`}>Keep mine</button>
           <button className="small" onClick={() => run(() => resolve(path, [file], theirs))}

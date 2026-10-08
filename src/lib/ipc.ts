@@ -48,6 +48,8 @@ const FAILED: Record<string, (a: Args) => string> = {
   push_tag: (a) => `Failed to push tag ${a.name}`,
   delete_remote_branch: (a) => `Failed to delete ${a.name} on the remote`,
   resolve: () => "Failed to resolve the conflict",
+  write_resolved: (a) => `Failed to apply the resolution to ${a.file}`,
+  ai_resolve_conflict: (a) => `Failed to resolve ${a.file} with AI`,
   open_file: (a) => `Failed to open ${a.file}`,
   forget_repo: () => "Failed to remove the repository",
   trash_repo: () => "Failed to delete the repository",
@@ -143,6 +145,8 @@ export const deleteRemoteBranch = (path: string, name: string) => invoke<void>("
 export const cloneRepo = (url: string, dest: string) => invoke<RepoInfo>("clone_repo", { url, dest });
 /** Takes one side of each conflicted file whole (backed up first, undoable) and marks it resolved. */
 export const resolve = (path: string, paths: string[], side: Side) => invoke<void>("resolve", { path, paths, side });
+/** Writes `text` over a conflicted file (backed up first, undoable) and marks it resolved. */
+export const writeResolved = (path: string, file: string, text: string) => invoke<void>("write_resolved", { path, file, text });
 /** Working-tree text of a file; null = binary or over 1 MB. */
 export const workFile = (path: string, file: string) => invoke<string | null>("work_file", { path, file });
 /** Opens a repo file in `editor` (a name from `editors()`), or its default app when null. Remembers the choice. */
@@ -188,3 +192,5 @@ export const aiExplainCommit = (path: string, oid: string) => invoke<string>("ai
 export const aiExplainStash = (path: string, oid: string) => invoke<string>("ai_explain_stash", { path, oid });
 export const aiWriteRange = (path: string, base: string, head: string, kind: "pr" | "changelog" | "explain") =>
   invoke<string>("ai_write_range", { path, base, head, kind });
+/** Proposes a resolution for a conflicted file (sent whole to Gemini). Writes nothing; apply it with `writeResolved`. */
+export const aiResolveConflict = (path: string, file: string) => invoke<string>("ai_resolve_conflict", { path, file });

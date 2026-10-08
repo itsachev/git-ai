@@ -588,6 +588,14 @@ pub fn resolve(repo: &Path, paths: &[String], side: Side) -> Result<(), AppError
     Ok(())
 }
 
+/// Writes `text` as the resolved content of the conflicted `path` (backed up first) and marks it resolved.
+pub fn write_resolved(repo: &Path, path: &str, text: &str) -> Result<(), AppError> {
+    // "take …" so undo also brings back the conflict state, not just the markers.
+    crate::oplog::backup(repo, "take AI resolution", &[path.to_string()])?;
+    std::fs::write(repo.join(path), text).map_err(|e| AppError::new("io", e.to_string()))?;
+    git(repo, &["add", "--", path]).map(drop)
+}
+
 /// Tag at `target` (a commit oid or ref): annotated when `message` isn't empty, else lightweight.
 pub fn create_tag(repo: &Path, name: &str, target: &str, message: &str) -> Result<(), AppError> {
     ref_arg(name)?;

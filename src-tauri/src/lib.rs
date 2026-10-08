@@ -62,6 +62,7 @@ pub fn run() {
             commands::askpass_reply,
             commands::clone_repo,
             commands::resolve,
+            commands::write_resolved,
             commands::work_file,
             commands::open_file,
             commands::editors,
@@ -84,6 +85,7 @@ pub fn run() {
             commands::ai_explain_commit,
             commands::ai_explain_stash,
             commands::ai_write_range,
+            commands::ai_resolve_conflict,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
