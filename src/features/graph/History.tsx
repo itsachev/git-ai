@@ -5,7 +5,7 @@ import type { AppError } from "../../bindings/AppError";
 import { Gutter, errorText, kindClass, lineNumbers, useRun } from "../status/Changes";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm } from "../refs/Sidebar";
-import { CommitGraph, type Picked } from "./CommitGraph";
+import { CommitGraph, GraphOptions, savedOpts, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
 import { openFileHistory } from "./FileHistory";
@@ -13,6 +13,7 @@ import { openFileHistory } from "./FileHistory";
 /** Commit graph on top; the picked commit's details, files and file diff below. */
 export function History({ path }: { path: string }) {
   const [sel, setSel] = useState<Picked | null>(null);
+  const [opts, setOpts] = useState(savedOpts);
   const [file, setFile] = useState<string | null>(null);
   const [tagging, setTagging] = useState(false);
   const run = useRun();
@@ -44,7 +45,11 @@ export function History({ path }: { path: string }) {
 
   return (
     <div className="history-view">
-      <CommitGraph path={path} sel={sel} onSelect={setSel} />
+      <div className="graph-wrap">
+        {/* New options = new rows: drop the pick so the newest commit gets selected. */}
+        <GraphOptions opts={opts} onChange={(o) => { setOpts(o); setSel(null); }} />
+        <CommitGraph path={path} opts={opts} sel={sel} onSelect={setSel} />
+      </div>
       <Splitter name="graph-h" axis="y" label="Resize commit list" />
       <div className="history-bottom">
         <section className="commit-info">

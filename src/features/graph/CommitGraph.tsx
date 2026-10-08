@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { graphRows } from "../../lib/ipc";
 import type { GraphRow } from "../../bindings/GraphRow";
+import type { GraphOpts } from "../../bindings/GraphOpts";
 import { errorText } from "../status/Changes";
 import { RefMenu, showMenu, useRefActions } from "../refs/Sidebar";
 
@@ -17,10 +18,41 @@ const x = (lane: number) => LANE / 2 + 3 + lane * LANE;
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export type Picked = { i: number; oid: string };
-type Props = { path: string; sel: Picked | null; onSelect: (p: Picked) => void };
+type Props = { path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void };
+
+const OPTS_KEY = "graph-opts";
+/** Last-used history options, kept in localStorage (a per-window convenience). */
+export function savedOpts(): GraphOpts {
+  const def = { all: true, remotes: true, by_date: true };
+  try { return { ...def, ...JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}") }; } catch { return def; }
+}
+
+/** Branches / remotes / sort toggles above the commit table. */
+export function GraphOptions({ opts, onChange }: { opts: GraphOpts; onChange: (o: GraphOpts) => void }) {
+  const set = (o: Partial<GraphOpts>) => {
+    const next = { ...opts, ...o };
+    try { localStorage.setItem(OPTS_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
+    onChange(next);
+  };
+  // Segmented pickers: one pressed button per group.
+  const seg = (label: string, items: [string, boolean, Partial<GraphOpts>][]) => (
+    <div className="seg" role="group" aria-label={label}>
+      {items.map(([text, on, o]) => (
+        <button key={text} type="button" aria-pressed={on} onClick={() => set(o)}>{text}</button>
+      ))}
+    </div>
+  );
+  return (
+    <div className="graph-opts">
+      {seg("Branches", [["All branches", opts.all, { all: true }], ["Current", !opts.all, { all: false }]])}
+      {seg("Remote branches", [["Remotes", opts.remotes, { remotes: !opts.remotes }]])}
+      {seg("Sort", [["By date", opts.by_date, { by_date: true }], ["Ancestor order", !opts.by_date, { by_date: false }]])}
+    </div>
+  );
+}
 
 /** Virtualized commit table: only the visible rows are in the DOM, their graph on one canvas. */
-export function CommitGraph({ path, sel, onSelect }: Props) {
+export function CommitGraph({ path, opts, sel, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState({ top: 0, height: 0 });
@@ -37,7 +69,7 @@ export function CommitGraph({ path, sel, onSelect }: Props) {
   // Page 0 always loads: it carries the total even when scrolled far down.
   const pageIds = [...new Set([0, Math.floor(first / PAGE), Math.floor((first + want) / PAGE)])];
   const pages = useQueries({
-    queries: pageIds.map((p) => ({ queryKey: ["graph", path, p], queryFn: () => graphRows(path, p * PAGE, PAGE) })),
+    queries: pageIds.map((p) => ({ queryKey: ["graph", path, opts, p], queryFn: () => graphRows(path, opts, p * PAGE, PAGE) })),
   });
   const byId = new Map(pageIds.map((p, k) => [p, pages[k].data]));
   const head = pages[0].data;

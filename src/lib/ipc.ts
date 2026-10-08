@@ -4,6 +4,7 @@ import type { Status } from "../bindings/Status";
 import type { LineOp } from "../bindings/LineOp";
 import type { OpEntry } from "../bindings/OpEntry";
 import type { GraphPage } from "../bindings/GraphPage";
+import type { GraphOpts } from "../bindings/GraphOpts";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
@@ -90,8 +91,8 @@ export const undo = (path: string, id: string) => invoke<void>("undo", { path, i
 export const fileDiff = (path: string, file: string, staged: boolean) =>
   invoke<string | null>("file_diff", { path, file, staged });
 /** Graph rows `offset..offset + limit`, newest first. */
-export const graphRows = (path: string, offset: number, limit: number) =>
-  invoke<GraphPage>("graph_rows", { path, offset, limit });
+export const graphRows = (path: string, opts: GraphOpts, offset: number, limit: number) =>
+  invoke<GraphPage>("graph_rows", { path, opts, offset, limit });
 export const commitDetails = (path: string, oid: string) => invoke<CommitDetails>("commit_details", { path, oid });
 /** null = binary or over 1 MB. */
 export const commitFileDiff = (path: string, oid: string, file: string) =>
