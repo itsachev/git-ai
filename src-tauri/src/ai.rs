@@ -164,12 +164,16 @@ pub fn resolve_conflict(repo: &Path, file: &str) -> Result<String, AppError> {
     if has_markers(&out) {
         return Err(AppError::new("ai_error", "Gemini left conflict markers in. Try again or resolve by hand."));
     }
-    // Keep the file's trailing-newline convention.
-    let mut out = out.trim_end_matches(['\r', '\n']).to_string();
+    Ok(match_eol(&text, &out))
+}
+
+/// `out` with `text`'s line endings (CRLF or LF) and trailing-newline convention.
+fn match_eol(text: &str, out: &str) -> String {
+    let mut out = out.replace("\r\n", "\n").trim_end_matches('\n').to_string();
     if text.ends_with('\n') {
-        out.push_str(if text.ends_with("\r\n") { "\r\n" } else { "\n" });
+        out.push('\n');
     }
-    Ok(out)
+    if text.contains("\r\n") { out.replace('\n', "\r\n") } else { out }
 }
 
 fn has_markers(s: &str) -> bool {
@@ -244,6 +248,8 @@ mod tests {
         assert!(!has_markers("a\n<<<<<<<<< not one\n"));
         assert_eq!(strip_fence("```rust\nfn a() {}\n```"), "fn a() {}\n");
         assert_eq!(strip_fence("plain\n"), "plain\n");
+        assert_eq!(match_eol("a\r\nb\r\n", "x\ny"), "x\r\ny\r\n");
+        assert_eq!(match_eol("a\nb", "x\r\ny\n\n"), "x\ny");
     }
 
     #[test]

@@ -310,7 +310,7 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
   useEffect(() => {
     if (resolved) hadMarkers.current = false;
     if (typeof data !== "string" || resolved) return;
-    if (/^(<{7}|>{7})( |$)/m.test(data)) hadMarkers.current = true;
+    if (/^(<{7}|>{7})( |\r?$)/m.test(data)) hadMarkers.current = true;
     else if (hadMarkers.current) {
       hadMarkers.current = false;
       run(() => stage(path, [file]), `Resolved ${file}`);
@@ -404,7 +404,7 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
         : data === null ? <p className="muted">Binary file or larger than 1 MB, take a side or open it.</p>
         : data !== undefined && (
           <pre aria-label={resolved ? `Resolved ${file}` : `Conflicts in ${file}`}>
-            {data.replace(/\n$/, "").split("\n").map((l, i) => {
+            {data.replace(/\r?\n$/, "").split(/\r?\n/).map((l, i) => {
               // Marker lines switch the region; diff3 style adds a "|||||||" base section.
               const marker = /^(<{7}|\|{7}|={7}|>{7})( |$)/.exec(l)?.[1][0];
               if (marker) side = marker === "<" ? "ours" : marker === "|" ? "base" : marker === "=" ? "theirs" : "";

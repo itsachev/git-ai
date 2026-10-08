@@ -407,8 +407,11 @@ pub fn pull(repo: &Path) -> Result<(), AppError> {
 /// Pushes the current branch to its upstream. Without one it goes to the same name on `origin` (or the
 /// first remote) and becomes the upstream.
 pub fn push(repo: &Path) -> Result<(), AppError> {
-    push_branch(repo, &current_branch(repo)?).map(drop)
+    push_branch(repo, &current_branch(repo)?, &|_| Ok(())).map(drop)
 }
+
+/// Checks a remote URL before anything is pushed to it.
+type UrlCheck<'a> = &'a dyn Fn(&str) -> Result<(), AppError>;
 
 fn current_branch(repo: &Path) -> Result<String, AppError> {
     Ok(git(repo, &["symbolic-ref", "-q", "--short", "HEAD"])
@@ -418,28 +421,28 @@ fn current_branch(repo: &Path) -> Result<String, AppError> {
 }
 
 /// Pushes local `branch` as `push` does; returns the remote and the branch name there.
-fn push_branch(repo: &Path, branch: &str) -> Result<(String, String), AppError> {
+fn push_branch(repo: &Path, branch: &str, check: UrlCheck) -> Result<(String, String), AppError> {
     let config = |key: &str| git(repo, &["config", "--get", &format!("branch.{branch}.{key}")]).ok().map(|s| s.trim().to_string());
     let src = format!("refs/heads/{branch}");
-    let (remote, dst) = match (config("remote"), config("merge")) {
-        (Some(remote), Some(dst)) => {
-            ref_arg(&remote)?;
-            git_net(repo, &["push", "-q", &remote, &format!("{src}:{dst}")])?;
-            (remote, dst)
-        }
-        _ => {
-            let remote = default_remote(repo)?;
-            git_net(repo, &["push", "-q", "-u", &remote, &format!("{src}:{src}")])?;
-            (remote, src)
-        }
+    let (remote, dst, new) = match (config("remote"), config("merge")) {
+        (Some(remote), Some(dst)) => (remote, dst, false),
+        _ => (default_remote(repo)?, src.clone(), true),
     };
+    ref_arg(&remote)?;
+    check(git(repo, &["remote", "get-url", "--", &remote])?.trim())?;
+    let spec = format!("{src}:{dst}");
+    let mut args = vec!["push", "-q", &remote, &spec];
+    if new {
+        args.insert(2, "-u");
+    }
+    git_net(repo, &args)?;
     Ok((remote, dst.strip_prefix("refs/heads/").unwrap_or(&dst).to_string()))
 }
 
 /// Readies `head` for a pull request into `base`. A local branch ("" = current) is pushed first; a remote
 /// branch ("origin/feat") is used as is. Returns the head's remote URL and the bare head and base names.
 // ponytail: head and base on the same GitHub repo; PRs from a fork to its upstream need an owner:branch head.
-pub fn pr_branches(repo: &Path, head: &str, base: &str) -> Result<(String, String, String), AppError> {
+pub fn pr_branches(repo: &Path, head: &str, base: &str, check: UrlCheck) -> Result<(String, String, String), AppError> {
     let remote_branch = |n: &str| split_remote(repo, n).ok().filter(|_| rev(repo, &format!("refs/remotes/{n}")).is_ok());
     let (remote, head) = match remote_branch(head) {
         Some(rb) => rb,
@@ -447,7 +450,7 @@ pub fn pr_branches(repo: &Path, head: &str, base: &str) -> Result<(String, Strin
             let b = if head.is_empty() { current_branch(repo)? } else { head.to_string() };
             rev(repo, &format!("refs/heads/{b}"))
                 .map_err(|_| AppError::new("not_branch", format!("'{b}' isn't a branch. Pick a branch to open the pull request from.")))?;
-            push_branch(repo, &b)?
+            push_branch(repo, &b, check)?
         }
     };
     let base = remote_branch(base).map_or_else(|| base.to_string(), |(_, b)| b);
@@ -664,6 +667,12 @@ pub fn checkout(repo: &Path, name: &str, track: bool, carry: bool) -> Result<(),
     if !carry {
         return git(repo, args).map(drop);
     }
+    switch_carrying(repo, args, name)
+}
+
+/// Runs the switch in `args` with the uncommitted changes stashed, then puts them back on `name`.
+/// If they clash there, the stash is kept and the conflicts show.
+fn switch_carrying(repo: &Path, args: &[&str], name: &str) -> Result<(), AppError> {
     let before = rev(repo, "refs/stash").ok();
     git(repo, &["stash", "push", "-q", "-u", "-m", &format!("carried to {name}")])?;
     let stashed = rev(repo, "refs/stash").ok() != before;
@@ -692,7 +701,11 @@ pub fn create_branch(repo: &Path, name: &str, from: Option<&str>, checkout: bool
         ref_arg(f)?;
         args.push(f);
     }
-    git(repo, &args).map(drop)
+    match git(repo, &args) {
+        // The start point differs where the changes are: carry them like a branch switch does.
+        Err(e) if checkout && e.code == "dirty" => switch_carrying(repo, &args, name),
+        r => r.map(drop),
+    }
 }
 
 /// Deletes a local branch; its tip is logged so undo can recreate it. Without `force`, git refuses
