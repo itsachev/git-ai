@@ -166,10 +166,11 @@ export function Changes({ path }: { path: string }) {
             // Committing during a merge/rebase may finish it; say so once nothing is left in progress.
             const op = amend ? null : data.operation;
             let finished = false;
+            let note: string | null = null;
             return run(async () => {
-              await commit(path, msg, amend);
+              note = await commit(path, msg, amend);
               finished = !!op && !(await repoStatus(path)).operation;
-            }, () => finished ? `${cap(op!)} finished` : undefined);
+            }, () => [note, finished && `${cap(op!)} finished`].filter(Boolean).join(" ") || undefined);
           }} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />

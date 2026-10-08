@@ -171,10 +171,11 @@ pub fn discard(repo: &Path, paths: &[String]) -> Result<(), AppError> {
 
 /// With `amend`, or when it finishes a merge/cherry-pick, HEAD before and after is logged so the commit
 /// can be undone. An empty message while an op is in progress uses git's prepared message.
-pub fn commit(repo: &Path, message: &str, amend: bool) -> Result<(), AppError> {
+/// Returns a note for the user when a rebase dropped the commit (see `continue_rebase`).
+pub fn commit(repo: &Path, message: &str, amend: bool) -> Result<Option<String>, AppError> {
     let op = if amend { Some("amend".to_string()) } else { crate::git::read::operation(repo)? };
     let Some(op) = op else {
-        return git(repo, &["commit", "-q", "-m", message]).map(drop);
+        return git(repo, &["commit", "-q", "-m", message]).map(|_| None);
     };
     if op == "rebase" {
         return continue_rebase(repo);
@@ -188,7 +189,7 @@ pub fn commit(repo: &Path, message: &str, amend: bool) -> Result<(), AppError> {
     } else {
         args.extend(["-m", message]);
     }
-    log_head_move(repo, &op, || git(repo, &args).map(drop))
+    log_head_move(repo, &op, || git(repo, &args).map(drop)).map(|_| None)
 }
 
 /// Runs `f` and, when it moved HEAD, logs the move so it can be undone.
@@ -318,17 +319,29 @@ pub fn rebase(repo: &Path, base: &str, steps: &[RebaseStep]) -> Result<(), AppEr
 }
 
 /// Continues a stopped rebase with the staged resolution, keeping the commit's message. Logs the
-/// whole rebase for undo once it finishes.
-fn continue_rebase(repo: &Path) -> Result<(), AppError> {
+/// whole rebase for undo once it finishes. When the resolution leaves the commit with no changes, git
+/// drops it without a word; the returned note (or the next stop's error) says so.
+fn continue_rebase(repo: &Path) -> Result<Option<String>, AppError> {
     let orig = git(repo, &["rev-parse", "--git-path", "rebase-merge/orig-head"])
         .ok()
         .and_then(|p| std::fs::read_to_string(repo.join(p.trim())).ok())
         .map(|s| s.trim().to_string());
-    git_env(repo, &["rebase", "--continue"], &[("GIT_EDITOR", OsStr::new("true"))]).map_err(|e| stopped(repo, "rebase", e))?;
-    if crate::git::read::operation(repo)?.is_some() {
-        return Ok(());
+    // `diff --cached --quiet` succeeds when the index matches HEAD.
+    let skipped = git(repo, &["diff", "--cached", "--quiet"]).is_ok().then(|| {
+        let subject = git(repo, &["log", "-1", "--format=%s", "REBASE_HEAD"]).map(|s| format!("“{}”", s.trim())).unwrap_or("this commit".into());
+        format!("Skipped {subject}: with your resolution it changes nothing.")
+    });
+    git_env(repo, &["rebase", "--continue"], &[("GIT_EDITOR", OsStr::new("true"))]).map_err(|e| {
+        let mut e = stopped(repo, "rebase", e);
+        if let Some(note) = &skipped {
+            e.message = format!("{note} {}", e.message);
+        }
+        e
+    })?;
+    if crate::git::read::operation(repo)?.is_none() {
+        crate::oplog::record(repo, crate::oplog::OpEntry::new("rebase", orig, Some(rev(repo, "HEAD")?)))?;
     }
-    crate::oplog::record(repo, crate::oplog::OpEntry::new("rebase", orig, Some(rev(repo, "HEAD")?)))
+    Ok(skipped)
 }
 
 /// Network git: credential prompts go to the app UI (see `askpass`), common failures are explained.

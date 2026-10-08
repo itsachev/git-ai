@@ -692,4 +692,31 @@ mine
         assert_eq!((e.op.as_str(), e.head.as_deref()), ("rebase", Some(head.as_str())));
         let _ = fs::remove_dir_all(&dir);
     }
+
+    /// Resolving a rebase conflict to what the new base already has empties the commit: git drops it, `commit` says so.
+    #[test]
+    fn rebase_skips_emptied_commit() {
+        let dir = temp_repo("rebase-empty");
+        let p = dir.as_path();
+        let commit = |text: &str, msg: &str| {
+            fs::write(dir.join("a.txt"), text).unwrap();
+            cli::stage(p, &["a.txt".into()]).unwrap();
+            assert_eq!(cli::commit(p, msg, false).unwrap(), None);
+        };
+        commit("base\n", "base");
+        let main = git(p, &["branch", "--show-current"]).unwrap().trim().to_string();
+        git(p, &["switch", "-qc", "side"]).unwrap();
+        commit("side\n", "side");
+        git(p, &["switch", "-q", &main]).unwrap();
+        commit("main\n", "main");
+        git(p, &["switch", "-q", "side"]).unwrap();
+        assert_eq!(cli::rebase_onto(p, &main).unwrap_err().code, "conflicts");
+        fs::write(dir.join("a.txt"), "main\n").unwrap();
+        cli::stage(p, &["a.txt".into()]).unwrap();
+        assert_eq!(cli::commit(p, "", false).unwrap().as_deref(), Some("Skipped “side”: with your resolution it changes nothing."));
+        assert_eq!(cli::status(p).unwrap().operation, None);
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), cli::rev(p, &main).unwrap());
+        assert_eq!(super::entries(p, 1).unwrap()[0].op, "rebase");
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
