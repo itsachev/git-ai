@@ -28,6 +28,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ]],
   ["history", "History", [
     ["Commit graph", "History tab · Ctrl+2", "Every commit, with lanes that show where branches split and merge, and branch and tag labels. Arrow keys and Page Up / Down move the selection. Fast on 100k+ commits."],
+    ["History options", "Options above the graph", "Show all branches or just the current one, hide or show remote branches, and sort by date or ancestor order."],
     ["Commit details", "Click a commit", "Its message, author, date, parent commits, the files it changed and each file's diff."],
     ["Cherry-pick", "Click a commit → Cherry-pick", "Copies that one commit's change onto your current branch as a new commit. Use it to bring a single fix over from another branch without merging everything else."],
     ["Merge a commit", "Click a commit → Merge into current", "Brings that commit, and everything before it, into the branch you are on."],
@@ -69,7 +70,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Backups before discarding", "Automatic", "Discarded file content is saved before it goes, so undoing a discard brings the content back too."],
   ]],
   ["command", "Everywhere", [
-    ["Command palette", "Ctrl+K or Ctrl+Shift+P", "Type to find any action by name and see its shortcut: switch views, check out a branch, change theme and more."],
+    ["Command palette", "Ctrl+K or Ctrl+Shift+P", "Type to find any action by name and see its shortcut and the git command it runs: switch views, check out a branch, change theme and more."],
     ["Theme", "Theme button, or Ctrl+K", "System, light or dark."],
     ["Settings", "Gear button", "Your git name and email, saving HTTPS sign-ins, your SSH key and your Gemini API key. Stored on this computer only."],
     ["First-run setup", "On first launch, or Settings → Run setup again", "A short walkthrough of the settings above."],
