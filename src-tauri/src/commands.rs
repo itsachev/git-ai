@@ -116,10 +116,11 @@ pub async fn undo(path: String, id: String) -> Result<(), AppError> {
 pub async fn graph_rows(
     cache: State<'_, graph::GraphCache>,
     path: String,
+    opts: graph::GraphOpts,
     offset: usize,
     limit: usize,
 ) -> Result<graph::GraphPage, AppError> {
-    graph::rows(&cache, Path::new(&path), offset, limit)
+    graph::rows(&cache, Path::new(&path), opts, offset, limit)
 }
 
 #[tauri::command]

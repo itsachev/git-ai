@@ -568,6 +568,18 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 
 /* ---------- History ---------- */
 .history-view { height: 100%; display: grid; grid-template-rows: var(--graph-h, minmax(9rem, 1.1fr)) auto minmax(10rem, 1fr); }
+.graph-wrap { display: flex; flex-direction: column; gap: 0.4rem; min-height: 0; }
+.graph-wrap > .graph { flex: 1; }
+.graph-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+/* Segmented control: sunken track, the pressed option a raised pill. */
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--sunken); }
+.seg button {
+  min-height: 1.75rem; padding: 0 0.7rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+  color: var(--muted); background: none; box-shadow: none; transition: color 120ms, background-color 120ms;
+}
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { color: var(--accent-fg); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), inset 0 0 0 1px var(--line); }
+@media (pointer: coarse) { .seg button { min-height: 2.5rem; } }
 .graph {
   --graph-cols: minmax(0, 1fr) 9.5rem 9rem 4.75rem;
   display: flex; flex-direction: column; min-height: 0;

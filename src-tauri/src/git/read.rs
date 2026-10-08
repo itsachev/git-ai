@@ -521,9 +521,15 @@ mod tests {
         let patch = super::staged_patch(&dir).unwrap();
         assert!(patch.contains("+four\n") && patch.contains("Binary files"), "{patch}");
 
-        let page = crate::git::graph::rows(&Default::default(), &dir, 0, 500).unwrap();
+        use crate::git::graph::{rows, GraphOpts};
+        let all = GraphOpts { all: true, remotes: true, by_date: true };
+        let page = rows(&Default::default(), &dir, all, 0, 500).unwrap();
         assert_eq!((page.total, page.lanes), (2, 1));
         assert!(page.rows[0].head && page.rows[0].oid == second.id().to_string());
+        // A side branch shows only with all branches on.
+        repo.commit(Some("refs/heads/side"), &sig, &sig, "side", &first.tree().unwrap(), &[&first]).unwrap();
+        assert_eq!(rows(&Default::default(), &dir, all, 0, 500).unwrap().total, 3);
+        assert_eq!(rows(&Default::default(), &dir, GraphOpts { all: false, ..all }, 0, 500).unwrap().total, 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -2,7 +2,7 @@
 //! Computed once per ref state (cached), then paged out to the UI.
 use crate::errors::AppError;
 use git2::{Oid, Repository};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -35,8 +35,21 @@ pub struct GraphPage {
     pub rows: Vec<GraphRow>,
 }
 
+/// What the history view shows.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, TS)]
+#[ts(export)]
+pub struct GraphOpts {
+    /// Every branch and tag; false = only what HEAD reaches.
+    pub all: bool,
+    /// Remote branches (as walk starts and as labels).
+    pub remotes: bool,
+    /// Commit date order; false = ancestor order (keeps each branch's commits together).
+    pub by_date: bool,
+}
+
 struct Layout {
     repo: String,
+    opts: GraphOpts,
     /// Sorted tip oids; the layout is stale once they change.
     key: Vec<Oid>,
     rows: Vec<(Oid, u32, Vec<(u32, u32)>)>,
@@ -48,18 +61,19 @@ struct Layout {
 pub struct GraphCache(Mutex<Option<Layout>>);
 
 /// Rows `offset..offset + limit`, newest first. Recomputes the layout when any ref moved.
-pub fn rows(cache: &GraphCache, path: &Path, offset: usize, limit: usize) -> Result<GraphPage, AppError> {
+pub fn rows(cache: &GraphCache, path: &Path, opts: GraphOpts, offset: usize, limit: usize) -> Result<GraphPage, AppError> {
     let repo = Repository::open(path)?;
-    let tips = tips(&repo);
+    let tips = tips(&repo, opts.remotes);
     let head = repo.head().ok().and_then(|h| h.target());
-    let mut key: Vec<Oid> = tips.iter().map(|t| t.1).chain(head).collect();
+    let starts: &[_] = if opts.all { &tips } else { &[] };
+    let mut key: Vec<Oid> = starts.iter().map(|t| t.1).chain(head).collect();
     key.sort();
     key.dedup();
     let name = path.to_string_lossy().into_owned();
 
     let mut cache = cache.0.lock().unwrap_or_else(|e| e.into_inner());
-    if !matches!(&*cache, Some(l) if l.repo == name && l.key == key) {
-        *cache = Some(compute(&repo, name, key)?);
+    if !matches!(&*cache, Some(l) if l.repo == name && l.opts == opts && l.key == key) {
+        *cache = Some(compute(&repo, name, opts, key)?);
     }
     let l = cache.as_ref().unwrap();
 
@@ -84,19 +98,20 @@ pub fn rows(cache: &GraphCache, path: &Path, offset: usize, limit: usize) -> Res
     Ok(GraphPage { total: l.rows.len() as u32, lanes: l.lanes, rows: rows.collect::<Result<_, AppError>>()? })
 }
 
-/// (short name, commit) for every branch, remote branch and tag. Tags are peeled to their commit.
-fn tips(repo: &Repository) -> Vec<(String, Oid)> {
+/// (short name, commit) for every branch, remote branch (if `remotes`) and tag. Tags are peeled to their commit.
+fn tips(repo: &Repository, remotes: bool) -> Vec<(String, Oid)> {
     let Ok(refs) = repo.references() else { return vec![] };
+    let prefixes: &[&str] = if remotes { &["refs/heads/", "refs/remotes/", "refs/tags/"] } else { &["refs/heads/", "refs/tags/"] };
     refs.flatten()
-        .filter(|r| r.name().is_ok_and(|n| ["refs/heads/", "refs/remotes/", "refs/tags/"].iter().any(|p| n.starts_with(p))))
+        .filter(|r| r.name().is_ok_and(|n| prefixes.iter().any(|p| n.starts_with(p))))
         .filter(|r| r.name().is_ok_and(|n| !n.ends_with("/HEAD"))) // origin/HEAD duplicates origin/main
         .filter_map(|r| Some((r.shorthand().ok()?.to_string(), r.peel_to_commit().ok()?.id())))
         .collect()
 }
 
-fn compute(repo: &Repository, name: String, key: Vec<Oid>) -> Result<Layout, AppError> {
+fn compute(repo: &Repository, name: String, opts: GraphOpts, key: Vec<Oid>) -> Result<Layout, AppError> {
     let mut walk = repo.revwalk()?;
-    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
+    walk.set_sorting(if opts.by_date { git2::Sort::TOPOLOGICAL | git2::Sort::TIME } else { git2::Sort::TOPOLOGICAL })?;
     for oid in &key {
         walk.push(*oid)?;
     }
@@ -109,7 +124,7 @@ fn compute(repo: &Repository, name: String, key: Vec<Oid>) -> Result<Layout, App
         .collect::<Result<Vec<_>, git2::Error>>()?;
     let (cols, lanes) = layout(&commits);
     let rows = commits.into_iter().zip(cols).map(|((oid, _), (col, edges))| (oid, col, edges)).collect();
-    Ok(Layout { repo: name, key, rows, lanes })
+    Ok(Layout { repo: name, opts, key, rows, lanes })
 }
 
 /// Assigns each commit (children before parents) a lane, plus the edges coming into its row.
@@ -182,6 +197,48 @@ mod tests {
         assert_eq!(rows, vec![(0, vec![]), (1, vec![(0, 0)]), (0, vec![(0, 0), (1, 0)])]);
     }
 
+    /// Remotes toggle and the two sort orders, on a real repo.
+    #[test]
+    fn options() {
+        use super::{rows, GraphCache, GraphOpts};
+        let dir = std::env::temp_dir().join(format!("git-ai-opts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let repo = git2::Repository::init(&dir).unwrap();
+        let tree = repo.find_tree(repo.treebuilder(None).unwrap().write().unwrap()).unwrap();
+        let mut at = |r: &str, msg: &str, t: i64, parents: &[git2::Oid]| {
+            let sig = git2::Signature::new("T", "t@t", &git2::Time::new(t, 0)).unwrap();
+            let ps: Vec<_> = parents.iter().map(|p| repo.find_commit(*p).unwrap()).collect();
+            repo.commit(Some(r), &sig, &sig, msg, &tree, &ps.iter().collect::<Vec<_>>()).unwrap()
+        };
+        // base, then a1 b1 a2 b2 interleaved in time on branches a (HEAD) and b; origin/x on its own.
+        let base = at("refs/heads/a", "base", 100, &[]);
+        let a1 = at("refs/heads/a", "a1", 200, &[base]);
+        let b1 = at("refs/heads/b", "b1", 300, &[base]);
+        let a2 = at("refs/heads/a", "a2", 400, &[a1]);
+        at("refs/heads/b", "b2", 500, &[b1]);
+        at("refs/remotes/origin/x", "x", 600, &[a2]);
+        repo.set_head("refs/heads/a").unwrap();
+        let on = GraphOpts { all: true, remotes: true, by_date: true };
+        let order = |o| rows(&GraphCache::default(), &dir, o, 0, 100).unwrap().rows.into_iter().map(|r| r.summary).collect::<Vec<_>>();
+        assert_eq!(order(on), ["x", "b2", "a2", "b1", "a1", "base"]);
+        let page = rows(&GraphCache::default(), &dir, on, 0, 100).unwrap();
+        assert!(page.rows[0].refs == ["origin/x"]);
+        // Remotes off: x is gone as a row and as a label.
+        let off = GraphOpts { remotes: false, ..on };
+        assert_eq!(order(off), ["b2", "a2", "b1", "a1", "base"]);
+        // Ancestor order keeps each branch's commits together.
+        let topo = order(GraphOpts { by_date: false, ..off });
+        eprintln!("ancestor order: {topo:?}");
+        let pos = |m: &str| topo.iter().position(|s| s == m).unwrap();
+        assert!(pos("b2") + 1 == pos("b1") && pos("a2") + 1 == pos("a1"), "{topo:?}");
+        // Same cache, options flipped: no stale layout.
+        let cache = GraphCache::default();
+        assert_eq!(rows(&cache, &dir, on, 0, 100).unwrap().total, 6);
+        assert_eq!(rows(&cache, &dir, off, 0, 100).unwrap().total, 5);
+        assert_eq!(rows(&cache, &dir, GraphOpts { all: false, ..off }, 0, 100).unwrap().total, 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// 100k commits (main + a 3-commit topic branch merged every 50), timed.
     /// `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`
     #[test]
@@ -221,12 +278,13 @@ mod tests {
         assert!(imp.wait().unwrap().success());
 
         let cache = super::GraphCache::default();
+        let all = super::GraphOpts { all: true, remotes: true, by_date: true };
         let t = Instant::now();
-        let page = super::rows(&cache, &dir, 0, 500).unwrap();
+        let page = super::rows(&cache, &dir, all, 0, 500).unwrap();
         eprintln!("first page (layout + 500 rows): {:?}, total {}, lanes {}", t.elapsed(), page.total, page.lanes);
         assert!(page.total >= 100_000);
         let t = Instant::now();
-        super::rows(&cache, &dir, 60_000, 500).unwrap();
+        super::rows(&cache, &dir, all, 60_000, 500).unwrap();
         eprintln!("cached page at 60k: {:?}", t.elapsed());
         let _ = std::fs::remove_dir_all(&dir);
     }
