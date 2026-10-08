@@ -18,8 +18,8 @@ export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const [busy, setBusy] = useState<string | null>(null);
-  const op = (label: string, doing: string, done: string, fn: () => Promise<unknown>, count = 0) => ({
-    label, doing, count,
+  const op = (label: string, doing: string, done: string, fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
+    label, doing, badge, hint,
     go: async () => {
       if (busy) return;
       setBusy(doing);
@@ -32,7 +32,9 @@ export function useSync(path: string, run: Run) {
     ops: [
       op("Fetch", "Fetching…", "Fetched all remotes", () => fetchAll(path)),
       op("Pull", "Pulling…", `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
-      op("Push", "Pushing…", `Pushed ${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`, () => push(path), cur?.ahead ?? 0),
+      op("Push", "Pushing…", `Pushed ${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`, () => push(path), cur?.ahead ?? 0,
+        // No upstream: ahead is unknown (0), but the branch exists only here.
+        ...(cur && !cur.upstream ? ["new", `${cur.name} isn't on the remote yet. Push publishes it.`] as const : [])),
     ],
   };
 }
@@ -45,7 +47,7 @@ export function SyncButtons({ sync, children }: { sync: Sync; children?: React.R
         <button key={o.label} disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing} title={o.label}>
           <Icon name={o.label.toLowerCase() as IconName} />
           <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
-          {o.count > 0 && <span className="count" title={`${o.count} to ${o.label.toLowerCase()}`}>{o.count}</span>}
+          {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
         </button>
       ))}
       {children}

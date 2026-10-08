@@ -4,7 +4,7 @@ import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge } from
 import type { AppError } from "../../bindings/AppError";
 import { Gutter, errorText, kindClass, lineNumbers, useRun } from "../status/Changes";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
-import { NameForm } from "../refs/Sidebar";
+import { NameForm, refsQuery } from "../refs/Sidebar";
 import { CommitGraph, GraphOptions, savedOpts, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
@@ -39,6 +39,10 @@ export function History({ path }: { path: string }) {
   }
   const details =useQuery({ queryKey: ["commit", path, sel?.oid], queryFn: () => commitDetails(path, sel!.oid), enabled: !!sel });
   const d = details.data;
+  const refs = useQuery(refsQuery(path)).data;
+  const tip = refs?.local.find((b) => b.name === refs.head)?.oid;
+  // Rebase rewrites commits after `d` on the current branch: none if `d` is the tip or not on it.
+  const noRebase = !d ? null : d.oid === tip ? "This is the newest commit: nothing after it to rebase" : !d.in_head ? "Not on the current branch" : null;
   // Keep the picked file only while the commit has it, else show the first file.
   const shown = d?.files.find((f) => f.path === file)?.path ?? d?.files[0]?.path ?? null;
   const nl = d?.message.indexOf("\n") ?? -1;
@@ -64,7 +68,7 @@ export function History({ path }: { path: string }) {
                 <button className="small" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={() => run(() => merge(path, d.oid, true), `Cherry-picked ${d.oid.slice(0, 7)}`)}>Cherry-pick</button>
                 <button className="small" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={() => run(() => merge(path, d.oid, false), `Merged ${d.oid.slice(0, 7)} into the current branch`)}>Merge into current</button>
                 <button className="small" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}>Tag…</button>
-                <button className="small" onClick={() => openRebase(d.oid)} title="Reorder, edit, squash or drop the commits after this one">Rebase from here…</button>
+                <button className="small" disabled={!!noRebase} onClick={() => openRebase(d.oid)} title={noRebase ?? "Reorder, edit, squash or drop the commits after this one"}>Rebase from here…</button>
                 <button className="small" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
                   title={hasKey ? "Explain this commit in plain words (message and diff sent to Gemini)" : "Add a Gemini API key in Settings first"}>
                   {explaining === d.oid ? "Explaining…" : "Explain"}

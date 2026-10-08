@@ -52,7 +52,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ["remote", "Remotes and GitHub", [
     ["Fetch", "Fetch button · Ctrl+Shift+F", "Downloads new commits from the remote without touching your files, so the graph and counts are up to date."],
     ["Pull", "Pull button · Ctrl+Shift+L", "Fetches and brings the new commits into your current branch. The badge shows how many are waiting."],
-    ["Push", "Push button · Ctrl+Shift+U", "Uploads your new commits to the remote. The badge shows how many."],
+    ["Push", "Push button · Ctrl+Shift+U", "Uploads your new commits to the remote. The badge shows how many, or \"new\" when the branch isn't on the remote yet."],
     ["Passwords and SSH keys", "Asked when git needs them", "Sign-in goes through git's own credential helpers and your SSH key. When git asks for a password or passphrase, your answer goes straight to git and is never stored by the app."],
     ["Pull request", "Right-click a local branch → Create pull request…, or Ctrl+K", "Opens a pull request on GitHub with a title and description written by AI from the branch's commits. Needs GitHub sign-in."],
     ["Changelog (AI)", "Right-click a tag → Changelog since this tag, or Ctrl+K", "Release notes written by AI from the commits between two points, ready to copy."],
