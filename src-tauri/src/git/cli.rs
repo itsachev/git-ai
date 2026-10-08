@@ -562,12 +562,16 @@ fn union(text: &str, ours_first: bool) -> Option<String> {
 /// or both sides of each block in order, then marks them resolved. The working-tree content
 /// (conflict markers, edits) is backed up first.
 pub fn resolve(repo: &Path, paths: &[String], side: Side) -> Result<(), AppError> {
+    // The undo label speaks the UI's "mine"/"theirs": during a rebase git's "theirs" is your commit.
+    let rebasing = crate::git::read::operation(repo)?.as_deref() == Some("rebase");
+    let (mine, other) = if rebasing { ("theirs", "mine") } else { ("mine", "theirs") };
     let (flag, op) = match side {
-        Side::Ours => ("--ours", "take ours"),
-        Side::Theirs => ("--theirs", "take theirs"),
-        Side::OursThenTheirs => ("", "take ours then theirs"),
-        Side::TheirsThenOurs => ("", "take theirs then ours"),
+        Side::Ours => ("--ours", format!("take {mine}")),
+        Side::Theirs => ("--theirs", format!("take {other}")),
+        Side::OursThenTheirs => ("", format!("take {mine} then {other}")),
+        Side::TheirsThenOurs => ("", format!("take {other} then {mine}")),
     };
+    let op = op.as_str();
     crate::oplog::backup(repo, op, paths)?;
     if flag.is_empty() {
         for p in paths {
