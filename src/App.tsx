@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
 import { forgetRepo, missingRepos, openRepo, recentRepos,stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
@@ -23,7 +24,22 @@ import { Palette, type Command } from "./features/palette/Palette";
 import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { SetupWizard, openSetup } from "./features/setup/Setup";
 import { UpdateBanner } from "./features/update/Update";
+import bg from "./assets/app_bg.jpg";
 import "./App.css";
+
+// The first frames are busy (font swap, decoding the backdrop JPEG, the first IPC round-trips), so an intro played
+// through them stutters. Reveals start once fonts and backdrop are ready, plus a beat. Later reveals start at once.
+const settled = (() => {
+  const img = new Image();
+  img.src = bg;
+  return Promise.all([document.fonts.ready, img.decode().catch(() => {})]).then(() => new Promise<void>((r) => setTimeout(r, 250)));
+})();
+/** Hold a paused reveal until the app has settled; returns the matchMedia cleanup so a revert first cancels it. */
+function playSettled(t: gsap.core.Animation) {
+  let live = true;
+  settled.then(() => { if (live) t.play(); });
+  return () => { live = false; };
+}
 
 /** Brand mark: a trunk with one branch forking off; the live commit in the signal color. */
 function Mark() {
@@ -91,6 +107,34 @@ function App() {
   const [filter, setFilter] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
+  const home = useRef<HTMLElement>(null);
+  const hasRecent = recent.length > 0;
+
+  // Home intro: headline word by word out of its masks, then lede, actions, recents and corner pills.
+  useGSAP(() => {
+    if (repo) return;
+    gsap.matchMedia().add(MOTION, () => {
+      const words = SplitText.create("h1", { type: "words", wordsClass: "w", mask: "words", aria: "auto" }).words;
+      const tl = gsap.timeline({ paused: true, defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
+        .from(".brand", { opacity: 0, y: 8, duration: 0.6 })
+        .from(words, { yPercent: 110, stagger: 0.06, duration: 0.9 }, 0.05)
+        .from(".lede", { opacity: 0, y: 12 }, 0.2)
+        .from(".tile", { opacity: 0, y: 16, stagger: 0.06 }, 0.25)
+        .from(".home-recent > :not(.recent)", { opacity: 0, x: 16, stagger: 0.05 }, 0.25)
+        .from(".corner > *", { opacity: 0, y: 8, stagger: 0.05, duration: 0.6 }, 0.4);
+      return playSettled(tl);
+    });
+  }, { scope: home, dependencies: [!!repo], revertOnUpdate: true });
+
+  // Recents arrive over IPC after the first paint: cascade the rows in on arrival (only the ones on screen).
+  useGSAP(() => {
+    if (repo || !hasRecent) return;
+    gsap.matchMedia().add(MOTION, () => {
+      // Delay: on first load they follow the Recent header in the intro.
+      return playSettled(gsap.timeline({ paused: true }).from(gsap.utils.toArray<HTMLElement>(".recent li").slice(0, 14),
+        { opacity: 0, x: 16, stagger: 0.035, duration: 0.7, ease: "expo.out", clearProps: CLEAN }, 0.3));
+    });
+  }, { scope: home, dependencies: [!!repo, hasRecent], revertOnUpdate: true });
 
   async function refresh() {
     const [r, m] = await Promise.all([recentRepos(), missingRepos()]);
@@ -131,7 +175,7 @@ function App() {
   const f = filter.trim().toLowerCase();
   const shown = recent.filter((p) => p.toLowerCase().includes(f));
   const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} theme={theme} setTheme={setTheme} /> : (
-    <main className="home">
+    <main className="home" ref={home}>
       <Backdrop />
       <section className="home-intro">
         <p className="brand"><Mark /> <Brand /></p>
@@ -223,6 +267,17 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const sync = useSync(path, run);
   const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
   const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
+  const shell = useRef<HTMLDivElement>(null);
+
+  // Opening a repo: the rail head and views cascade in from the left, the toolbar drops in (the Sidebar reveals itself
+  // when its refs arrive). The branch chips keep their own CSS pop.
+  useGSAP(() => {
+    gsap.matchMedia().add(MOTION, () => {
+      gsap.timeline({ defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
+        .from(".rail-head > *, .views button", { opacity: 0, x: -14, stagger: 0.04 })
+        .from(".toolbar > :not(.branch-chip)", { opacity: 0, y: -8, stagger: 0.03 }, 0.05);
+    });
+  }, { scope: shell, dependencies: [path], revertOnUpdate: true });
 
   const show = (t: typeof tab) => { setTab(t); setSide(false); };
   // Escape closes the drawer, unless a dialog or menu on top takes it first.
@@ -261,14 +316,14 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, { label: "Close repository", run: onClose });
 
   return (
-    <div className={`shell${side ? " show-side" : ""}`}>
+    <div ref={shell} className={`shell${side ? " show-side" : ""}`}>
       <aside className="rail" aria-label="Repository">
         <div className="rail-head">
-          <button className="icon-btn" onClick={onClose} aria-label="Back to repositories" title="Back to repositories"><Icon name="back" /></button>
-          <div className="repo-id">
-            <strong title={path}>{repo.name}</strong>
-            <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
-          </div>
+          {/* Arrow and repo name are one target: either goes back to the repository list. */}
+          <button className="back" onClick={onClose} title={`Back to repositories\n${path}`} aria-label={`${repo.name}: back to repositories`}>
+            <Icon name="back" /><strong>{repo.name}</strong>
+          </button>
+          <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
         </div>
         <nav className="views" aria-label="Views">
           {views.map(([id, label, icon]) => (

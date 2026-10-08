@@ -9,6 +9,7 @@ import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
 import { confirm } from "../../lib/modal";
+import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
 /** Checkout that offers to bring conflicting local changes along instead of just failing. */
 export async function switchTo(path: string, name: string, track: boolean) {
@@ -104,6 +105,16 @@ export function Sidebar({ path }: { path: string }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropActions, setDropActions] = useState<Action[]>([]);
   const dropPop = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLElement>(null);
+  // Refs load after the rail mounts: when they arrive, sections slide in from the left and the first rows cascade after.
+  useGSAP(() => {
+    if (!root.current) return;
+    gsap.matchMedia().add(MOTION, () => {
+      gsap.timeline({ defaults: { ease: "expo.out", duration: 0.7, clearProps: CLEAN } })
+        .from(root.current!.children, { opacity: 0, x: -14, stagger: 0.05 }, 0.1)
+        .from(gsap.utils.toArray<HTMLElement>(".refs > li", root.current).slice(0, 16), { opacity: 0, x: -10, stagger: 0.025 }, 0.2);
+    });
+  }, { scope: root, dependencies: [!!data], revertOnUpdate: true });
   const other = (to: string) => (!dragging || dragging === to ? null : to === data?.head ? dragging : dragging === data?.head ? to : null);
   const dnd = (name: string): DragProps => ({
     onDragStart: () => setDragging(name),
@@ -142,7 +153,7 @@ export function Sidebar({ path }: { path: string }) {
   }
 
   return (
-    <section className="sidebar" aria-label="Branches">
+    <section ref={root} className="sidebar" aria-label="Branches">
       <label className="search"><Icon name="search" /><input type="search" placeholder="Filter" aria-label="Filter branches, tags, stashes and undo history"
         value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
       <details open>
