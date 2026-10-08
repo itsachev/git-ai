@@ -216,7 +216,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const refs = useQuery(refsQuery(path)).data;
   const log = useQuery(opLogQuery(path)).data;
   const branch = status ? status.branch : repo.branch;
-  const [tab, setTab] = useState<"status" | "history">("status");
+  const [tab, setTab] = useState<"status" | "history">("history");
   // Narrow windows show the rail as a drawer over the body; wide ones show both.
   const [side, setSide] = useState(false);
   const run = useRun();
