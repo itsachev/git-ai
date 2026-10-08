@@ -1,14 +1,14 @@
 ﻿import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, stash, stashSave, undo } from "../../lib/ipc";
+import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, resetTo, stash, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
-import { confirm } from "../../lib/modal";
+import { choose, confirm } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
 /** Checkout that offers to bring conflicting local changes along instead of just failing. */
@@ -24,7 +24,8 @@ export async function switchTo(path: string, name: string, track: boolean) {
 
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
 
-export type Action = [string, () => void];
+/** [label, handler, why it is disabled (absent = enabled)] */
+export type Action = [string, () => void, string?];
 
 /** Menu actions for a branch, remote branch or tag by short name (shared by the sidebar and the graph's ref labels). */
 export function useRefActions(path: string) {
@@ -35,17 +36,51 @@ export function useRefActions(path: string) {
     if (!data) return [];
     const head = data.head;
     const branchOff: Action = ["New branch from here", () => openNewBranch(name)];
-    // Merge/rebase need a current branch that isn't this one.
+    // Merge/rebase need a current branch that isn't this one, and do nothing when it already has all of this one.
+    const done = [...data.local, ...data.remote, ...data.tags].find((r) => r.name === name)?.in_head ? `${head} already has everything in ${name}` : undefined;
     const onto: Action[] = head && head !== name ? [
-      [`Merge ${name} into ${head}`, () => run(() => merge(path, name, false), `Merged ${name} into ${head}`)],
-      [`Rebase ${head} onto ${name}`, () => run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`)],
+      [`Merge ${name} into ${head}`, () => run(() => merge(path, name, false), `Merged ${name} into ${head}`), done],
+      [`Rebase ${head} onto ${name}`, () => run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`), done],
     ] : [];
     if (ontoOnly) return onto;
+    /** Checkout of a remote branch: its local namesake, created (tracking) if missing; asks what to do when the remote has commits the local lacks. */
+    const checkoutRemote = (name: string) => {
+      const short = name.slice(name.indexOf("/") + 1);
+      const local = data.local.find((b) => b.name === short);
+      const remote = data.remote.find((r) => r.name === name)!;
+      // Ahead/behind are only known against the upstream; another remote just has to point elsewhere.
+      const tracks = local?.upstream === name;
+      const newer = local && (tracks ? local.behind > 0 : local.oid !== remote.oid);
+      return async () => {
+        if (!local) return run(() => switchTo(path, name, true));
+        if (!newer) return run(() => switchTo(path, short, false));
+        const behind = tracks ? `${local.behind} commit${local.behind === 1 ? "" : "s"}` : "commits";
+        const own = tracks ? local.ahead : 1; // unknown: assume it may have its own
+        const sw = head !== short;
+        const lose = tracks ? `its ${own} commit${own === 1 ? "" : "s"} not on ${name}` : `any commits not on ${name}`;
+        const pick = await choose(`Checkout ${name}`, `${name} has ${behind} that your local ${short} doesn't. What should ${short} do?`, [
+          { label: sw ? `Switch and ${own ? `merge ${name}` : "fast-forward"}` : own ? `Merge ${name}` : "Fast-forward", hint: own ? `Merges ${name} into ${short}; your commits stay.` : `Moves ${short} up to ${name}.` },
+          { label: `Recreate ${short} from ${name}`, tone: own ? "danger" : "accent", hint: own ? `Resets ${short} to ${name}, dropping ${lose}. Undo history can reverse it.` : `Resets ${short} to ${name}.` },
+          { label: head === short ? `Keep ${short} as is` : `Switch to ${short} as is`, hint: `Leaves ${short} where it is; Pull later.` },
+          { label: "New branch from here…", hint: `Starts a new local branch at ${name}.` },
+        ], "branch");
+        if (pick === 3) return openNewBranch(name);
+        if (pick < 0) return;
+        run(async () => {
+          if (head !== short) await switchTo(path, short, false);
+          if (pick === 0) await merge(path, name, false);
+          if (pick === 1) await resetTo(path, name);
+        }, pick < 2 ? `${pick ? "Recreated" : "Updated"} ${short} from ${name}` : undefined);
+      };
+    };
     if (data.local.some((b) => b.name === name)) {
       const pr: Action = ["Create pull request…", () => openWriteUp("pr", null, name)];
       const explain: Action = ["Explain branch (AI)", () => openWriteUp("explain", null, name)];
-      if (name === head) return [branchOff, pr, explain];
-      return [["Checkout", () => run(() => switchTo(path, name, false))], branchOff, pr, explain, ...onto, ["Delete", async () => {
+      // Its upstream has new commits: offer the same choices as checking out the remote branch.
+      const up = data.local.find((b) => b.name === name)!;
+      const sync: Action[] = up.upstream && up.behind > 0 ? [[`Checkout ${up.upstream}…`, checkoutRemote(up.upstream)]] : [];
+      if (name === head) return [...sync, branchOff, pr, explain];
+      return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, pr, explain, ...onto, ["Delete", async () => {
         if (!(await confirm("Delete branch", `Delete branch ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))) return;
         run(async () => {
           try {
@@ -58,10 +93,7 @@ export function useRefActions(path: string) {
       }]];
     }
     if (data.remote.some((r) => r.name === name)) {
-      // Checks out as the local branch of the same name, created (tracking) if missing.
-      const short = name.slice(name.indexOf("/") + 1);
-      const hasLocal = data.local.some((b) => b.name === short);
-      return [["Checkout", () => run(() => (hasLocal ? switchTo(path, short, false) : switchTo(path, name, true)))], branchOff, ...onto, ["Delete", async () => {
+      return [["Checkout", checkoutRemote(name)], branchOff, ...onto, ["Delete", async () => {
         if (await confirm("Delete remote branch", `Delete branch ${name} on the remote? Undo history (sidebar) can push it back.`, "Delete", "danger"))
           run(() => deleteRemoteBranch(path, name), `Deleted ${name} on the remote`);
       }]];
@@ -88,7 +120,7 @@ export function showMenu(el: HTMLElement | null, e: React.MouseEvent<HTMLElement
 export function RefMenu({ pop, label, actions }: { pop: React.RefObject<HTMLDivElement | null>; label: string; actions: Action[] }) {
   return (
     <div ref={pop} popover="auto" className="row-menu" role="menu" aria-label={label}>
-      {actions.map(([a, fn]) => <button key={a} role="menuitem" onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}</button>)}
+      {actions.map(([a, fn, off]) => <button key={a} role="menuitem" disabled={!!off} title={off} onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}</button>)}
     </div>
   );
 }

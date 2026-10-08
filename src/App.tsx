@@ -21,6 +21,7 @@ import { GitHubAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
 import { Palette, type Command } from "./features/palette/Palette";
+import { LfsDialog, openLfs } from "./features/lfs/Lfs";
 import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { SetupWizard, openSetup } from "./features/setup/Setup";
 import { UpdateBanner } from "./features/update/Update";
@@ -302,6 +303,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
+    { label: "Git LFS…", git: "git lfs track", run: () => openLfs() },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
@@ -354,6 +356,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         <WriteUpDialog path={path} />
         <RebaseDialog path={path} />
         <FileHistoryDialog path={path} />
+        <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
         <footer className="statusbar"><Palette commands={commands} /></footer>
       </main>

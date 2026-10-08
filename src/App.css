@@ -416,6 +416,9 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
    the wheel carries on to the sidebar. */
 .sidebar > details > summary { position: sticky; top: 0; z-index: 1; background: var(--rail); }
 .sidebar .refs { max-height: min(17rem, 40vh); overflow-y: auto; }
+/* Hairlines between top-level sections and between undo entries. */
+.sidebar > details + details { margin-top: 0.5rem; border-top: 1px solid var(--line); }
+.refs.ops li + li { border-top: 1px solid var(--line); }
 .sidebar summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.45rem;
   min-height: var(--ctl); margin-top: 0.5rem; padding: 0 0.25rem 0 0.4rem; border-radius: var(--r);
@@ -453,7 +456,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .row-menu:popover-open { display: grid; gap: 1px; opacity: 1; scale: 1; }
 @starting-style { .row-menu:popover-open { opacity: 0; scale: 0.94; } }
 .row-menu button { justify-content: flex-start; color: inherit; background: none; box-shadow: none; padding: 0 0.7rem; border-radius: 6px; font-weight: 500; }
-.row-menu button:hover, .row-menu button:focus-visible { background: var(--accent); color: var(--accent-ink); outline: none; }
+.row-menu button:hover:not(:disabled), .row-menu button:focus-visible { background: var(--accent); color: var(--accent-ink); outline: none; }
 /* Undo history: label over its time, Undo always visible. */
 .ops .name { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0.3rem 0.25rem 0.3rem 1.6rem; font-family: inherit; }
 .ops .name small { color: var(--muted); font-size: 0.74rem; }
@@ -717,6 +720,16 @@ dialog.modal {
 dialog.modal.tone-accent { --tone: var(--accent); }
 dialog.modal.tone-warn { --tone: var(--mod); }
 dialog.modal.tone-danger { --tone: var(--danger); }
+/* choose(): one full-width card per option, label over a muted hint; a danger option tints its edge. */
+.choices { display: grid; gap: 0.5rem; margin-bottom: 1.1rem; }
+.choices .choice {
+  display: grid; gap: 0.15rem; justify-items: start; justify-content: stretch; min-height: 44px; padding: 0.65rem 0.9rem; text-align: left;
+  color: var(--fg); background: color-mix(in srgb, var(--sunken) 55%, var(--panel)); border: 1px solid var(--line); border-radius: 12px;
+  transition: border-color 160ms, background-color 160ms;
+}
+.choices .choice:hover, .choices .choice:focus-visible { border-color: var(--tone); background: color-mix(in srgb, var(--tone) 8%, var(--panel)); }
+.choices .choice.tone-danger strong { color: var(--danger); }
+.choices .choice span { font-size: 0.88rem; line-height: 1.35; white-space: normal; }
 .modal-head {
   position: sticky; top: calc(-1 * var(--pad)); z-index: 2;
   display: flex; gap: 0.9rem; align-items: center;
@@ -999,6 +1012,12 @@ dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, 
 .setting .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .setting input { flex: 1 1 12rem; min-width: 0; }
 .ssh-key-path { overflow-wrap: anywhere; }
+/* Git LFS dialog: tracked patterns, one per row with its Untrack button. */
+dialog.lfs-dialog { width: min(32rem, 100vw - 2rem); }
+.lfs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.lfs-list li { display: flex; align-items: center; gap: 0.5rem; min-height: var(--ctl); padding: 0 0.25rem 0 0.6rem; border-radius: 8px; background: var(--sunken); }
+.lfs-list code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.diff.muted > p { margin: 0 0 0.6rem; }
 /* Git identity form and the "key found" offer (shared by Settings and the setup wizard). */
 .identity { display: grid; gap: 0.75rem; }
 .identity > label:not(.check) { display: grid; gap: 0.3rem; font-size: 0.85rem; font-weight: 700; }

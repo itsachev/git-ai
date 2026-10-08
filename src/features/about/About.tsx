@@ -37,7 +37,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ]],
   ["branch", "Branches, tags and stashes", [
     ["Sidebar", "Always visible on wide windows · Ctrl+B or ☰ on narrow ones", "Local and remote branches, tags, stashes and undo history, with a filter. ↑ and ↓ counts show commits waiting to be pushed or pulled."],
-    ["Check out a branch", "Double-click a branch, right-click → Checkout, or Ctrl+K → Checkout", "Switches your files to that branch. Uncommitted changes come along when git can. A remote branch becomes a local branch that tracks it."],
+    ["Check out a branch", "Double-click a branch, right-click → Checkout, or Ctrl+K → Checkout", "Switches your files to that branch. Uncommitted changes come along when git can. A remote branch becomes a local branch that tracks it. If the remote branch is ahead of yours, pick: fast-forward or merge, recreate yours from it, switch as is, or branch off."],
     ["New branch", "Branch button, + in the sidebar, Ctrl+Shift+B, or right-click → New branch from here", "A branch is a movable name for a line of work. Start from any branch, tag or commit, use feature/ fix/ chore/ prefixes, and switch to it right away. The dialog shows the exact git command."],
     ["Merge a branch", "Right-click a branch → Merge <branch> into <current>", "Combines that branch's work into the branch you are on."],
     ["Drag and drop branches", "Drag a branch onto the current branch, or the current branch onto another", "Drop to pick Merge or Rebase, the same as the right-click menu. Remote branches work too."],

@@ -10,6 +10,7 @@ import { Icon } from "../../lib/icons";
 import { Splitter } from "../../lib/splitter";
 import { ModalHead, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
+import { lfsPatternFor, openLfs } from "../lfs/Lfs";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
@@ -435,7 +436,15 @@ function Diff({ path, sel, run }: DiffProps) {
   if (!sel) return <section className="diff muted">Select a file to see its changes.</section>;
   if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
   if (data === undefined) return <section className="diff" />;
-  if (data === null) return <section className="diff muted">Binary file or larger than 1 MB, no inline diff.</section>;
+  if (data === null) {
+    const pattern = lfsPatternFor(sel.file);
+    return (
+      <section className="diff muted">
+        <p>Binary file or larger than 1 MB, no inline diff.</p>
+        {pattern && <button className="small" onClick={() => openLfs(pattern)}>Track {pattern} with Git LFS…</button>}
+      </section>
+    );
+  }
   const all = data.replace(/\n$/, "").split("\n");
   // Skip the "diff --git / index / --- / +++" header; hunks start at the first "@@".
   const start = all.findIndex((l) => l.startsWith("@@"));
@@ -533,6 +542,7 @@ export function opLabel(e: OpEntry): string {
     amend: "Amend commit",
     merge: "Merge",
     "cherry-pick": "Cherry-pick",
+    reset: "Reset branch",
     "delete branch": `Delete branch ${name}`,
     "delete tag": `Delete tag ${name}`,
     "drop stash": "Drop stash",
