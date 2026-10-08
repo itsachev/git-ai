@@ -292,7 +292,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 @media (hover: none) { .recent .icon-btn { opacity: 1; } }
 .modal .dialog-actions { flex-wrap: wrap; }
 
-.clone, .github .device {
+.clone, .account .device {
   display: grid; gap: 0.75rem; margin-top: 1rem; max-width: 34rem; padding: 1rem;
   background: var(--panel); border-radius: 12px; box-shadow: var(--shadow);
   animation: rise 220ms var(--ease);
@@ -302,13 +302,45 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 /* git's progress line, e.g. "Receiving objects:  42% (420/1000)". */
 .clone .progress { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.8rem var(--mono); }
 .clone .error { margin: 0; }
-.github { margin-top: 2rem; max-width: 34rem; }
-.github + .github { margin-top: 1rem; }
-.github p { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-.github .device p { display: block; }
+/* Provider accounts (features/github/GitHub.tsx): glass chips in the tiles' grid, so they line up under Open / Clone.
+   .account is display: contents so the device-code panel and errors can span the whole row. */
+.accounts { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); max-width: 34rem; margin-top: 1.25rem; }
+.accounts:empty { display: none; }
+.account { display: contents; }
+.account > :is(.device, .error) { grid-column: 1 / -1; }
+.account .device p { margin: 0; }
+.account .error { margin: 0.25rem 0 0; }
+.account-chip {
+  display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; text-align: left; white-space: normal;
+  min-width: 0; min-height: 3.5rem; padding: 0.4rem 0.4rem 0.4rem 0.95rem; border-radius: 10px;
+  color: var(--fg); background: color-mix(in srgb, var(--panel) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 13%, transparent); box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+  backdrop-filter: blur(10px);
+  animation: rise 420ms var(--ease) 0.45s backwards; /* accounts load over IPC, after the GSAP intro has run */
+}
+.account:nth-child(2) .account-chip { animation-delay: 0.52s; }
+.account-chip > .icon { flex: none; width: 1.5rem; height: 1.5rem; }
+.account-chip > span { display: grid; flex: 1; min-width: 0; }
+.account-chip strong { font-size: 0.98rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-chip small { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--muted); }
+/* Connected: a green dot before the provider name. */
+.signed-in small::before {
+  content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--add);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--add) 20%, transparent);
+}
+.account-chip .icon-btn { flex: none; min-height: 2.5rem; width: 2.5rem; border-radius: 8px; }
+.account-chip .icon-btn:hover:not(:disabled) { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+/* Not connected: a dashed outline that firms up into the accent on hover. */
+button.account-chip { border-style: dashed; padding-right: 0.95rem; }
+button.account-chip > .icon { color: var(--muted); transition: color 180ms var(--ease), scale 320ms var(--spring); }
+button.account-chip:hover:not(:disabled) {
+  translate: 0 -1px; border-style: solid; border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.14), 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 1.1; }
 .user-code { display: block; font: 600 clamp(1.5rem, 6vw, 2.2rem) var(--mono); letter-spacing: 0.18em; user-select: all; color: var(--accent-fg); }
 .welcome-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.github .error { margin: 0.5rem 0 0; }
 
 /* ---------- Repo shell: rail + stage ---------- */
 .shell { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
