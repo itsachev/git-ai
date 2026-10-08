@@ -24,6 +24,17 @@ with a short \"## Summary\" paragraph (what and why) and a \"## Changes\" list o
 \"## Notes\" list only for risky changes, migrations or follow-ups the reviewer should know. GitHub Markdown, \
 no code fences around the whole answer.";
 
+const STASH_PROMPT: &str = "You explain a git stash (set-aside uncommitted work) to the developer who made it \
+and forgot what it was. From the stash message and its changes, say in plain words what the work in progress \
+does and how far along it looks. Start with one sentence summary, then at most 5 short \"- \" bullets. Plain \
+text only: no Markdown headings, no bold, no code fences.";
+
+const BRANCH_PROMPT: &str = "You explain a branch to a developer who hasn't read it. From the commit messages \
+and the combined diff of what the branch adds on top of its base, say in plain words what the branch does and, \
+if the code shows it, why. Start with a one or two sentence summary, then at most 7 short \"- \" bullets for the \
+notable changes. Mention risky or surprising changes and anything unfinished. Plain text only: no Markdown \
+headings, no bold, no code fences.";
+
 const CHANGELOG_PROMPT: &str = "You write release changelogs for users of the software. From the commit messages \
 and the combined diff of a release, write Markdown \"- \" bullets grouped under \"### Added\", \"### Changed\", \
 \"### Fixed\" and \"### Removed\" (leave out empty groups). One line per user-visible change, in plain words; \
@@ -96,11 +107,28 @@ pub fn explain_commit(repo: &Path, oid: &str) -> Result<String, AppError> {
     Ok(generate(EXPLAIN_PROMPT, &input)?.trim().to_string())
 }
 
-/// PR title + description (`kind` "pr") or changelog (`kind` "changelog") for what `head` adds on top of `base`.
+/// Plain-language explanation of a stash (tracked changes + untracked files).
+pub fn explain_stash(repo: &Path, oid: &str) -> Result<String, AppError> {
+    let (message, diff) = read::stash_patch(repo, oid)?;
+    let (diff, cut) = clip(&diff, MAX_DIFF);
+    let mut input = format!("Stash message:
+{message}
+
+Stashed changes:
+{diff}");
+    if cut {
+        input += "
+[diff cut here, too long]";
+    }
+    Ok(generate(STASH_PROMPT, &input)?.trim().to_string())
+}
+
+/// PR title + description (`kind` "pr"), changelog ("changelog") or plain explanation ("explain") for what `head` adds on top of `base`.
 pub fn write_range(repo: &Path, base: &str, head: &str, kind: &str) -> Result<String, AppError> {
     let prompt = match kind {
         "pr" => PR_PROMPT,
         "changelog" => CHANGELOG_PROMPT,
+        "explain" => BRANCH_PROMPT,
         _ => return Err(AppError::new("bad_kind", format!("Unknown kind {kind}."))),
     };
     let (messages, diff) = read::range_patch(repo, base, head, 300)?;
