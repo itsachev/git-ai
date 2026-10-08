@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { commitDetails, createBranch } from "../../lib/ipc";
+import type { AppError } from "../../bindings/AppError";
 import { Icon } from "../../lib/icons";
 import { ModalHead } from "../../lib/modal";
 import { statusQuery, useRun } from "../status/Changes";
@@ -91,7 +92,15 @@ function Form({ path, initial }: { path: string; initial: string | null }) {
   async function submit() {
     if (!ok) return;
     setBusy(true);
-    const done = await run(() => createBranch(path, name, from || null, co), co ? `Created and switched to ${name}` : `Created ${name}`);
+    const done = await run(async () => {
+      try {
+        await createBranch(path, name, from || null, co);
+      } catch (e) {
+        // Created and switched, but the carried changes clashed: the notice says so, the dialog is done.
+        if ((e as AppError).code === "conflicts") close();
+        throw e;
+      }
+    }, co ? `Created and switched to ${name}` : `Created ${name}`);
     setBusy(false);
     if (done) close();
   }

@@ -304,7 +304,7 @@ pub async fn github_repos() -> Result<Vec<crate::github::GhRepo>, AppError> {
 /// into `base` on GitHub. Returns the PR's web URL.
 #[tauri::command]
 pub async fn github_create_pr(path: String, head: String, base: String, title: String, body: String) -> Result<String, AppError> {
-    let (url, head, base) = cli::pr_branches(Path::new(&path), &head, &base)?;
+    let (url, head, base) = cli::pr_branches(Path::new(&path), &head, &base, &|u| crate::github::check_remote(u).map(drop))?;
     crate::github::create_pr(&url, &head, &base, &title, &body)
 }
 

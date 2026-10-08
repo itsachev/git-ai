@@ -182,10 +182,14 @@ fn repo_slug(url: &str) -> Option<String> {
     ok.then(|| slug.to_string())
 }
 
+/// "owner/name" of `remote_url`, or a "not_github" error.
+pub fn check_remote(remote_url: &str) -> Result<String, AppError> {
+    repo_slug(remote_url).ok_or_else(|| AppError::new("not_github", format!("The remote ({remote_url}) isn't a github.com repository.")))
+}
+
 /// Opens a pull request of `head` into `base` on the GitHub repo behind `remote_url`; returns its web URL.
 pub fn create_pr(remote_url: &str, head: &str, base: &str, title: &str, body: &str) -> Result<String, AppError> {
-    let slug = repo_slug(remote_url)
-        .ok_or_else(|| AppError::new("not_github", format!("The remote ({remote_url}) isn't a github.com repository.")))?;
+    let slug = check_remote(remote_url)?;
     let token = token().ok_or_else(|| AppError::new("signed_out", "Sign in to GitHub first."))?;
     let mut res = ureq::post(&format!("https://api.github.com/repos/{slug}/pulls"))
         .config()

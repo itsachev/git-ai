@@ -336,11 +336,16 @@ mod tests {
 
         // PR target: a local branch is pushed (and tracks), a remote branch is used as is.
         cli::create_branch(a, "pr", None, false).unwrap();
-        assert_eq!(cli::pr_branches(a, "pr", "origin/main").unwrap(), (bare_s.to_string(), "pr".into(), "main".into()));
+        let any = &|_: &str| Ok(());
+        // A remote the check refuses (not on GitHub) gets nothing pushed.
+        let no = &|_: &str| Err(crate::errors::AppError::new("not_github", "no"));
+        assert_eq!(cli::pr_branches(a, "pr", "origin/main", no).unwrap_err().code, "not_github");
+        assert!(cli::rev(&bare, "refs/heads/pr").is_err());
+        assert_eq!(cli::pr_branches(a, "pr", "origin/main", any).unwrap(), (bare_s.to_string(), "pr".into(), "main".into()));
         assert_eq!(cli::rev(&bare, "refs/heads/pr").unwrap(), cli::rev(a, "pr").unwrap());
-        assert_eq!(cli::pr_branches(a, "origin/pr", "main").unwrap().1, "pr");
-        assert_eq!(cli::pr_branches(a, "", "pr").unwrap().1, "main");
-        assert_eq!(cli::pr_branches(a, "v1", "main").unwrap_err().code, "not_branch");
+        assert_eq!(cli::pr_branches(a, "origin/pr", "main", any).unwrap().1, "pr");
+        assert_eq!(cli::pr_branches(a, "", "pr", any).unwrap().1, "main");
+        assert_eq!(cli::pr_branches(a, "v1", "main", any).unwrap_err().code, "not_branch");
 
         // Remote branch delete; undo pushes it back; that undo itself can't be undone.
         git(a, &["push", "-q", "origin", "main:refs/heads/feat"]).unwrap();
@@ -552,8 +557,26 @@ mine
         assert_eq!(fs::read_to_string(dir2.join("a.txt")).unwrap(), "edit
 ");
         assert!(crate::git::read::refs(q).unwrap().stashes.is_empty());
+
+        // New branch from a start point that clashes with the changes: carried like a switch.
+        let dir3 = temp_repo("carry3");
+        let r = dir3.as_path();
+        let commit = |text: &str| {
+            fs::write(dir3.join("a.txt"), text).unwrap();
+            cli::stage(r, &["a.txt".into()]).unwrap();
+            cli::commit(r, "c", false).unwrap();
+        };
+        commit("base\n");
+        cli::create_branch(r, "feat", None, true).unwrap();
+        commit("feat\n");
+        cli::checkout(r, "main", false, false).unwrap();
+        fs::write(dir3.join("a.txt"), "mine\n").unwrap();
+        assert_eq!(cli::create_branch(r, "nb", Some("feat"), true).unwrap_err().code, "conflicts");
+        assert_eq!(cli::status(r).unwrap().branch.as_deref(), Some("nb"));
+        assert_eq!(crate::git::read::refs(r).unwrap().stashes.len(), 1);
         let _ = fs::remove_dir_all(&dir);
         let _ = fs::remove_dir_all(&dir2);
+        let _ = fs::remove_dir_all(&dir3);
     }
 
     /// Interactive rebase: reorder, reword, squash, fixup, drop, undo; then a conflict continued by commit.

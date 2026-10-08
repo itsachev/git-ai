@@ -225,6 +225,13 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
 
   const show = (t: typeof tab) => { setTab(t); setSide(false); };
+  // Escape closes the drawer, unless a dialog or menu on top takes it first.
+  useEffect(() => {
+    if (!side) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open], :popover-open")) setSide(false); };
+    addEventListener("keydown", esc);
+    return () => removeEventListener("keydown", esc);
+  }, [side]);
   // A merge/rebase/... that just paused at conflicts: go where they get resolved.
   const nConflicts = status?.conflicted.length ?? 0;
   const hadConflicts = useRef(nConflicts > 0);
