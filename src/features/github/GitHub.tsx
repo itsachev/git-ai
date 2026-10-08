@@ -6,6 +6,7 @@ import {
 } from "../../lib/ipc";
 import type { DeviceCode } from "../../bindings/DeviceCode";
 import { errorText } from "../status/Changes";
+import { Icon } from "../../lib/icons";
 
 export const userQuery = { queryKey: ["github-user"], queryFn: githubUser, staleTime: Infinity, retry: false };
 export const gitlabUserQuery = { queryKey: ["gitlab-user"], queryFn: gitlabUser, staleTime: Infinity, retry: false };
@@ -57,12 +58,15 @@ function Account({ provider }: { provider: keyof typeof providers }) {
   // Offline or keychain trouble: no account row rather than an error on the home screen.
   if (user.isError || user.isPending) return null;
   return (
-    <section className="github">
+    <div className="account">
       {user.data ? (
-        <p>
-          <span>{p.name}: <strong>@{user.data}</strong></span>
-          <button onClick={signOut}>Sign out</button>
-        </p>
+        <div className="account-chip signed-in">
+          <Icon name={provider} />
+          <span><strong>@{user.data}</strong><small>{p.name}</small></span>
+          <button className="icon-btn" onClick={signOut} title={`Sign out of ${p.name}`} aria-label={`Sign out of ${p.name}`}>
+            <Icon name="logout" />
+          </button>
+        </div>
       ) : code ? (
         <div className="device" role="status">
           <p>Enter this code on {p.name}:</p>
@@ -74,9 +78,12 @@ function Account({ provider }: { provider: keyof typeof providers }) {
           <p className="muted">Waiting for approval at {code.verification_uri}…</p>
         </div>
       ) : (
-        <button onClick={signIn}>Sign in to {p.name}</button>
+        <button className="account-chip" onClick={signIn}>
+          <Icon name={provider} />
+          <span><strong>Sign in to {p.name}</strong><small>Clone your repos</small></span>
+        </button>
       )}
       {error && <p className="error" role="alert">{error}</p>}
-    </section>
+    </div>
   );
 }

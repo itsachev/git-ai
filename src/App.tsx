@@ -194,8 +194,10 @@ function App() {
         </div>
         {cloning && <CloneForm onCloned={cloned} />}
         {error && <p className="error" role="alert">{error}</p>}
-        <GitHubAccount />
-        <GitLabAccount />
+        <div className="accounts" aria-label="Accounts" role="group">
+          <GitHubAccount />
+          <GitLabAccount />
+        </div>
       </section>
       <section className="home-recent" aria-labelledby="recent-title">
         <div className="section-head">
