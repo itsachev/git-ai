@@ -86,7 +86,7 @@ pub fn discard(path: String, paths: Vec<String>) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub fn commit(path: String, message: String, amend: bool) -> Result<(), AppError> {
+pub fn commit(path: String, message: String, amend: bool) -> Result<Option<String>, AppError> {
     cli::commit(Path::new(&path), &message, amend)
 }
 

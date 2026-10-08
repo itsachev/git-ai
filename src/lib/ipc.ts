@@ -84,7 +84,8 @@ export const repoStatus = (path: string) => invoke<Status>("repo_status", { path
 export const stage = (path: string, paths: string[]) => invoke<void>("stage", { path, paths });
 export const unstage = (path: string, paths: string[]) => invoke<void>("unstage", { path, paths });
 export const discard = (path: string, paths: string[]) => invoke<void>("discard", { path, paths });
-export const commit = (path: string, message: string, amend: boolean) => invoke<void>("commit", { path, message, amend });
+/** A note when a rebase dropped the commit (the resolution changed nothing), else null. */
+export const commit = (path: string, message: string, amend: boolean) => invoke<string | null>("commit", { path, message, amend });
 /** null before the first commit. */
 export const headMessage = (path: string) => invoke<string | null>("head_message", { path });
 /** `lines` index into the lines of the file's `fileDiff` text. */
