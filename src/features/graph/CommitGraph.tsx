@@ -192,7 +192,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
   return (
     <section className="graph">
       <div className="graph-head" style={cols}>
-        <span>Graph</span><span>Description</span><span className="c-date">Date</span><span className="c-author">Author</span><span className="c-oid">Commit</span>
+        <span>{gw >= 56 ? "Graph" : ""}</span><span>Description</span><span className="c-date">Date</span><span className="c-author">Author</span><span className="c-oid">Commit</span>
       </div>
       {err ? <p className="error" role="alert">{errorText(err)}</p> : null}
       {head && !total && <p className="muted">No commits yet.</p>}
@@ -217,7 +217,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
                 <span className="sum">{r.summary}</span>
               </span>
               <span className="c-date">{dateFmt.format(r.time * 1000)}</span>
-              <span className="c-author">{r.author}</span>
+              <span className="c-author"><Avatar name={r.author} /><span>{r.author}</span></span>
               <span className="c-oid">{r.oid.slice(0, 7)}</span>
             </div>
           ))}
@@ -238,4 +238,12 @@ function RefChip({ name, path, extra }: { name: string; path: string; extra: Act
       {actions.length > 0 && <RefMenu pop={pop} label={name} actions={actions} />}
     </>
   );
+}
+
+/** Initials on a hue picked from the name, so one author keeps one color everywhere. */
+export function Avatar({ name }: { name: string }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return <span className="avatar" style={{ "--h": h } as React.CSSProperties} aria-hidden="true">{initials}</span>;
 }
