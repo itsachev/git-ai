@@ -420,8 +420,11 @@ fn net_error(e: AppError) -> AppError {
     } else {
         return e;
     };
-    let last = m.lines().last().unwrap_or_default().trim();
-    AppError::new(code, format!("{text} (git: {last})"))
+    // The cause is the first "fatal:" or "! [rejected]" line; the last line is usually advice or "failed to push some refs".
+    match m.lines().map(str::trim).find(|l| l.starts_with("fatal:") || l.starts_with('!')) {
+        Some(cause) => AppError::new(code, format!("{text} (git: {cause})")),
+        None => AppError::new(code, text),
+    }
 }
 
 /// Clones `url` into `dest` (must not exist or be empty). git's progress lines ("Receiving objects:  42% …")
