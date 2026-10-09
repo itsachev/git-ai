@@ -7,6 +7,7 @@ mod git;
 mod github;
 mod gitlab;
 mod oplog;
+mod terminal;
 mod watch;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -74,6 +75,12 @@ pub fn run() {
             commands::open_file,
             commands::editors,
             commands::open_terminal,
+            commands::terminals,
+            commands::terminal_set,
+            commands::pty_open,
+            commands::pty_write,
+            commands::pty_resize,
+            commands::pty_close,
             commands::github_start,
             commands::github_finish,
             commands::github_user,
