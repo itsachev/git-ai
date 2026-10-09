@@ -185,6 +185,8 @@ export const workFile = (path: string, file: string) => invoke<string | null>("w
 export const openFile = (path: string, file: string, editor: string | null) => invoke<void>("open_file", { path, file, editor });
 /** Installed editors and the last one used. */
 export const editors = () => invoke<Editors>("editors");
+/** Opens the system terminal in the repo folder. */
+export const openTerminal = (path: string) => invoke<void>("open_terminal", { path });
 /** Answers an "askpass" prompt; null cancels (git then fails). */
 export const askpassReply = (id: number, answer: string | null) => invoke<void>("askpass_reply", { id, answer });
 // GitHub sign-in (OAuth device flow). The token stays in the OS keychain; git gets it via askpass.
