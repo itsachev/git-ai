@@ -205,7 +205,7 @@ export function AboutButton() {
                 ))}
               </h3>
               <p>
-                <Brand /> shows your repository the way Sourcetree does: changes, history graph and branches side by side.
+                <Brand /> shows your repository at a glance: changes, history graph and branches side by side.
                 It is local-first: your repository is the only database. Risky operations are recorded so each one can be undone,
                 and git's errors are explained in plain words. Here is every feature, where to find it, and what it is for.
               </p>
