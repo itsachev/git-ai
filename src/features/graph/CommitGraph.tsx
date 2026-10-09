@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { graphRows, resetTo } from "../../lib/ipc";
+import { graphRows, merge, rebaseOnto, resetTo } from "../../lib/ipc";
+import { openNewBranch } from "../refs/NewBranch";
 import type { GraphRow } from "../../bindings/GraphRow";
 import type { GraphOpts } from "../../bindings/GraphOpts";
 import { errorText, useRun } from "../status/Changes";
@@ -67,23 +68,35 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState({ top: 0, height: 0 });
-  const branch = useQuery(refsQuery(path)).data?.head;
+  const refsData = useQuery(refsQuery(path)).data;
+  const branch = refsData?.head;
+  const refActions = useRefActions(path);
   const run = useRun();
   const menuPop = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<Action[]>([]);
 
-  /** Right-click on a commit row: picks it and opens its actions. */
-  function rowMenu(e: React.MouseEvent<HTMLDivElement>, i: number, r: GraphRow) {
-    onSelect({ i, oid: r.oid });
+  /** Reset the current branch to commit `r` (row menu and its ref labels' menus). */
+  function resetAction(r: GraphRow): Action {
     const at = r.oid.slice(0, 7);
     const target = branch ?? "HEAD";
-    flushSync(() => setMenu([
-      [`Reset ${target} to here…`, async () => {
-        const i = await choose(`Reset ${target} to ${at}`, `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
-          RESETS.map(([label, hint, tone]) => ({ label, hint, tone })), "branch");
-        if (i >= 0) run(() => resetTo(path, r.oid, RESETS[i][3]), `Reset ${target} to ${at} (${RESETS[i][3].toLowerCase()})`);
-      }],
-    ]));
+    return [`Reset ${target} to here…`, async () => {
+      const i = await choose(`Reset ${target} to ${at}`, `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
+        RESETS.map(([label, hint, tone]) => ({ label, hint, tone })), "branch");
+      if (i >= 0) run(() => resetTo(path, r.oid, RESETS[i][3]), `Reset ${target} to ${at} (${RESETS[i][3].toLowerCase()})`);
+    }];
+  }
+
+  /** Right-click on a commit row: picks it and opens its actions (its label's, local branch first, plus reset). */
+  function rowMenu(e: React.MouseEvent<HTMLDivElement>, i: number, r: GraphRow) {
+    onSelect({ i, oid: r.oid });
+    const ref = r.refs.find((n) => refsData?.local.some((b) => b.name === n)) ?? r.refs[0];
+    const at = r.oid.slice(0, 7);
+    // Unlabeled commit: the same actions, by commit id.
+    const own: Action[] = [["New branch from here", () => openNewBranch(r.oid)], ...(branch && !r.head ? [
+      [`Merge ${at} into ${branch}`, () => run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`)],
+      [`Rebase ${branch} onto ${at}`, () => run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`)],
+    ] as Action[] : [])];
+    flushSync(() => setMenu([...(ref ? refActions(ref) : own), resetAction(r)]));
     showMenu(menuPop.current, e);
   }
 
@@ -193,7 +206,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
               style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}>
               <span />
               <span className="desc">
-                {r.refs.map((n) => <RefChip key={n} name={n} path={path} />)}
+                {r.refs.map((n) => <RefChip key={n} name={n} path={path} extra={[resetAction(r)]} />)}
                 <span className="sum">{r.summary}</span>
               </span>
               <span className="c-date">{dateFmt.format(r.time * 1000)}</span>
@@ -209,9 +222,9 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
 }
 
 /** Branch/tag label on a commit; right-click for the same actions as the sidebar. */
-function RefChip({ name, path }: { name: string; path: string }) {
+function RefChip({ name, path, extra }: { name: string; path: string; extra: Action[] }) {
   const pop = useRef<HTMLDivElement>(null);
-  const actions = useRefActions(path)(name);
+  const actions = [...useRefActions(path)(name), ...extra];
   return (
     <>
       <span className="ref" title={`${name} (right-click for actions)`} onContextMenu={(e) => { e.stopPropagation(); showMenu(pop.current, e); }}>{name}</span>
