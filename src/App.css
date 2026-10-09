@@ -161,42 +161,20 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 /* ---------- Home ---------- */
 .home {
   min-height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(2rem, 6vw, 5rem); align-content: start;
-  padding: clamp(1.5rem, 7vh, 5rem) clamp(1rem, 6vw, 5rem) 3rem; max-width: 76rem; margin: 0 auto;
+  padding: clamp(1.5rem, 7vh, 5rem) clamp(1rem, 6vw, 5rem) 6.5rem; /* bottom: clear the corner pills */ max-width: 76rem; margin: 0 auto;
 }
 @media (min-width: 60rem) { .home { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-content: center; } }
-/* Backdrop (features/home/Backdrop.tsx): radial ground, canvas network + fan, floating cards. */
+/* Backdrop (features/home/Backdrop.tsx): the artwork plus a canvas of light mapped onto it, in a layer that drifts (parallax). */
 .home { position: relative; isolation: isolate; overflow-x: clip; } /* reveals slide in from the edges: no page-wide scrollbar flash */
-.home::before {
-  content: ""; position: fixed; inset: 0; z-index: -2;
-  background: #0e1014 url("./assets/app_bg.jpg") center / cover no-repeat;
-  filter: invert(1) hue-rotate(180deg); /* light: the dark artwork flipped to a light one */
+.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #0e1014; animation: home-bg-in 1.4s var(--ease) both; }
+.home-art {
+  position: absolute; inset: -24px; /* bleed, so the drift never shows an edge */
+  background: url("./assets/app_bg.jpg") center / cover no-repeat;
+  filter: invert(1) hue-rotate(180deg); /* light: the dark artwork (and its light) flipped to a light one */
 }
-:root[data-theme="dark"] .home::before { filter: none; }
-/* The static artwork draws the network, fan and cards, so it stands in for the canvas backdrop in both themes. */
-.home-bg { display: none; }
-.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; animation: home-bg-in 1.4s var(--ease) both; }
-.home-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.home-bg { --glass: color-mix(in srgb, var(--fg) 8%, transparent); --glass-edge: color-mix(in srgb, var(--fg) 18%, transparent); }
-.bg-float, .bg-cube { position: absolute; animation: bg-float 9s ease-in-out infinite alternate; }
-.bg-float { display: grid; transform: perspective(500px) rotateY(var(--ry, 0deg)) rotateX(8deg); } /* turned toward the focus */
-.bg-card {
-  grid-area: 1 / 1; display: grid; align-content: start; gap: 6px; width: 5.4rem; height: 6.6rem; padding: 0.75rem 0.65rem;
-  mask-image: linear-gradient(#000 35%, transparent);
-  background: linear-gradient(160deg, var(--glass-edge), var(--glass) 60%); border: 1px solid var(--glass-edge); border-radius: 8px;
-  box-shadow: inset 0 1px color-mix(in srgb, var(--fg) 18%, transparent), 0 12px 30px rgb(0 0 0 / 0.25); backdrop-filter: blur(6px);
-}
-.bg-float.stack .bg-card:first-child { translate: -0.8rem -0.7rem; opacity: 0.7; }
-.bg-float.single { opacity: 0.55; }
-.bg-card i { display: block; height: 4px; border-radius: 2px; background: var(--glass-edge); }
-.bg-card i:nth-child(1) { width: 45%; } .bg-card i:nth-child(2) { width: 90%; } .bg-card i:nth-child(3) { width: 70%; }
-.bg-card i:nth-child(4) { width: 85%; } .bg-card i:nth-child(5) { width: 40%; }
-.bg-cube {
-  border-radius: 4px; background: linear-gradient(145deg, color-mix(in srgb, var(--fg) 30%, transparent), var(--glass) 60%); border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px color-mix(in srgb, var(--fg) 22%, transparent), 0 4px 12px rgb(0 0 0 / 0.2); animation-duration: 7s;
-}
-@keyframes bg-float { to { translate: 0 -0.6rem; } }
+:root[data-theme="dark"] .home-art { filter: none; }
+.home-art canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 @keyframes home-bg-in { from { opacity: 0; } }
-@media (max-width: 40rem) { .bg-float { display: none; } }
 .brand { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 clamp(0.75rem, 3vh, 1.5rem); font: 650 1.05rem var(--display); letter-spacing: -0.03em; }
 /* Home screen controls pinned to the window corners. */
 .corner { position: fixed; z-index: 1; --gap: clamp(0.75rem, 2vw, 1.5rem); }
@@ -223,8 +201,9 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   .corner-btn span { display: none; }
 }
 .mark { width: 1.6rem; height: 1.6rem; color: var(--fg); }
+/* The headline is the hero; the brand sits above it as a lockup. */
 .home h1 {
-  font: 650 1.65rem/1.15 var(--display); letter-spacing: -0.03em; text-wrap: balance;
+  max-width: 13ch; font: 650 clamp(2.4rem, 4.6vw, 4rem)/0.98 var(--display); letter-spacing: -0.04em; text-wrap: balance;
 }
 .home h1 .w-mask { padding-bottom: 0.12em; margin-bottom: -0.12em; } /* SplitText word masks (App.tsx intro): keep descenders */
 /* The app name (lib/modal.tsx Brand): a size up, heavier, in an indigo → fuchsia → amber gradient that slowly drifts.
@@ -238,26 +217,53 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   animation: brand-drift 9s ease-in-out infinite alternate;
 }
 @keyframes brand-drift { to { background-position: 100% 0; } }
-.brand .brand-name { font-size: clamp(2.1rem, 5vw, 3.4rem); }
-.brand .mark { width: clamp(1.9rem, 4.4vw, 3rem); height: auto; aspect-ratio: 1; }
-.lede { max-width: 30rem; margin: 1.5rem 0 2rem; font-size: 1.1rem; color: var(--muted); text-wrap: pretty; }
-.tiles { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); max-width: 38rem; }
+.brand .brand-name { font-size: 1.6rem; }
+.brand .mark { width: 1.75rem; height: auto; aspect-ratio: 1; }
+.lede { max-width: 32rem; margin: 1.25rem 0 2.25rem; font-size: clamp(1rem, 0.4vw + 0.9rem, 1.15rem); color: var(--muted); text-wrap: pretty; }
+/* Actions, bento: the primary action spans the row (icon beside the text), Clone and Create are glass tiles below it,
+   in the same two columns as the account chips. A soft light follows the pointer
+   (--mx/--my, set in App.tsx). */
+.home { --actions: 40rem; }
+.tiles { display: grid; gap: 0.65rem; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: var(--actions); }
 .tile {
-  justify-content: flex-start; gap: 0.85rem; text-align: left; white-space: normal;
-  min-height: 4.25rem; padding: 0.75rem 1rem; border-radius: 10px;
+  position: relative; overflow: hidden; display: grid; justify-content: stretch; justify-items: start; align-content: start; gap: 0.9rem;
+  text-align: left; white-space: normal; min-height: 7.5rem; padding: 1rem 1.1rem; border-radius: 14px;
 }
-.tile .icon { width: 1.6rem; height: 1.6rem; color: var(--accent); transition: scale 320ms var(--spring), translate 320ms var(--spring); }
-.tile:hover:not(:disabled) .icon { scale: 1.12; translate: 0 -1px; }
-.tile:not(.primary):hover:not(:disabled) { box-shadow: var(--tool-lit), var(--tool-edge), var(--veil), 0 10px 26px rgb(0 0 0 / 0.2); }
-.tile.primary .icon { color: inherit; }
-.tile span { display: grid; }
-.tile strong { font-size: 1.05rem; }
-.tile small { color: color-mix(in srgb, var(--tool-ink) 65%, transparent); font-weight: 400; }
-.tile.primary small { color: color-mix(in srgb, var(--accent-ink) 70%, transparent); }
-.home-recent { min-width: 0; align-self: stretch; display: flex; flex-direction: column; gap: 0.75rem; }
-@media (min-width: 60rem) { .home-recent { padding-left: clamp(2rem, 4vw, 4rem); border-left: 1px solid var(--line); } }
+.tile.primary { grid-column: 1 / -1; min-height: 5rem; grid-template-columns: auto 1fr; align-items: center; align-content: center; }
+.tile:not(.primary) {
+  color: var(--fg); background: color-mix(in srgb, var(--panel) 58%, transparent); backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 12%, transparent), inset 0 1px 0 color-mix(in srgb, white 10%, transparent), 0 8px 24px rgb(0 0 0 / 0.1);
+}
+.tile::before { /* pointer light */
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 300ms var(--ease);
+  background: radial-gradient(18rem circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%);
+}
+.tile:hover::before { opacity: 1; }
+.tile:not(.primary):hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 1px 0 color-mix(in srgb, white 10%, transparent), 0 14px 32px rgb(0 0 0 / 0.16);
+}
+.tile .icon {
+  box-sizing: content-box; width: 1.3rem; height: 1.3rem; padding: 0.55rem; border-radius: 10px;
+  color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 16%, transparent);
+  transition: scale 320ms var(--spring), rotate 420ms var(--spring);
+}
+.tile:hover:not(:disabled) .icon { scale: 1.08; rotate: -6deg; }
+.tile.primary .icon { color: var(--accent-ink); background: rgb(255 255 255 / 0.18); }
+.tile span { display: grid; gap: 0.15rem; }
+.tile strong { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.015em; }
+.tile small { font-size: 0.84rem; line-height: 1.35; color: var(--muted); font-weight: 400; }
+.tile.primary small { color: color-mix(in srgb, var(--accent-ink) 75%, transparent); }
+/* Recent: a glass panel, so the list reads over the artwork. */
+.home-recent {
+  min-width: 0; align-self: center; display: flex; flex-direction: column; gap: 0.75rem;
+  padding: 1.1rem 0.6rem 0.6rem; border-radius: 18px;
+  background: color-mix(in srgb, var(--panel) 55%, transparent); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent), inset 0 1px 0 color-mix(in srgb, white 8%, transparent), 0 20px 50px rgb(0 0 0 / 0.14);
+}
+.home-recent > :not(.recent) { margin-inline: 0.55rem; }
+@media (max-width: 60rem) { .home-recent { max-width: var(--actions); } } /* stacked: as wide as the actions above */
 .section-head { display: flex; align-items: center; gap: 0.5rem; }
-.section-head h2 { font-size: 0.85rem; color: var(--muted); }
+.section-head h2 { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .empty { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); margin: 0.5rem 0; }
 /* Scrolls on its own past ~10 rows (up to 100 recents); the filter and header stay put. */
 .recent {
@@ -334,7 +340,7 @@ dialog.clone-dialog { width: min(44rem, 100vw - 2rem); }
 .clone .dialog-actions { margin-top: 0.35rem; }
 /* Provider accounts (features/github/GitHub.tsx): glass chips in the tiles' grid, so they line up under Open / Clone.
    .account is display: contents so the device-code panel and errors can span the whole row. */
-.accounts { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); max-width: 34rem; margin-top: 1.25rem; }
+.accounts { display: grid; gap: 0.65rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); max-width: var(--actions); margin-top: 0.65rem; }
 .accounts:empty { display: none; }
 .account { display: contents; }
 .account > :is(.device, .error) { grid-column: 1 / -1; }
