@@ -19,6 +19,9 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 </div>
 
+> [!WARNING]
+> **git-ai is in active development and has not officially launched.** Expect bugs, missing pieces and breaking changes between releases. Back up important work before using it on real repositories.
+
 ---
 
 ## Why git-ai
@@ -105,6 +108,9 @@ AI features are optional and use your own key (BYOK). Open **Settings → AI**, 
 | Google Gemini | `gemini-3.5-flash-lite` | `GEMINI_API_KEY` |
 | Anthropic Claude | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
 | OpenAI / compatible (Ollama, LM Studio, …) | `gpt-5-mini` | `OPENAI_API_KEY` |
+
+> [!IMPORTANT]
+> The providers and default models above are temporary choices for development. They will change before launch.
 
 Data is only sent when you click an AI action, and it goes straight from your machine to the provider you picked. What gets sent is the relevant diff, commit messages or conflicted file. Diffs are cut at 100 KB. With a local OpenAI-compatible server, nothing leaves your computer.
 
