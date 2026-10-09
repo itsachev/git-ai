@@ -6,6 +6,8 @@
 
 **A fast, local-first desktop Git GUI that explains itself.**
 
+<h2>💯 Completely free. No subscription, no paywall, no account required.</h2>
+
 The repository graph, staging and conflict handling you'd expect from a Sourcetree-style client, plus AI that writes your commit messages, explains commits and helps resolve conflicts. When git fails, you get the error in plain language.
 
 [![CI](https://github.com/itsachev/git-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/itsachev/git-ai/actions/workflows/ci.yml)
@@ -26,6 +28,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ## Why git-ai
 
+- **Free.** Every feature in the app costs nothing. AI features use your own key, so you pay your AI provider directly for those requests, or nothing at all with a local model.
 - **Fast on big repos.** The commit graph is laid out in Rust and drawn on a virtualized canvas. On a 100k-commit repo the first page loads in about 0.8 s and later pages in about 6 ms.
 - **Undo for destructive operations.** Before a reset, discard, force push or recreate, git-ai records the affected refs and backs up the content it is about to throw away. You can undo it from the sidebar.
 - **Your repository is the database.** No commits or refs are copied into app storage. git-ai only keeps recent repos, settings and the undo log.
