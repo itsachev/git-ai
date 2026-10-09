@@ -10,7 +10,7 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { RefMenu, refsQuery, showMenu } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
-import { Brand, ModalHead, confirm } from "../../lib/modal";
+import { Brand, ModalHead, choose, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
 
 export type Sync = ReturnType<typeof useSync>;
@@ -43,11 +43,23 @@ export function useSync(path: string, run: Run) {
           await push(path);
           pushed = `Pushed ${target}`;
         } catch (e) {
-          if ((e as AppError).code !== "rejected") throw e;
-          // Usual after a rebase or amend: the remote still has the old commits.
-          if (!(await confirm("Push rejected", `${errorText(e)} If you rewrote this branch on purpose (rebase, amend), force push replaces the remote's commits with yours. Undo history (sidebar) can put them back.`, "Force push", "danger"))) return;
-          await push(path, true);
-          pushed = `Force pushed ${target}`;
+          const code = (e as AppError).code;
+          if (code !== "rejected" && code !== "rewritten") throw e;
+          // "rewritten": the branch was rebased or amended after its last push, so force push is the likely fix.
+          const mine = code === "rewritten";
+          const pullThenPush: Choice = { label: "Pull, then push", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: !mine };
+          const force: Choice = { label: "Force push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase or amend. Undo history can put them back.", suggested: mine };
+          const choices = mine ? [force, pullThenPush] : [pullThenPush, force];
+          const i = await choose("Push rejected", errorText(e), choices);
+          if (i < 0) return;
+          if (choices[i] === force) {
+            await push(path, true);
+            pushed = `Force pushed ${target}`;
+          } else {
+            await pull(path);
+            await push(path);
+            pushed = `Pulled and pushed ${target}`;
+          }
         }
       }, cur?.ahead ?? 0,
         // No upstream: ahead is unknown (0), but the branch exists only here.

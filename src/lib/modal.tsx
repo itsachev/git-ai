@@ -21,8 +21,8 @@ export function ModalHead({ id, icon, tone = "accent", title, sub }: { id: strin
 export const Brand = () => <span className="brand-name">git-ai</span>;
 
 // In-app replacement for the native confirm box, so confirms look like every other modal.
-/** One option of `choose`: `hint` is a plain line under the label. */
-export type Choice = { label: string; hint?: string; tone?: Tone };
+/** One option of `choose`: `hint` is a plain line under the label; `suggested` tags the likely right pick. */
+export type Choice = { label: string; hint?: string; tone?: Tone; suggested?: boolean };
 /** A text field of `prompt`. */
 export type Field = { label: string; value?: string; placeholder?: string };
 type Ask = { title: string; message: string; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; resolve: (i: number, values: string[]) => void };
@@ -81,7 +81,7 @@ export function ConfirmDialog() {
             <div className="choices">
               {a.choices.map((c, i) => (
                 <button key={c.label} type="button" className={`choice tone-${c.tone ?? "accent"}`} onClick={() => answer(i)}>
-                  <strong>{c.label}</strong>{c.hint && <span className="muted">{c.hint}</span>}
+                  <strong>{c.label}{c.suggested && <span className="choice-tag">Suggested</span>}</strong>{c.hint && <span className="muted">{c.hint}</span>}
                 </button>
               ))}
             </div>

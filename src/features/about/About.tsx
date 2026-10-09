@@ -41,6 +41,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Explain a commit (AI)", "Click a commit → Explain", "A plain-words summary of what the commit does and why. Its message and diff are sent to your AI provider."],
     ["File history and blame", "Commit details → History next to a file", "Every commit that touched the file, with its diff, and Blame: who last changed each line and in which commit."],
     ["Labels in the graph", "Right-click a branch or tag label", "The same menu as the sidebar, right where you see the label: checkout, merge, rebase onto it, branch from it and more."],
+    ["Commit menu", "Right-click any commit row", "The label's menu, or for a commit without one: new branch from it, merge it, rebase onto it, reset to it. Actions that would do nothing are greyed out."],
   ]],
   ["branch", "Branches, tags and stashes", [
     ["Sidebar", "Always visible on wide windows · Ctrl+B or ☰ on narrow ones", "Local and remote branches, tags, stashes and undo history, with a filter. ↑ and ↓ counts show commits waiting to be pushed or pulled."],
@@ -62,6 +63,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Pull", "Pull button · Ctrl+Shift+L", "Fetches and brings the new commits into your current branch. The badge shows how many are waiting."],
     ["Pull with rebase", "Right-click the Pull button, or Ctrl+K", "Puts your new commits on top of the remote's instead of adding a merge commit, for a straight history. Uncommitted changes are set aside and put back."],
     ["Push", "Push button · Ctrl+Shift+U", "Uploads your new commits to the remote. The badge shows how many, or \"new\" when the branch isn't on the remote yet."],
+    ["Force push", "Push → rejected → Force push", "After a rebase or amend, replaces the remote's commits with yours, but only if nobody pushed since your last fetch. Undo history can push the old commits back."],
     ["Manage remotes", "Sidebar → Remotes → + or a remote's ⋯", "Add a remote by name and URL, change its URL, or remove it. Removing only forgets it here; nothing changes on the server."],
     ["Passwords and SSH keys", "Asked when git needs them", "Sign-in goes through git's own credential helpers and your SSH key. When git asks for a password or passphrase, your answer goes straight to git and is never stored by the app."],
     ["Pull / merge request", "Right-click a local branch → Create pull request…, or Ctrl+K", "Opens a pull request on GitHub, or a merge request when the repo is on gitlab.com, with a title and description written by AI from the branch's commits. Needs GitHub or GitLab sign-in."],

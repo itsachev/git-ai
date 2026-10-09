@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useQueries, useQuery } from "@tanstack/react-query";
-import { graphRows, merge, rebaseOnto, resetTo } from "../../lib/ipc";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { commitDetails, graphRows, merge, rebaseOnto, resetTo } from "../../lib/ipc";
 import { openNewBranch } from "../refs/NewBranch";
 import type { GraphRow } from "../../bindings/GraphRow";
 import type { GraphOpts } from "../../bindings/GraphOpts";
@@ -72,6 +72,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
   const branch = refsData?.head;
   const refActions = useRefActions(path);
   const run = useRun();
+  const qc = useQueryClient();
   const menuPop = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<Action[]>([]);
 
@@ -80,21 +81,27 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
     const at = r.oid.slice(0, 7);
     const target = branch ?? "HEAD";
     return [`Reset ${target} to here…`, async () => {
-      const i = await choose(`Reset ${target} to ${at}`, `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
+      const i = await choose(`Reset ${target} to ${at}`, r.head
+        ? `${target} already points at “${r.summary}”, so only your uncommitted changes are affected. What should happen to them?`
+        : `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
         RESETS.map(([label, hint, tone]) => ({ label, hint, tone })), "branch");
       if (i >= 0) run(() => resetTo(path, r.oid, RESETS[i][3]), `Reset ${target} to ${at} (${RESETS[i][3].toLowerCase()})`);
     }];
   }
 
   /** Right-click on a commit row: picks it and opens its actions (its label's, local branch first, plus reset). */
-  function rowMenu(e: React.MouseEvent<HTMLDivElement>, i: number, r: GraphRow) {
+  async function rowMenu(e: React.MouseEvent<HTMLDivElement>, i: number, r: GraphRow) {
+    e.preventDefault();
     onSelect({ i, oid: r.oid });
     const ref = r.refs.find((n) => refsData?.local.some((b) => b.name === n)) ?? r.refs[0];
     const at = r.oid.slice(0, 7);
+    // Same query as the details pane, so it's usually cached already.
+    const inHead = !ref && branch && !r.head && (await qc.fetchQuery({ queryKey: ["commit", path, r.oid], queryFn: () => commitDetails(path, r.oid) }).catch(() => null))?.in_head;
+    const done = inHead ? `${branch} already has ${at}` : undefined;
     // Unlabeled commit: the same actions, by commit id.
     const own: Action[] = [["New branch from here", () => openNewBranch(r.oid)], ...(branch && !r.head ? [
-      [`Merge ${at} into ${branch}`, () => run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`)],
-      [`Rebase ${branch} onto ${at}`, () => run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`)],
+      [`Merge ${at} into ${branch}`, () => run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`), done],
+      [`Rebase ${branch} onto ${at}`, () => run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`), done],
     ] as Action[] : [])];
     flushSync(() => setMenu([...(ref ? refActions(ref) : own), resetAction(r)]));
     showMenu(menuPop.current, e);

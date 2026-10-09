@@ -54,6 +54,8 @@ await page.waitForTimeout(1500);
 return await page.evaluate(() => [...document.querySelectorAll('button')].map(b => b.innerText.trim()).filter(Boolean).join(' | '));
 ```
 
+If `connectOverCDP` throws `targetInfo: {... "type": "shared_worker" ...}` (Vite's blob worker has no `browserContextId`), patch the scratchpad copy: in `node_modules/playwright-core/lib/server/chromium/crBrowser.js`, `_onAttachedToTarget`, change `if (targetInfo.type === "browser")` to `if (targetInfo.type === "browser" || !targetInfo.browserContextId)`.
+
 Notes:
 - Read dialog text with `document.querySelectorAll('dialog[open]')`. Errors show as a dialog with an OK button.
 - Closed dialogs and popovers stay in the DOM. Use `.first()` or `.filter({ visible: true })` to avoid strict-mode errors.
