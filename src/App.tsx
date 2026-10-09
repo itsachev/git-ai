@@ -194,7 +194,10 @@ function App() {
         <p className="brand"><Mark /> <Brand /></p>
         <h1>Git, in plain sight.</h1>
         <p className="lede">Local-first. Discards, branch deletes and merges are recorded, so each one can be undone.</p>
-        <div className="tiles">
+        <div className="tiles" onPointerMove={(e) => {
+          const t = (e.target as HTMLElement).closest<HTMLElement>(".tile"), r = t?.getBoundingClientRect();
+          if (t && r) { t.style.setProperty("--mx", `${e.clientX - r.left}px`); t.style.setProperty("--my", `${e.clientY - r.top}px`); }
+        }}>
           <button className="tile primary" onClick={pick}>
             <Icon name="open" />
             <span><strong>Open repository</strong><small>A folder that contains .git</small></span>
