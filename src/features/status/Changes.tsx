@@ -7,7 +7,7 @@ import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
-import { Icon } from "../../lib/icons";
+import { Icon, type IconName } from "../../lib/icons";
 import { Splitter } from "../../lib/splitter";
 import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
@@ -177,7 +177,7 @@ export function Changes({ path }: { path: string }) {
         )}
         <div className="lists">
         {empty ? (
-          <p className="empty"><Icon name="changes" />Nothing to commit, working tree clean.</p>
+          <p className="empty"><Icon name="check" />No changes</p>
         ) : (
           <>
             <FileList {...list} title="Conflicts" files={data.conflicted} staged={false}
@@ -189,7 +189,7 @@ export function Changes({ path }: { path: string }) {
           </>
         )}
         </div>
-        <CommitBox path={path} canCommit={data.staged.length > 0} finishing={data.operation} conflicts={data.conflicted.length} run={run}
+        <CommitBox path={path} branch={data.branch} staged={data.staged.length} finishing={data.operation} conflicts={data.conflicted.length} run={run}
           onCommit={(msg, amend) => {
             // Committing during a merge/rebase may finish it; say so once nothing is left in progress.
             const op = amend ? null : data.operation;
@@ -202,20 +202,23 @@ export function Changes({ path }: { path: string }) {
           }} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />
-      {conflicted || resolved ? <Conflict key={cur.file} path={path} file={cur.file} op={data.operation} resolved={resolved} run={run} /> : <Diff path={path} sel={cur} run={run} />}
+      {conflicted || resolved ? <Conflict key={cur.file} path={path} file={cur.file} op={data.operation} resolved={resolved} run={run} />
+        : empty && !data.operation ? <Clean branch={data.branch} />
+        : <Diff path={path} sel={cur} kind={cur?.file && (cur.staged ? data.staged : data.unstaged).find((f) => f.path === cur.file)?.kind} run={run} />}
     </div>
   );
 }
 
 /** `finishing`: the merge/rebase/... in progress; committing finishes (or continues) it, an empty message uses git's.
  *  `conflicts`: unresolved files, which block that. */
-type CommitProps = { path: string; canCommit: boolean; finishing: string | null; conflicts: number; run: Run; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+type CommitProps = { path: string; branch: string | null; staged: number; finishing: string | null; conflicts: number; run: Run; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 /** What the Commit button does while `op` is in progress. */
 const finishLabel = (op: string) => op === "rebase" ? "continue the rebase" : `finish the ${op}`;
 
-function CommitBox({ path, canCommit, finishing, conflicts, run, onCommit }: CommitProps) {
+function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }: CommitProps) {
+  const canCommit = staged > 0;
   const [msg, setMsg] = useState("");
   const [amend, setAmend] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -240,6 +243,7 @@ function CommitBox({ path, canCommit, finishing, conflicts, run, onCommit }: Com
   // A merge commit may have nothing staged (all conflicts resolved to "ours").
   const ready = amend ? msg.trim() !== "" : finishing ? !conflicts : canCommit && msg.trim() !== "";
   const ok = ready && !busy;
+  const subject = msg.split("\n")[0].trim().length;
   function toggleAmend(on: boolean) {
     setAmend(on);
     if (on && !msg.trim() && head) setMsg(head);
@@ -256,6 +260,11 @@ function CommitBox({ path, canCommit, finishing, conflicts, run, onCommit }: Com
   }
   return (
     <form className="commit" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <div className="commit-head">
+        <label htmlFor="commit-msg">{amend ? "Amend" : "Commit"} to <span className="mono">{branch ?? "detached HEAD"}</span></label>
+        {/* Git convention: a subject line of 72 characters at most. */}
+        {subject > 0 && <span className={`subject-len${subject > 72 ? " over" : ""}`} title="Subject line length (72 max by convention)">{subject}/72</span>}
+      </div>
       <textarea
         id="commit-msg"
         aria-label="Commit message"
@@ -266,16 +275,17 @@ function CommitBox({ path, canCommit, finishing, conflicts, run, onCommit }: Com
         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
       />
       <div className="commit-row">
-        <button type="button" className="small" disabled={!canCommit || amend || !!finishing || writing} onClick={generate}
+        <button type="button" className="small ghost" disabled={!canCommit || amend || !!finishing || writing} onClick={generate}
           title={hasKey ? "Write a message from the staged changes (sent to your AI provider)" : "Set up AI in Settings first"}>
-          {writing ? "Writing…" : "Generate message"}
+          <Icon name="sparkle" />{writing ? "Writing…" : "Generate"}
         </button>
         <label className="check">
           <input type="checkbox" checked={amend} disabled={!head || !!finishing} onChange={(e) => toggleAmend(e.target.checked)} />
           Amend last commit
         </label>
         <button className="primary" disabled={!ok} title={finishing && conflicts ? "Resolve the conflicts first" : undefined}>
-          {busy ? "Working…" : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`) : "Commit"}
+          {busy ? "Working…" : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
+            : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}
         </button>
       </div>
     </form>
@@ -301,26 +311,21 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
     <section>
       <div className="list-head">
         <h2>{title} <span className="count">{files.length}</span></h2>
-        {onDiscard && <button className="small" onClick={() => onDiscard(files)}>Discard all</button>}
-        <button className="small" onClick={() => onAction(files)}>{action} all</button>
+        {onDiscard && <button className="small ghost" onClick={() => onDiscard(files)}>Discard all</button>}
+        <button className="small ghost" onClick={() => onAction(files)}>{action} all</button>
       </div>
       <ul className="files">
         {files.map((f) => {
-          const slash = f.path.lastIndexOf("/");
           const selected = sel?.file === f.path && sel.staged === staged;
           return (
             <li key={f.path} className={selected ? "sel" : undefined}>
               <button className="row" aria-pressed={selected} onClick={() => onSelect({ file: f.path, staged })}
                 title={f.orig_path ? `${f.orig_path} → ${f.path}` : f.path}>
-                <span className={`kind ${kindClass(f.kind)}`}>{f.kind}</span>
-                <span className="path">
-                  <strong>{f.path.slice(slash + 1)}</strong>
-                  {slash > 0 && <small>{f.path.slice(0, slash)}</small>}
-                </span>
+                <FileLabel f={f} />
               </button>
-              {onIgnore && f.kind === "?" && f.path !== ".gitignore" && <button className="small" onClick={() => onIgnore(f.path)}>Ignore</button>}
-              {onDiscard && <button className="small" onClick={() => onDiscard([f])}>Discard</button>}
-              <button className="small" onClick={() => onAction([f])}>{action}</button>
+              {onIgnore && f.kind === "?" && f.path !== ".gitignore" && <button className="small ghost" onClick={() => onIgnore(f.path)}>Ignore</button>}
+              {onDiscard && <button className="small ghost" onClick={() => onDiscard([f])}>Discard</button>}
+              <button className="small ghost" onClick={() => onAction([f])}>{action}</button>
             </li>
           );
         })}
@@ -454,9 +459,55 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
   );
 }
 
-type DiffProps = { path: string; sel: Selection | null; run: Run };
+type DiffProps = { path: string; sel: Selection | null; kind?: string; run: Run };
 
-function Diff({ path, sel, run }: DiffProps) {
+/** Folder (dimmed) + file name; the name never truncates first. */
+export function FileLabel({ f }: { f: FileChange }) {
+  const slash = f.path.lastIndexOf("/");
+  return (
+    <>
+      <span className={`kind ${kindClass(f.kind)}`}>{f.kind}</span>
+      <span className="path">
+        <strong>{f.path.slice(slash + 1)}</strong>
+        {slash > 0 && <small>{f.path.slice(0, slash)}</small>}
+      </span>
+    </>
+  );
+}
+
+/** Diff pane header: kind, folder/name, +added −removed. `lines`: the diff from its first "@@". */
+export function DiffHead({ file, kind, lines, children }: { file: string; kind?: string; lines?: string[]; children?: React.ReactNode }) {
+  const slash = file.lastIndexOf("/");
+  const count = (c: string) => lines?.reduce((n, l) => n + +(l[0] === c), 0) ?? 0;
+  return (
+    <header className="diff-head">
+      {kind && <span className={`kind ${kindClass(kind)}`}>{kind}</span>}
+      <span className="diff-file" title={file}>
+        {slash > 0 && <small>{file.slice(0, slash + 1)}</small>}<strong>{file.slice(slash + 1)}</strong>
+      </span>
+      {lines && <span className="stat" aria-label={`${count("+")} lines added, ${count("-")} removed`}><b className="plus">+{count("+")}</b><b className="minus">−{count("-")}</b></span>}
+      {children}
+    </header>
+  );
+}
+
+/** Centered message filling a pane: icon, title, one line. */
+export const PaneNote = ({ icon, title, children }: { icon: IconName; title: string; children?: React.ReactNode }) => (
+  <div className="pane-note"><span className="pane-note-icon"><Icon name={icon} /></span><strong>{title}</strong>{children}</div>
+);
+
+/** Nothing to commit: takes the whole diff pane. */
+function Clean({ branch }: { branch: string | null }) {
+  return (
+    <section className="diff clean">
+      <PaneNote icon="check" title="Working tree clean">
+        <p>Everything on <span className="mono">{branch ?? "detached HEAD"}</span> is committed. Edit a file and it shows up here.</p>
+      </PaneNote>
+    </section>
+  );
+}
+
+function Diff({ path, sel, kind, run }: DiffProps) {
   const { data, error } = useQuery({
     queryKey: ["diff", path, sel?.file, sel?.staged],
     queryFn: () => fileDiff(path, sel!.file, sel!.staged),
@@ -470,22 +521,26 @@ function Diff({ path, sel, run }: DiffProps) {
     setAnchor(null);
   }, [data, sel?.file, sel?.staged]);
 
-  if (!sel) return <section className="diff muted">Select a file to see its changes.</section>;
-  if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
-  if (data === undefined) return <section className="diff" />;
+  if (!sel) return <section className="diff"><PaneNote icon="changes" title="No file selected"><p>Pick a file to see its changes.</p></PaneNote></section>;
+  const head = <DiffHead file={sel.file} kind={kind} />;
+  if (error) return <section className="diff">{head}<p className="pane-note error" role="alert">{errorText(error)}</p></section>;
+  if (data === undefined) return <section className="diff">{head}</section>;
   if (data === null) {
     const pattern = lfsPatternFor(sel.file);
     return (
-      <section className="diff muted">
-        <p>Binary file or larger than 1 MB, no inline diff.</p>
-        {pattern && <button className="small" onClick={() => openLfs(pattern)}>Track {pattern} with Git LFS…</button>}
+      <section className="diff">
+        {head}
+        <PaneNote icon="info" title="No inline diff">
+          <p>Binary file or larger than 1 MB.</p>
+          {pattern && <button className="small" onClick={() => openLfs(pattern)}>Track {pattern} with Git LFS…</button>}
+        </PaneNote>
       </section>
     );
   }
   const all = data.replace(/\n$/, "").split("\n");
   // Skip the "diff --git / index / --- / +++" header; hunks start at the first "@@".
   const start = all.findIndex((l) => l.startsWith("@@"));
-  if (start < 0) return <section className="diff muted">No content changes.</section>;
+  if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
 
   const file = sel.file;
   const isChange = (i: number) => all[i][0] === "+" || all[i][0] === "-";
@@ -511,20 +566,20 @@ function Diff({ path, sel, run }: DiffProps) {
   // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
   return (
     <section className="diff">
-      <div className="diff-bar">
+      <DiffHead file={file} kind={kind} lines={all.slice(start)}>
         {picked.size ? (
-          <>
-            <span>{picked.size} line{picked.size > 1 ? "s" : ""} selected</span>
+          <span className="picked" role="status">
+            <span>{picked.size} line{picked.size > 1 ? "s" : ""}</span>
             {ops.map(([op, label]) => (
-              <button key={op} className="small" onClick={() => apply(op, [...picked], "the selected lines")}>{label} lines</button>
+              <button key={op} className={`small ${op === "Discard" ? "ghost" : "primary"}`} onClick={() => apply(op, [...picked], "the selected lines")}>{label}</button>
             ))}
-            <button className="small" onClick={() => setPicked(new Set())}>Clear</button>
-          </>
+            <button className="small ghost" onClick={() => setPicked(new Set())}>Clear</button>
+          </span>
         ) : (
-          <span className="muted">Click changed lines to select them, Shift+click for a range.</span>
+          <span className="hint">Click lines to pick them, Shift+click for a range</span>
         )}
-      </div>
-      <pre aria-label={`Diff of ${file}`}>
+      </DiffHead>
+      <pre key={file} aria-label={`Diff of ${file}`}>
         {lineNumbers(all, start).map(([o, n], k) => {
           const i = start + k;
           const l = all[i];
@@ -532,9 +587,9 @@ function Diff({ path, sel, run }: DiffProps) {
             return (
               <div key={i} className="hunk">
                 {ops.map(([op, label]) => (
-                  <button key={op} className="small" onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
+                  <button key={op} className="small ghost" onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
                 ))}
-                {l}
+                <span>{l}</span>
               </div>
             );
           if (!isChange(i)) return <div key={i}><Gutter o={o} n={n} />{l || " "}</div>;

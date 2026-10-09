@@ -306,7 +306,7 @@ function RemoteSummary({ name, actions }: { name: string; actions: Action[] }) {
   return (
     <>
       <summary onContextMenu={(e) => showMenu(pop.current, e)}>
-        {name}
+        <Icon name="chevron" />{name}
         <button className="icon-btn" onClick={(e) => showMenu(pop.current, e)} aria-label={`Actions for remote ${name}`} title="Actions"><Icon name="more" /></button>
       </summary>
       <RefMenu pop={pop} label={`Remote ${name}`} actions={actions} />

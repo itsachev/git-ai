@@ -496,8 +496,13 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .sidebar summary::-webkit-details-marker { display: none; }
 .sidebar summary:hover { color: var(--fg); }
 .sidebar summary .icon-btn { margin-left: auto; width: calc(var(--ctl) - 0.25rem); min-height: calc(var(--ctl) - 0.25rem); }
-.sidebar .nested { padding-left: 0.6rem; }
-.sidebar .nested summary { margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 0.85rem; font-weight: 500; font-family: var(--mono); }
+/* A remote group reads as a tree: its name lines up with local branch names (chevron in the dot's
+   column), its branches hang one step in from a guide line under the chevron. */
+.sidebar .nested > summary { margin-top: 0.15rem; min-height: calc(var(--ctl) - 0.15rem); font-size: 0.86rem; color: var(--fg); }
+.sidebar .nested > summary > .icon:first-child { width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--muted); transition: rotate 200ms var(--ease); }
+.sidebar .nested:not([open]) > summary > .icon:first-child { rotate: -90deg; }
+.sidebar .nested > .refs { margin-left: 0.78rem; box-shadow: inset 1px 0 var(--line); }
+.sidebar .nested > .refs .name { padding-left: 1.4rem; }
 .refs { list-style: none; padding: 0; margin: 0; }
 .refs li { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; border-radius: var(--r); padding-right: 0.25rem; transition: background-color 140ms; }
 .refs li:hover, .refs li:focus-within { background: var(--pick); }
@@ -532,60 +537,92 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .new-branch { display: grid; gap: 0.4rem; margin: 0.25rem 0 0.5rem; padding: 0.6rem; background: var(--panel); border-radius: 8px; box-shadow: var(--shadow); animation: rise 180ms var(--ease); }
 .new-branch button { justify-self: end; }
 
-/* ---------- File lists ---------- */
-.files { list-style: none; padding: 0; margin: 0; }
-.files li { display: flex; align-items: center; gap: 0.25rem; padding-right: 0.25rem; border-radius: var(--r); transition: background-color 140ms; }
-.files li:hover { background: var(--raised); }
-/* Hairline between rows, inset past the kind badge, fading at the right; hidden next to hover/selection. */
-.files li + li { position: relative; }
-.files li + li::before {
-  content: ""; position: absolute; top: 0; left: 2.6rem; right: 0.5rem; height: 1px; pointer-events: none;
-  background: linear-gradient(90deg, var(--line), transparent); transition: opacity 140ms;
+/* ---------- Panes: File Status + History ----------
+   One card language: every pane is a --panel card with a hairline ring; a pane's header is a quiet strip with
+   one strong thing in it (the file name, the commit subject). Row and hunk actions are ghost buttons, so the
+   dark push buttons stay for the few real actions (Commit, Fetch/Pull/Push). */
+.side, .commit-info, .graph, .diff {
+  background: var(--panel); border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.04);
 }
-.files li:hover::before, .files li:hover + li::before, .files li.sel::before, .files li.sel + li::before { opacity: 0; }
-.files li.sel { background: var(--accent); color: var(--accent-ink); box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 30%, transparent); }
+/* Ghost: text + icon, no fill until hover. */
+button.ghost { color: var(--muted); background: transparent; box-shadow: none; font-weight: 500; }
+button.ghost:hover:not(:disabled) { color: var(--fg); background: var(--pick); box-shadow: none; }
+button.ghost .icon { width: 1.05em; height: 1.05em; }
+/* Uppercase micro-labels for pane sections. */
+.list-head h2, .commit-info h3, .commit-head label, .graph-head, .commit-info dt {
+  font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+
+/* ---------- File lists ---------- */
+.files { list-style: none; padding: 0; margin: 0; display: grid; gap: 1px; }
+.files li { position: relative; display: flex; align-items: center; gap: 2px; padding-right: 0.25rem; border-radius: 8px; transition: background-color 140ms; }
+.files li:hover { background: var(--raised); }
+.files li.sel { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent); }
 .files li.sel .path small, .files li.sel .kind { color: inherit; }
-.files li.sel .path small { opacity: 0.8; }
+.files li.sel .path small { opacity: 0.75; }
+.files li.sel .kind { background: rgb(255 255 255 / 0.2); }
+.files li.sel button.ghost { color: var(--accent-ink); }
+.files li.sel button.ghost:hover:not(:disabled) { background: rgb(255 255 255 / 0.18); }
 .files .row {
   flex: 1; min-width: 0; justify-content: flex-start; gap: 0.6rem;
-  color: inherit; background: none; box-shadow: none; text-align: left; padding: 0 0.5rem; min-height: var(--ctl);
+  color: inherit; background: none; box-shadow: none; text-align: left; padding: 0 0.45rem; min-height: var(--ctl);
 }
-.files .row:hover { background: none; }
-.files li > button.small { opacity: 0; transition: opacity 160ms, box-shadow 240ms var(--ease), scale 200ms var(--spring); }
+.files .row:hover { background: none; box-shadow: none; }
+.files .row:active:not(:disabled) { scale: 1; filter: none; }
+/* Row actions: on hover/focus/selection where there is a mouse, always on touch. Opacity keeps them focusable. */
+.files li > button.small { min-height: 1.6rem; padding: 0 0.5rem; font-size: 0.8rem; opacity: 0; transition: opacity 160ms, background-color 160ms, color 160ms; }
 .files li:hover > button.small, .files li:focus-within > button.small, .files li.sel > button.small { opacity: 1; }
 @media (hover: none) { .files li > button.small { opacity: 1; } }
 .path { min-width: 0; display: flex; align-items: baseline; gap: 0.5rem; overflow: hidden; white-space: nowrap; }
 .path strong { font-weight: 500; flex-shrink: 0; }
-.path small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 0.8rem; }
+.path small { color: var(--faint); overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 0.76rem; }
 .kind {
-  flex-shrink: 0; display: inline-grid; place-items: center; min-width: 1.45rem; height: 1.3rem; padding: 0 0.2rem;
-  font: 700 0.72rem var(--mono); border-radius: 4px; color: var(--muted);
-  background: color-mix(in srgb, currentColor 14%, transparent);
+  flex-shrink: 0; display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.25rem; padding: 0 0.2rem;
+  font: 700 0.68rem var(--mono); border-radius: 5px; color: var(--muted);
+  background: color-mix(in srgb, currentColor 13%, transparent);
 }
 .k-M { color: var(--mod); }
 .k-A { color: var(--add); }
 .k-D, .k-X { color: var(--danger); }
 .k-R, .k-C { color: var(--info); }
 
-/* ---------- File Status ---------- */
+/* ---------- File Status: working tree card (lists + composer) beside the diff ---------- */
 .changes { display: grid; gap: 0.75rem; }
-.side { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; container: side / inline-size; }
-.lists { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; align-content: start; }
-.list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.6rem 0 0.2rem; padding-left: 0.4rem; }
-.list-head h2, .commit-info h3 {
-  display: flex; align-items: center; gap: 0.45rem; margin-right: auto;
-  font-size: 0.8rem; color: var(--muted);
-}
+.side { min-width: 0; display: flex; flex-direction: column; overflow: hidden; container: side / inline-size; }
+.side > .banner { margin: 0.5rem 0.5rem 0; }
+.lists { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.35rem; align-content: start; padding: 0.35rem 0.4rem 0.6rem; }
+.lists > .empty { justify-content: center; margin: 1.25rem 0; font-size: 0.9rem; }
+.lists > .empty .icon { color: var(--add); }
+.lists section { animation: rise 320ms var(--ease) backwards; }
+.lists section + section { animation-delay: 50ms; }
+.lists section + section + section { animation-delay: 100ms; }
+.list-head { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-height: 2.1rem; padding: 0.25rem 0 0.15rem 0.5rem; background: var(--panel); }
+.list-head h2 { display: flex; align-items: center; gap: 0.45rem; margin-right: auto; }
+.list-head .count { font-size: 0.68rem; }
+.list-head button.small { min-height: 1.6rem; padding: 0 0.5rem; font-size: 0.78rem; }
+/* Composer: docked at the bottom of the card, on a faintly sunken strip. */
 .commit {
-  display: grid; gap: 0.5rem; padding: 0.6rem; background: var(--panel);
-  border-radius: 10px; box-shadow: var(--shadow);
+  display: grid; gap: 0.5rem; margin-top: auto; padding: 0.7rem 0.75rem 0.75rem;
+  background: color-mix(in srgb, var(--sunken) 40%, var(--panel)); border-top: 1px solid var(--line);
 }
-.commit textarea { resize: vertical; min-height: 4.5rem; background: var(--bg); }
-.commit-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
-.commit-row .primary { min-width: 7rem; }
+.commit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; min-width: 0; }
+.commit-head label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.commit-head label .mono { text-transform: none; letter-spacing: 0; font-size: 0.78rem; color: var(--accent-fg); }
+.subject-len { flex: none; font: 600 0.72rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; transition: color 160ms; }
+.subject-len.over { color: var(--danger); }
+.commit textarea {
+  resize: vertical; min-height: 5rem; padding: 0.55rem 0.65rem; line-height: 1.5; border-radius: 9px;
+  background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.commit textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
+.commit-row { display: flex; align-items: center; gap: 0.35rem 0.6rem; flex-wrap: wrap; }
+.commit-row .check { margin-right: auto; font-size: 0.85rem; }
+.commit-row .ghost .icon { color: var(--accent-fg); }
+.commit-row .primary { min-width: 8.5rem; }
 .banner {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--mod) 45%, transparent); border-radius: var(--r);
+  border: 1px solid color-mix(in srgb, var(--mod) 45%, transparent); border-radius: 10px;
   background: color-mix(in srgb, var(--mod) 10%, var(--panel)); color: var(--fg);
 }
 .banner .icon { color: var(--mod); }
@@ -596,24 +633,38 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   /* Row actions drop under the file name instead of squeezing it to nothing. */
   .files li { flex-wrap: wrap; padding-bottom: 0.15rem; }
   .files .row { flex-basis: 100%; }
-  .files li > button.small { margin-left: auto; }
-  .files li > button.small + button.small { margin-left: 0; }
+  .files li > button.small:first-of-type { margin-left: auto; }
 }
 @container stage (min-width: 38rem) {
   .changes { height: 100%; grid-template-columns: var(--side-w, 22rem) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 0; }
   .side { min-height: 0; }
   .lists { flex: 1; min-height: 0; overflow: auto; }
-  .changes > .diff { min-height: 0; display: flex; flex-direction: column; }
+  .changes > .diff { min-height: 0; }
   .changes > .diff pre { flex: 1; min-height: 0; max-height: none; }
 }
 
-/* ---------- Diff ---------- */
-.diff { min-width: 0; }
-.diff.muted, .diff.error { display: grid; place-items: center; min-height: 8rem; padding: 1rem; text-align: center; border: 1px dashed var(--line-strong); border-radius: 10px; }
+/* ---------- Diff pane ---------- */
+.diff { min-width: 0; display: flex; flex-direction: column; overflow: hidden; container: pane / inline-size; }
+.diff-head {
+  flex: none; display: flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; padding: 0.35rem 0.5rem 0.35rem 0.8rem;
+  border-bottom: 1px solid var(--line); transition: background-color 200ms var(--ease);
+}
+.diff-head:has(.picked) { background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
+.diff-file { flex: 1; min-width: 0; display: flex; align-items: baseline; overflow: hidden; white-space: nowrap; font: 0.84rem var(--mono); letter-spacing: 0; }
+.diff-file small { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: inherit; color: var(--faint); }
+.diff-file strong { flex-shrink: 0; font-weight: 700; color: var(--fg); }
+.stat { flex: none; display: flex; gap: 0.5rem; font: 700 0.78rem var(--mono); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.stat .plus { color: var(--add); }
+.stat .minus { color: var(--danger); }
+.diff-head .hint { flex: none; font-size: 0.78rem; color: var(--faint); }
+.picked { flex: none; display: flex; align-items: center; gap: 0.3rem; animation: rise 220ms var(--ease); }
+.picked > span { margin-right: 0.3rem; font-size: 0.82rem; font-weight: 700; color: var(--accent-fg); font-variant-numeric: tabular-nums; }
+.picked button.small { min-height: 1.75rem; }
+@container pane (max-width: 34rem) { .diff-head .hint { display: none; } }
+@container pane (max-width: 26rem) { .diff-head { flex-wrap: wrap; } .picked { flex-basis: 100%; } }
 .diff pre {
-  margin: 0; overflow: auto; max-height: 70vh; padding: 0.35rem 0;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  font: 0.82rem/1.65 var(--mono); tab-size: 4;
+  margin: 0; overflow: auto; max-height: 70vh; padding: 0 0 0.5rem; background: var(--panel);
+  font: 0.82rem/1.7 var(--mono); tab-size: 4; animation: fade 240ms var(--ease);
 }
 .diff pre > div { padding: 0 0.9rem 0 0; white-space: pre; min-width: max-content; }
 /* Top-aligned: an empty number span would otherwise set the baseline and make the row taller. */
@@ -621,26 +672,49 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .diff pre > div:not(.add):not(.del) .ln { background: var(--panel); }
 .diff .ln span { width: 4.5ch; padding-right: 0.6ch; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .diff .ln span:last-child { border-right: 1px solid var(--line); }
-.diff .add { background: color-mix(in srgb, var(--add) 14%, var(--panel)); }
-.diff .del { background: color-mix(in srgb, var(--danger) 13%, var(--panel)); }
+.diff .add { background: color-mix(in srgb, var(--add) 12%, var(--panel)); }
+.diff .del { background: color-mix(in srgb, var(--danger) 11%, var(--panel)); }
 .diff .add .ln span { color: var(--add); }
 .diff .del .ln span { color: var(--danger); }
+/* Hunk headers stick to the top while their lines scroll by. */
 .diff .hunk {
-  display: flex; align-items: center; gap: 0.4rem; margin: 0.35rem 0; padding: 0.2rem 0.75rem;
-  color: var(--info); background: color-mix(in srgb, var(--info) 8%, var(--panel));
-  border-block: 1px solid color-mix(in srgb, var(--info) 15%, transparent);
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 2px; margin: 0.6rem 0 0.15rem; padding: 0.15rem 0.5rem;
+  font-size: 0.76rem; color: var(--info); background: color-mix(in srgb, var(--info) 7%, var(--panel));
+  border-block: 1px solid color-mix(in srgb, var(--info) 14%, transparent);
 }
-.diff .hunk:first-child { margin-top: 0; }
-.diff .hunk button { font-family: var(--sans); min-height: 1.6rem; }
+.diff .hunk:first-child { margin-top: 0; border-top: 0; }
+.diff .hunk > span { padding: 0.15rem 0.3rem; opacity: 0.85; }
+.diff .hunk button { font-family: var(--sans); min-height: 1.5rem; padding: 0 0.5rem; font-size: 0.76rem; color: var(--info); }
 .diff .pick { cursor: pointer; }
 .diff .pick:hover { box-shadow: inset 3px 0 var(--faint); }
 .diff .pick.on { box-shadow: inset 3px 0 var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
+/* Empty, binary, clean: a centered note filling the pane. */
+.pane-note { flex: 1; display: grid; place-content: center; justify-items: center; gap: 0.35rem; padding: 2rem 1.25rem; text-align: center; color: var(--muted); animation: rise 360ms var(--ease); }
+.pane-note strong { font: 700 1.05rem/1.25 var(--display); letter-spacing: -0.02em; color: var(--fg); }
+.pane-note p { margin: 0; max-width: 34ch; font-size: 0.9rem; text-wrap: pretty; }
+.pane-note button { margin-top: 0.6rem; }
+.pane-note-icon {
+  position: relative; display: grid; place-items: center; width: 3rem; height: 3rem; margin-bottom: 0.5rem; border-radius: 15px;
+  color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 11%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.pane-note-icon .icon { width: 1.5rem; height: 1.5rem; }
+/* Working tree clean: the hero of an empty File Status, with a slow green ring. */
+.diff.clean { background: radial-gradient(34rem 18rem at 50% 42%, color-mix(in srgb, var(--add) 8%, transparent), transparent 70%), var(--panel); }
+.clean .pane-note strong { font-size: clamp(1.5rem, 1rem + 2.4cqi, 2.4rem); font-weight: 750; letter-spacing: -0.04em; }
+.clean .pane-note-icon { width: 3.75rem; height: 3.75rem; border-radius: 50%; color: var(--add); background: color-mix(in srgb, var(--add) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--add) 25%, transparent); }
+.clean .pane-note-icon .icon { width: 1.8rem; height: 1.8rem; }
+.clean .pane-note-icon::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 1.5px solid var(--add); animation: ping 3s var(--ease) 600ms infinite; }
+.clean .pane-note .mono { color: var(--fg); }
+.diff.muted, .diff.error { display: grid; place-items: center; min-height: 8rem; padding: 1rem; text-align: center; }
+.diff > p.error { padding: 1rem; }
+/* Conflict view: bar and legend inside the card. */
+.diff > .diff-bar { padding: 0.4rem 0.5rem 0 0.8rem; }
+.diff > .legend { padding: 0 0.8rem; }
 .diff-bar { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-height: var(--ctl); margin-bottom: 0.4rem; font-size: 0.9rem; }
 .diff-bar > span { margin-right: auto; }
 .diff-bar > .split-btn, .diff-bar > .conflict-actions { margin-right: 0; }
 .conflict-file { min-width: 0; overflow-wrap: anywhere; }
 .conflict-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
-.changes > .diff { container: pane / inline-size; }
 @container pane (max-width: 40rem) {
   .conflict-file { flex-basis: 100%; }
   .conflict-actions { flex: 1; justify-content: stretch; }
@@ -667,37 +741,32 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 
 /* ---------- History ---------- */
 .history-view { height: 100%; display: grid; grid-template-rows: var(--graph-h, minmax(9rem, 1.1fr)) auto minmax(10rem, 1fr); }
-.graph-wrap { display: flex; flex-direction: column; gap: 0.4rem; min-height: 0; }
+.graph-wrap { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .graph-wrap > .graph { flex: 1; }
 .graph-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
 /* Segmented control: sunken track, the pressed option a raised pill. */
-.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--sunken); }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--sunken); }
 .seg button {
-  min-height: 1.75rem; padding: 0 0.7rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+  min-height: 1.75rem; padding: 0 0.75rem; border-radius: 7px; font-size: 0.8rem; font-weight: 600;
   color: var(--muted); background: none; box-shadow: none; transition: color 160ms, background-color 160ms, box-shadow 200ms, scale 200ms var(--spring);
 }
-.seg button:hover:not(:disabled) { color: var(--fg); }
-.seg button[aria-pressed="true"] { color: var(--accent-fg); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), inset 0 0 0 1px var(--line); }
+.seg button:hover:not(:disabled) { color: var(--fg); box-shadow: none; }
+.seg button[aria-pressed="true"] { color: var(--fg); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), inset 0 0 0 1px var(--line); }
 @media (pointer: coarse) { .seg button { min-height: 2.5rem; } }
 .graph {
-  --graph-cols: minmax(0, 1fr) 9.5rem 9rem 4.75rem;
-  display: flex; flex-direction: column; min-height: 0;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  --graph-cols: minmax(0, 1fr) 9.5rem 9.5rem 4.75rem;
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
 }
 .graph-head, .grow { display: grid; align-items: center; column-gap: 0.85rem; white-space: nowrap; }
-.graph-head {
-  font-size: 0.8rem; font-weight: 600; color: var(--muted);
-  padding: 0.35rem 0; border-bottom: 1px solid var(--line); background: var(--panel); overflow-y: hidden; scrollbar-gutter: stable;
-}
-.graph-head > span:first-child { padding-left: 0.6rem; }
-/* Header cells share the column classes; keep the header's own font. */
-.graph-head > span { font: inherit; color: inherit; }
+.graph-head { padding: 0.5rem 0 0.45rem; border-bottom: 1px solid var(--line); overflow-y: hidden; scrollbar-gutter: stable; }
+.graph-head > span:first-child { padding-left: 0.75rem; }
+.graph-head > span { font: inherit; color: inherit; } /* header cells share the column classes */
 .graph-body { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .graph-body:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: -2px; }
-.grow { position: absolute; left: 0; right: 0; font-size: 0.9rem; }
+.grow { position: absolute; left: 0; right: 0; font-size: 0.88rem; }
 .grow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Row separator; a pseudo-element so it survives the hover/head/sel backgrounds and box-shadows. The lane canvas draws over it. */
-.grow::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: var(--line); pointer-events: none; }
+.grow::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: color-mix(in srgb, var(--line) 60%, transparent); pointer-events: none; }
 .grow { transition: background-color 120ms; }
 .grow:hover { background: var(--raised); }
 .grow.head:not(.sel) { background: var(--active); box-shadow: var(--active-bar); }
@@ -708,14 +777,26 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .desc { display: flex; align-items: center; gap: 0.35rem; }
 .sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ref {
-  flex-shrink: 0; font: 600 0.72rem/1.5 var(--mono); padding: 0 0.4rem; border-radius: 4px;
-  color: var(--accent-fg); background: color-mix(in srgb, var(--accent-fg) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-fg) 30%, transparent);
+  flex-shrink: 0; font: 600 0.7rem/1.5 var(--mono); padding: 0 0.4rem; border-radius: 5px;
+  color: var(--accent-fg); background: color-mix(in srgb, var(--accent-fg) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-fg) 28%, transparent);
 }
 .grow.head .ref:first-child { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .grow.sel.head .ref:first-child { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); }
-.c-date, .c-author, .c-oid { color: var(--muted); font-size: 0.85rem; }
+.c-date, .c-author, .c-oid { color: var(--muted); font-size: 0.82rem; }
 .c-oid { font-family: var(--mono); }
+.c-author { display: flex; align-items: center; gap: 0.45rem; }
+.c-author > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Author initials on a hue from the name (Avatar in CommitGraph.tsx). */
+.avatar {
+  display: inline-grid; place-items: center; flex: none; width: 2rem; height: 2rem; border-radius: 50%;
+  font: 700 0.72rem/1 var(--sans); letter-spacing: 0.02em;
+  color: oklch(0.42 0.13 var(--h)); background: oklch(0.92 0.05 var(--h));
+  box-shadow: inset 0 0 0 1px oklch(0.42 0.13 var(--h) / 0.15);
+}
+:root[data-theme="dark"] .avatar { color: oklch(0.9 0.08 var(--h)); background: oklch(0.38 0.08 var(--h)); }
+.grow .avatar { width: 1.15rem; height: 1.15rem; font-size: 0.48rem; }
+.grow.sel .avatar { box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.6); }
 /* Columns follow the table's own width (the sidebar takes part of the window). */
 .graph { container-type: inline-size; }
 @container (max-width: 46rem) {
@@ -728,22 +809,48 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 }
 .history-bottom { display: grid; gap: 0.75rem; min-height: 0; overflow: auto; align-content: start; }
 .history-bottom .diff pre { max-height: none; }
-.commit-info { min-width: 0; padding: 0.9rem 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-.commit-info .subject { font: 600 1.3rem/1.25 var(--display); letter-spacing: -0.028em; overflow-wrap: anywhere; }
-.commit-info .message { margin: 0.5rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
-.commit-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
-.commit-info .explain { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; background: var(--active); border-left: 3px solid var(--accent); border-radius: 6px; }
-.commit-info .explain h3 { margin: 0 0 0.25rem; padding: 0; }
-.commit-info .explain p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.commit-info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.9rem; margin: 0 0 0.75rem; font-size: 0.88rem; }
-.commit-info dt { color: var(--muted); }
-.commit-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.commit-info dd.mono { font-size: 0.82rem; }
-.commit-info h3 { margin: 0.5rem 0 0.25rem; padding-left: 0.4rem; }
+/* Commit details: meta chips, the subject as the pane's headline, author line, an action strip, then files. */
+.commit-info { min-width: 0; padding: 1rem 1.1rem 0.75rem; overflow-x: hidden; container: info / inline-size; }
+.commit-info > * { animation: rise 380ms var(--ease) backwards; }
+.commit-info > :nth-child(2) { animation-delay: 30ms; }
+.commit-info > :nth-child(3) { animation-delay: 60ms; }
+.commit-info > :nth-child(4) { animation-delay: 90ms; }
+.commit-info > :nth-child(n + 5) { animation-delay: 120ms; }
+.ci-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.65rem; }
+button.sha {
+  min-height: 1.6rem; padding: 0 0.45rem 0 0.55rem; gap: 0.35rem; border-radius: 6px;
+  font: 600 0.78rem var(--mono); letter-spacing: 0; color: var(--accent-fg);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+button.sha:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 17%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+button.sha .icon { width: 0.9rem; height: 0.9rem; opacity: 0.75; }
+.ci-tag { padding: 0.1rem 0.5rem; border-radius: 999px; font: 700 0.66rem/1.5 var(--sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--pick); }
+.ci-tag.on { color: var(--add); background: color-mix(in srgb, var(--add) 13%, transparent); }
+.commit-info .subject { font: 700 clamp(1.15rem, 0.85rem + 1.6cqi, 1.65rem)/1.18 var(--display); letter-spacing: -0.032em; overflow-wrap: anywhere; text-wrap: balance; }
+.commit-info .message { margin: 0.6rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9rem; line-height: 1.6; color: var(--muted); }
+.ci-author { display: flex; align-items: center; gap: 0.65rem; min-width: 0; margin: 0.9rem 0 0.75rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+.ci-author > span:not(.avatar) { display: grid; min-width: 0; }
+.ci-author strong { font-size: 0.92rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-author small { font: 0.76rem var(--mono); letter-spacing: 0; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-author time { flex: none; margin-left: auto; font-size: 0.82rem; color: var(--muted); }
+/* Action strip: one sunken track of ghost buttons. */
+.commit-actions { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 0.85rem; padding: 3px; border-radius: 10px; background: color-mix(in srgb, var(--sunken) 55%, var(--panel)); }
+.commit-actions button.small { min-height: 1.85rem; padding: 0 0.6rem; font-size: 0.8rem; }
+.commit-actions button.ghost:hover:not(:disabled) { background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+.commit-actions button[aria-expanded="true"] { color: var(--accent-fg); background: var(--panel); }
+.commit-actions .ai .icon { color: var(--accent-fg); }
+@container info (max-width: 22rem) { .commit-actions button.small { flex: 1 1 auto; } }
+.commit-info .explain { margin: 0 0 0.85rem; padding: 0.7rem 0.85rem; border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+.commit-info .explain h3 { display: flex; align-items: center; gap: 0.35rem; margin: 0 0 0.35rem; padding: 0; color: var(--accent-fg); }
+.commit-info .explain p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9rem; line-height: 1.6; }
+.commit-info dl { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 0.3rem 0.9rem; margin: 0 0 0.9rem; }
+.commit-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: 0.85rem; }
+.commit-info dd.mono { font-size: 0.78rem; color: var(--muted); }
+.commit-info h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.3rem; padding-left: 0.45rem; }
 @container stage (min-width: 38rem) {
   .history-bottom { grid-template-columns: var(--info-w, 24rem) auto minmax(0, 1fr); column-gap: 0; overflow: hidden; align-content: stretch; }
-  .history-bottom > * { min-height: 0; overflow: auto; }
-  .history-bottom > .diff { display: flex; flex-direction: column; }
+  .history-bottom > * { min-height: 0; overflow: hidden auto; }
+  .history-bottom > .diff { overflow: hidden; }
   .history-bottom > .diff pre { flex: 1; min-height: 0; }
 }
 

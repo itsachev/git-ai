@@ -31,7 +31,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ["history", "History", [
     ["Commit graph", "History tab · Ctrl+2", "Every commit, with lanes that show where branches split and merge, and branch and tag labels. Arrow keys and Page Up / Down move the selection. Fast on 100k+ commits."],
     ["History options", "Options above the graph", "Show all branches or just the current one, hide or show remote branches, and sort by date or ancestor order."],
-    ["Commit details", "Click a commit", "Its message, author, date, parent commits, the files it changed and each file's diff."],
+    ["Commit details", "Click a commit", "Its message, author, date, parent commits, the files it changed and each file's diff. Click the short id to copy the full one."],
     ["Cherry-pick", "Click a commit → Cherry-pick", "Copies that one commit's change onto your current branch as a new commit. Use it to bring a single fix over from another branch without merging everything else."],
     ["Revert a commit", "Click a commit on your branch → Revert", "Adds a new commit that undoes that one's change, without rewriting history, so it is safe on shared branches. Recorded, so it can be undone."],
     ["Reset branch to a commit", "Right-click a commit → Reset to here…", "Moves your branch back (or forward) to that commit. Soft keeps the changes staged, Mixed keeps them as edits, Keep updates files but leaves your edits, Hard makes files match the commit. Undo history can reverse it; a hard reset backs up your edits first."],
