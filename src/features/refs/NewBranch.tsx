@@ -8,7 +8,7 @@ import { statusQuery, useRun } from "../status/Changes";
 import { refsQuery } from "./Sidebar";
 
 // One dialog per repo view; the toolbar, the sidebar "+", branch menus and the palette open it.
-// `from` = start point: null = HEAD, else a branch, remote branch or tag name.
+// `from` = start point: null = HEAD, else a branch, remote branch or tag name, or a commit id.
 let state: { from: string | null } | null = null;
 const subs = new Set<() => void>();
 export const openNewBranch = (from: string | null = null) => { state = { from }; subs.forEach((f) => f()); };
@@ -73,7 +73,9 @@ function Form({ path, initial }: { path: string; initial: string | null }) {
   const head = refs?.head ?? null;
   const all = [...(refs?.local ?? []), ...(refs?.remote ?? []), ...(refs?.tags ?? [])];
   const start = from || head;
-  const oid = all.find((r) => r.name === start)?.oid;
+  // Started from a commit id (graph row menu) rather than a ref name.
+  const byId = initial && !all.some((r) => r.name === initial) ? initial : null;
+  const oid = all.find((r) => r.name === start)?.oid ?? (start === byId ? byId : undefined);
   const commit = useQuery({ queryKey: ["commit", path, oid], queryFn: () => commitDetails(path, oid!), enabled: !!oid, staleTime: Infinity }).data;
   const isRemote = !!refs?.remote.some((r) => r.name === from);
 
@@ -128,6 +130,7 @@ function Form({ path, initial }: { path: string; initial: string | null }) {
         <div className="select">
           <select id="nb-from" value={from} onChange={(e) => setFrom(e.target.value)}>
             <option value="">{head ? `Current branch (${head})` : "Current commit (HEAD)"}</option>
+            {byId && <option value={byId}>Commit {byId.slice(0, 7)}</option>}
             {!!refs?.local.length && <optgroup label="Branches">{refs.local.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}</optgroup>}
             {!!refs?.remote.length && <optgroup label="Remote branches">{refs.remote.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}</optgroup>}
             {!!refs?.tags.length && <optgroup label="Tags">{refs.tags.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}</optgroup>}
