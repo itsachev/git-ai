@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { aiExplainStash, aiWriteRange, githubCreatePr } from "../../lib/ipc";
+import { aiExplainStash, aiWriteRange, createPr, prProvider } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { Refs } from "../../bindings/Refs";
 import { Icon } from "../../lib/icons";
@@ -9,9 +9,9 @@ import { ModalHead } from "../../lib/modal";
 import { useRun } from "../status/Changes";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { refsQuery } from "./Sidebar";
-import { GitHubAccount, userQuery } from "../github/GitHub";
+import { GitHubAccount, GitLabAccount, gitlabUserQuery, userQuery } from "../github/GitHub";
 
-// Pull request (title + description, AI-written on request, opened on GitHub), an AI release changelog or an
+// Pull request (title + description, AI-written on request, opened on GitHub, or a merge request on GitLab), an AI release changelog or an
 // AI explanation of what `head` adds on top of `base`; or, with `stash`, an AI explanation of that stash.
 // Opened from branch, tag and stash menus and the palette. "" = HEAD, base null = guess the default branch.
 type Kind = "pr" | "changelog" | "explain";
@@ -60,7 +60,13 @@ function RefOptions({ refs }: { refs: Refs | undefined }) {
 function Form({ path, initial }: { path: string; initial: State }) {
   const refs = useQuery(refsQuery(path)).data;
   const hasKey = useQuery(aiKeyQuery).data;
-  const login = useQuery(userQuery).data;
+  // The default remote's host picks the wording, the account and the API; elsewhere falls back to GitHub's.
+  const gitlab = useQuery({ queryKey: ["pr-provider", path], queryFn: () => prProvider(path) }).data === "gitlab";
+  const ghLogin = useQuery(userQuery).data;
+  const glLogin = useQuery(gitlabUserQuery).data;
+  const login = gitlab ? glLogin : ghLogin;
+  const host = gitlab ? "GitLab" : "GitHub";
+  const req = gitlab ? "merge request" : "pull request";
   const run = useRun();
   const [kind, setKind] = useState(initial.kind);
   const [head, setHead] = useState(initial.head);
@@ -102,8 +108,8 @@ function Form({ path, initial }: { path: string; initial: State }) {
   async function create() {
     setBusy(true);
     let url = "";
-    const done = await run(async () => { url = await githubCreatePr(path, head, baseShown, title.trim(), text); },
-      () => `Opened pull request #${url.split("/").pop()}`);
+    const done = await run(async () => { url = await createPr(path, head, baseShown, title.trim(), text); },
+      () => `Opened ${req} ${gitlab ? "!" : "#"}${url.split("/").pop()}`);
     setBusy(false);
     if (done) { openUrl(url); close(); }
   }
@@ -116,9 +122,9 @@ function Form({ path, initial }: { path: string; initial: State }) {
   return (
     // Enter in the PR title must not open the PR; only the button does.
     <form onSubmit={(e) => { e.preventDefault(); if (ok && !pr) generate(); }}>
-      <ModalHead id="wu-title" icon="sparkle" title={stash ? "Explain stash" : pr ? "Pull request" : explain ? "Explain branch" : "Changelog"}
+      <ModalHead id="wu-title" icon="sparkle" title={stash ? "Explain stash" : pr ? (gitlab ? "Merge request" : "Pull request") : explain ? "Explain branch" : "Changelog"}
         sub={stash ? `${stash.label}. Its changes, untracked files included, go to Gemini.`
-          : pr ? "Pushes the branch, then opens the pull request on GitHub. Write with AI sends commit messages and the diff to Gemini."
+          : pr ? `Pushes the branch, then opens the ${req} on ${host}. Write with AI sends commit messages and the diff to Gemini.`
           : explain ? "Commit messages and the combined diff go to Gemini, which says what the branch does."
           : "Commit messages and the combined diff go to Gemini. Edit the result before you use it."} />
 
@@ -168,7 +174,7 @@ function Form({ path, initial }: { path: string; initial: State }) {
           <textarea id="wu-text" value={text} onChange={(e) => setText(e.target.value)} spellCheck={pr} />
         </div>
       )}
-      {pr && login === null && <GitHubAccount />}
+      {pr && login === null && (gitlab ? <GitLabAccount /> : <GitHubAccount />)}
 
       <div className="dialog-actions">
         <button type="button" onClick={close}>Close</button>
@@ -179,8 +185,8 @@ function Form({ path, initial }: { path: string; initial: State }) {
         </button>
         {pr && (
           <button type="button" className="primary" onClick={create} disabled={!ok || !title.trim() || !login}
-            title={login ? undefined : "Sign in to GitHub first"}>
-            Create pull request
+            title={login ? undefined : `Sign in to ${host} first`}>
+            Create {req}
           </button>
         )}
       </div>

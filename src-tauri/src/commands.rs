@@ -306,11 +306,31 @@ pub async fn github_repos() -> Result<Vec<crate::github::GhRepo>, AppError> {
 }
 
 /// Pushes `head` (a local branch, "" = current; a remote branch is used as is), then opens a pull request
-/// into `base` on GitHub. Returns the PR's web URL.
+/// (GitHub) or merge request (GitLab) into `base`. Returns its web URL.
 #[tauri::command]
-pub async fn github_create_pr(path: String, head: String, base: String, title: String, body: String) -> Result<String, AppError> {
-    let (url, head, base) = cli::pr_branches(Path::new(&path), &head, &base, &|u| crate::github::check_remote(u).map(drop))?;
-    crate::github::create_pr(&url, &head, &base, &title, &body)
+pub async fn create_pr(path: String, head: String, base: String, title: String, body: String) -> Result<String, AppError> {
+    let check = |u: &str| match crate::gitlab::remote_slug(u) {
+        Some(_) => Ok(()),
+        None => crate::github::check_remote(u).map(drop).map_err(|_| {
+            AppError::new("not_hosted", format!("The remote ({u}) isn't on github.com or gitlab.com."))
+        }),
+    };
+    let (url, head, base) = cli::pr_branches(Path::new(&path), &head, &base, &check)?;
+    match crate::gitlab::remote_slug(&url) {
+        Some(_) => crate::gitlab::create_mr(&url, &head, &base, &title, &body),
+        None => crate::github::create_pr(&url, &head, &base, &title, &body),
+    }
+}
+
+/// "github", "gitlab" or None: where the repo's default remote lives, for the PR dialog's wording and sign-in.
+#[tauri::command]
+pub fn pr_provider(path: String) -> Option<String> {
+    let url = cli::default_remote_url(Path::new(&path)).ok()?;
+    if crate::gitlab::remote_slug(&url).is_some() {
+        Some("gitlab".into())
+    } else {
+        crate::github::check_remote(&url).ok().map(|_| "github".into())
+    }
 }
 
 #[tauri::command]

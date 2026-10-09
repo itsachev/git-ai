@@ -60,7 +60,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   reset_to: (a) => `Failed to reset to ${a.rev}`,
   ai_commit_message: () => "Failed to write a commit message",
   ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
-  github_create_pr: () => "Failed to open the pull request",
+  create_pr: () => "Failed to open the pull request",
   ai_explain_stash: () => "Failed to explain the stash",
   ai_write_range: (a) => a.kind === "pr" ? "Failed to write a PR description" : a.kind === "explain" ? "Failed to explain the branch" : "Failed to write a changelog",
 };
@@ -170,10 +170,12 @@ export const githubFinish = (code: DeviceCode) => invoke<string>("github_finish"
 export const githubUser = () => invoke<string | null>("github_user");
 /** Repos the signed-in user can clone, most recently pushed first; [] when signed out. */
 export const githubRepos = () => invoke<GhRepo[]>("github_repos");
-/** Pushes `head` ("" = current branch; a remote branch is used as is), then opens a PR into `base`. Returns its web URL.
- * Codes "signed_out", "not_github", "not_branch", "github" (GitHub refused, e.g. one already exists). */
-export const githubCreatePr = (path: string, head: string, base: string, title: string, body: string) =>
-  invoke<string>("github_create_pr", { path, head, base, title, body });
+/** Pushes `head` ("" = current branch; a remote branch is used as is), then opens a GitHub PR or GitLab MR into `base`.
+ * Returns its web URL. Codes "signed_out", "not_hosted", "not_branch", "github"/"gitlab" (refused, e.g. one already exists). */
+export const createPr = (path: string, head: string, base: string, title: string, body: string) =>
+  invoke<string>("create_pr", { path, head, base, title, body });
+/** Host of the default remote: "github", "gitlab" or null (elsewhere, or no remote). */
+export const prProvider = (path: string) => invoke<"github" | "gitlab" | null>("pr_provider", { path });
 export const githubSignOut =() => invoke<void>("github_sign_out");
 // GitLab (gitlab.com) sign-in, same device flow and calls as GitHub's. Code "gitlab" when the build has no client id.
 export const gitlabStart = () => invoke<DeviceCode>("gitlab_start");

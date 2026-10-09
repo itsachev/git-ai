@@ -166,20 +166,23 @@ pub fn repos() -> Result<Vec<GhRepo>, AppError> {
 
 /// "owner/name" of a github.com remote URL (https, ssh:// or scp-like git@github.com:owner/name).
 fn repo_slug(url: &str) -> Option<String> {
-    fn after_host(u: &str, sep: char) -> Option<&str> {
+    remote_path(url, "github.com").filter(|s| s.split('/').count() == 2)
+}
+
+/// The project path ("group/sub/name", at least two parts) of a remote URL on `host`.
+pub(crate) fn remote_path(url: &str, host_name: &str) -> Option<String> {
+    let after_host = |u: &'_ str, sep: char| -> Option<String> {
         let (host, rest) = u.split_once(sep)?;
         let host = host.rsplit_once('@').map_or(host, |(_, h)| h);
-        host.eq_ignore_ascii_case("github.com").then_some(rest)
-    }
+        host.eq_ignore_ascii_case(host_name).then(|| rest.to_string())
+    };
     let rest = match url.split_once("://") {
         Some(("https" | "ssh", u)) => after_host(u, '/')?,
         Some(_) => return None,
         None => after_host(url, ':')?,
     };
     let slug = rest.trim_end_matches('/').trim_end_matches(".git");
-    let mut parts = slug.split('/');
-    let ok = parts.next().is_some_and(|p| !p.is_empty()) && parts.next().is_some_and(|p| !p.is_empty()) && parts.next().is_none();
-    ok.then(|| slug.to_string())
+    (slug.split('/').count() >= 2 && slug.split('/').all(|p| !p.is_empty())).then(|| slug.to_string())
 }
 
 /// "owner/name" of `remote_url`, or a "not_github" error.
@@ -259,6 +262,12 @@ mod tests {
         assert_eq!(s("https://github.com.evil.io/a/b"), None);
         assert_eq!(s("http://github.com/a/b"), None);
         assert_eq!(s("https://github.com/a"), None);
+        assert_eq!(s("https://github.com/a/b/c"), None);
+        let gl = |u| super::remote_path(u, "gitlab.com");
+        assert_eq!(gl("git@gitlab.com:grp/sub/proj.git").as_deref(), Some("grp/sub/proj"));
+        assert_eq!(gl("https://oauth2@gitlab.com/a/b").as_deref(), Some("a/b"));
+        assert_eq!(gl("https://gitlab.com//b"), None);
+        assert_eq!(gl("https://github.com/a/b"), None);
     }
 
     #[test]

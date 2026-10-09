@@ -563,6 +563,10 @@ fn default_remote(repo: &Path) -> Result<String, AppError> {
     remote.map(|r| r.to_string()).ok_or_else(|| AppError::new("no_remote", "This repository has no remote yet (add one with `git remote add`)."))
 }
 
+pub fn default_remote_url(repo: &Path) -> Result<String, AppError> {
+    Ok(git(repo, &["remote", "get-url", "--", &default_remote(repo)?])?.trim().to_string())
+}
+
 /// Aborts the in-progress merge/cherry-pick/revert/rebase. Changed files are backed up first, since
 /// abort throws away conflict resolutions.
 pub fn abort(repo: &Path) -> Result<(), AppError> {

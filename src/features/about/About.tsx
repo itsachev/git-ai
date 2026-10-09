@@ -13,7 +13,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Recent repositories", "Home → Recent", "Every repository you have opened, with a filter box. Folders that were deleted or moved outside the app are flagged."],
     ["Remove from the list", "Right-click a recent repo, or its ⋯ button", "Takes the repository off the list, or also moves its folder to the Recycle Bin / Trash. You are warned first, because unpushed work goes with the folder."],
     ["GitHub sign-in", "Home → Sign in to GitHub", "Connects your GitHub account so you can clone your repos from a list and create pull requests. The token stays in your OS keychain."],
-    ["GitLab sign-in", "Home → Sign in to GitLab", "Connects your gitlab.com account so you can clone your projects from a list and push without typing a password. The token stays in your OS keychain and renews itself."],
+    ["GitLab sign-in", "Home → Sign in to GitLab", "Connects your gitlab.com account so you can clone your projects from a list, push without typing a password and create merge requests. The token stays in your OS keychain and renews itself."],
   ]],
   ["changes", "File Status", [
     ["See what changed", "File Status tab · Ctrl+1", "Lists your Staged files, unstaged Changes and Conflicts, and shows the diff of the file you click. Refreshes by itself the moment anything changes on disk."],
@@ -56,7 +56,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Pull", "Pull button · Ctrl+Shift+L", "Fetches and brings the new commits into your current branch. The badge shows how many are waiting."],
     ["Push", "Push button · Ctrl+Shift+U", "Uploads your new commits to the remote. The badge shows how many, or \"new\" when the branch isn't on the remote yet."],
     ["Passwords and SSH keys", "Asked when git needs them", "Sign-in goes through git's own credential helpers and your SSH key. When git asks for a password or passphrase, your answer goes straight to git and is never stored by the app."],
-    ["Pull request", "Right-click a local branch → Create pull request…, or Ctrl+K", "Opens a pull request on GitHub with a title and description written by AI from the branch's commits. Needs GitHub sign-in."],
+    ["Pull / merge request", "Right-click a local branch → Create pull request…, or Ctrl+K", "Opens a pull request on GitHub, or a merge request when the repo is on gitlab.com, with a title and description written by AI from the branch's commits. Needs GitHub or GitLab sign-in."],
     ["Changelog (AI)", "Right-click a tag → Changelog since this tag, or Ctrl+K", "Release notes written by AI from the commits between two points, ready to copy."],
   ]],
   ["warn", "Conflicts", [
