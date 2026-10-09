@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -22,7 +22,6 @@ import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
 import { Palette, type Command } from "./features/palette/Palette";
 import { LfsDialog, openLfs } from "./features/lfs/Lfs";
-import { BUILT_IN, TerminalPanel, terminalsQuery } from "./features/terminal/Terminal";
 import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { SetupWizard, openSetup } from "./features/setup/Setup";
 import { UpdateBanner } from "./features/update/Update";
@@ -318,10 +317,6 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     if (nConflicts && !hadConflicts.current) setTab("status");
     hadConflicts.current = nConflicts > 0;
   }, [nConflicts]);
-  // The Terminal button toggles the built-in panel, or opens the terminal app picked in Settings.
-  const termApp = useQuery(terminalsQuery).data?.chosen ?? BUILT_IN;
-  const [term, setTerm] = useState(false);
-  const openTerm = () => (termApp === BUILT_IN ? setTerm((v) => !v) : run(() => openTerminal(path)));
   const commands: Command[] = [
     { label: "Go to File Status", keys: "Ctrl+1", git: "git status", run: () => show("status") },
     { label: "Go to History", keys: "Ctrl+2", git: "git log --graph --oneline --all", run: () => show("history") },
@@ -331,7 +326,6 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
     { label: "Git LFS…", git: "git lfs track", run: () => openLfs() },
-    { label: termApp === BUILT_IN ? "Toggle terminal" : `Open in ${termApp}`, keys: "Ctrl+Shift+T", run: openTerm },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
@@ -376,8 +370,6 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <h1>{tab === "status" ? "File Status" : "History"}</h1>
           <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
           <SyncButtons sync={sync}><NewBranchButton /></SyncButtons>
-          <button className="icon-btn" onClick={openTerm} aria-label={termApp === BUILT_IN ? "Terminal" : `Open in ${termApp}`}
-            aria-pressed={termApp === BUILT_IN ? term : undefined} title={`${termApp === BUILT_IN ? "Terminal" : `Open in ${termApp}`} (Ctrl+Shift+T)`}><Icon name="terminal" /></button>
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>
@@ -389,7 +381,6 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         <FileHistoryDialog path={path} />
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
-        {term && termApp === BUILT_IN && <><Splitter name="body-h" axis="y" label="Resize terminal" /><TerminalPanel path={path} onClose={() => setTerm(false)} /></>}
         <footer className="statusbar"><Palette commands={commands} /></footer>
       </main>
     </div>

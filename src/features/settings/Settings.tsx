@@ -3,8 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { open as pickFile } from "@tauri-apps/plugin-dialog";
 import { homeDir, join } from "@tauri-apps/api/path";
-import { aiConfig, aiHasKey, aiSetConfig, aiSetKey, gitSetup, gitSetupSet, sshDetect, sshKey, sshKeySet, terminalSet } from "../../lib/ipc";
-import { BUILT_IN, terminalsQuery } from "../terminal/Terminal";
+import { aiConfig, aiHasKey, aiSetConfig, aiSetKey, gitSetup, gitSetupSet, sshDetect, sshKey, sshKeySet } from "../../lib/ipc";
 import { Icon } from "../../lib/icons";
 import { ModalHead } from "../../lib/modal";
 import { errorText } from "../status/Changes";
@@ -61,7 +60,6 @@ const SECTIONS = [
   { id: "settings-identity", title: "Git identity", icon: "user", hue: 265, Body: () => <GitIdentity /> },
   { id: "settings-ssh", title: "SSH key", icon: "key", hue: 165, Body: () => <SshKey /> },
   { id: "settings-ai", title: "AI features", icon: "sparkle", hue: 320, Body: () => <AiKey /> },
-  { id: "settings-terminal", title: "Terminal", icon: "terminal", hue: 210, Body: () => <TerminalPick /> },
 ] as const;
 
 /** Setup at a glance: each section's current value and whether it's ready. Clicking jumps to the card. */
@@ -70,14 +68,12 @@ function SettingsNav() {
   const ssh = useQuery(sshKeyQuery).data;
   const cfg = useQuery(aiConfigQuery).data;
   const has = useQuery(aiKeyQuery).data;
-  const term = useQuery(terminalsQuery).data?.chosen ?? BUILT_IN;
   const ai = PROVIDERS[cfg && cfg.provider in PROVIDERS ? cfg.provider : "gemini"];
   const local = cfg?.provider === "openai" && !!cfg.base_url.trim();
   // [value, state]: ok = set up, idle = fine as is, todo = needs doing.
   const status: Record<string, [string, "ok" | "idle" | "todo"]> = {
     "settings-identity": setup?.name && setup.email ? [`${setup.name} · ${setup.email}`, "ok"] : ["Not set", "todo"],
     "settings-ssh": ssh ? [ssh.split(/[\\/]/).pop()!, "ok"] : ["ssh defaults", "idle"],
-    "settings-terminal": [term, term === BUILT_IN ? "idle" : "ok"],
     "settings-ai": [`${ai.name} · ${local ? "local server" : has ? "key set" : "no key"}`, local || has ? "ok" : "todo"],
   };
   function go(id: string) {
@@ -296,37 +292,6 @@ export function SshKey() {
         <button className={offer ? undefined : "primary"} onClick={choose}>{key ? "Change key" : offer ? "Choose another key" : "Choose key"}</button>
         {key && <button onClick={() => save(null)}>Use ssh defaults</button>}
       </div>
-      {error && <p className="error" role="alert">{error}</p>}
-    </section>
-  );
-}
-
-/** What the toolbar's Terminal button opens: the panel inside the app, or a terminal app installed here. */
-function TerminalPick() {
-  const qc = useQueryClient();
-  const t = useQuery(terminalsQuery).data;
-  const [error, setError] = useState<string | null>(null);
-  async function pick(name: string) {
-    setError(null);
-    try {
-      await terminalSet(name);
-      qc.invalidateQueries({ queryKey: ["terminals"] });
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }
-  return (
-    <section className="setting">
-      <h3><span className="about-icon"><Icon name="terminal" /></span>Terminal</h3>
-      <p className="muted">
-        The Terminal button (Ctrl+Shift+T) opens a shell in the repository folder: in a panel under the current view,
-        or in a terminal app of your choice.
-      </p>
-      <label>Open in
-        <select value={t?.chosen ?? BUILT_IN} onChange={(e) => pick(e.target.value)} disabled={!t}>
-          {(t?.found ?? [BUILT_IN]).map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </label>
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );

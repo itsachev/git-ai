@@ -435,19 +435,6 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .palette-trigger:hover { color: var(--fg); background: var(--pick); }
 .palette-trigger kbd { margin-left: 0.25rem; }
 
-/* Built-in terminal (src/features/terminal): under the view; the splitter sets the view's height. */
-.stage:has(> .term-panel) > .stage-body { flex: 0 1 var(--body-h, 60%); }
-.stage > .split-y { flex: none; height: 7px; margin-block: -3.5px; z-index: 5; }
-.term-panel { flex: 1; min-height: 6rem; display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--panel); }
-.term-panel > header { display: flex; align-items: center; gap: 0.4rem; padding: 0 0.25rem 0 0.75rem; min-height: var(--ctl); font-size: 0.8rem; }
-.term-panel > header > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.term-panel > header .icon-btn { min-height: var(--ctl); }
-.term-host { flex: 1; min-height: 0; padding: 0 0 0.25rem 0.75rem; }
-.term-host .xterm { height: 100%; }
-/* xterm paints the leftover strip under the last row black. */
-.term-host .xterm-viewport { background-color: var(--panel) !important; }
-.icon-btn[aria-pressed="true"] { color: var(--accent-fg); background: var(--active); }
-
 /* Wide: rail beside the stage. Narrow: rail is a drawer over it. */
 .menu { display: none; }
 @media (min-width: 48rem) {
