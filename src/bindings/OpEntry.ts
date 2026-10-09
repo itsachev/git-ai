@@ -10,7 +10,7 @@ export type OpEntry = {
 id: string, 
 /**
  * "discard", "amend", "merge", "cherry-pick", "abort <op>", "delete branch", "delete tag",
- * "drop stash", "pull", "delete remote branch", or "undo <op>" for the undo of an op.
+ * "drop stash", "pull", "delete remote branch", "force push", or "undo <op>" for the undo of an op.
  */
 op: string, 
 /**

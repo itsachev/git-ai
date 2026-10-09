@@ -10,7 +10,8 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { RefMenu, refsQuery, showMenu } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
-import { Brand, ModalHead } from "../../lib/modal";
+import { Brand, ModalHead, confirm } from "../../lib/modal";
+import type { AppError } from "../../bindings/AppError";
 
 export type Sync = ReturnType<typeof useSync>;
 
@@ -19,7 +20,7 @@ export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const [busy, setBusy] = useState<string | null>(null);
-  const op = (label: string, doing: string, done: string, fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
+  const op = (label: string, doing: string, done: string | (() => string | undefined), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
     label, doing, badge, hint,
     go: async () => {
       if (busy) return;
@@ -28,13 +29,27 @@ export function useSync(path: string, run: Run) {
       setBusy(null);
     },
   });
+  let pushed: string | undefined;
+  const target = `${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`;
   return {
     busy,
     pullRebase: op("Pull with rebase", "Pulling…", `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true)).go,
     ops: [
       op("Fetch", "Fetching…", "Fetched all remotes", () => fetchAll(path)),
       op("Pull", "Pulling…", `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
-      op("Push", "Pushing…", `Pushed ${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`, () => push(path), cur?.ahead ?? 0,
+      op("Push", "Pushing…", () => pushed, async () => {
+        pushed = undefined;
+        try {
+          await push(path);
+          pushed = `Pushed ${target}`;
+        } catch (e) {
+          if ((e as AppError).code !== "rejected") throw e;
+          // Usual after a rebase or amend: the remote still has the old commits.
+          if (!(await confirm("Push rejected", `${errorText(e)} If you rewrote this branch on purpose (rebase, amend), force push replaces the remote's commits with yours. Undo history (sidebar) can put them back.`, "Force push", "danger"))) return;
+          await push(path, true);
+          pushed = `Force pushed ${target}`;
+        }
+      }, cur?.ahead ?? 0,
         // No upstream: ahead is unknown (0), but the branch exists only here.
         ...(cur && !cur.upstream ? ["new", `${cur.name} isn't on the remote yet. Push publishes it.`] as const : [])),
     ],

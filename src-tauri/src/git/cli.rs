@@ -407,7 +407,9 @@ fn net_error(e: AppError) -> AppError {
     }
     let m = e.message.as_str();
     let has = |pats: &[&str]| pats.iter().any(|p| m.contains(p));
-    let (code, text) = if has(&["[rejected]", "non-fast-forward", "fetch first"]) {
+    let (code, text) = if has(&["(stale info)"]) {
+        ("stale", "The remote branch changed since your last fetch. Fetch, check what's there, then force push again.")
+    } else if has(&["[rejected]", "non-fast-forward", "fetch first"]) {
         ("rejected", "The remote has commits you don't have yet. Pull first, then push.")
     } else if has(&["Authentication failed", "Permission denied", "could not read Username", "could not read Password", "Host key verification failed"]) {
         ("auth", "Signing in to the remote failed. Check your credentials or SSH key.")
@@ -477,9 +479,10 @@ pub fn pull(repo: &Path, rebase: bool) -> Result<(), AppError> {
 }
 
 /// Pushes the current branch to its upstream. Without one it goes to the same name on `origin` (or the
-/// first remote) and becomes the upstream.
-pub fn push(repo: &Path) -> Result<(), AppError> {
-    push_branch(repo, &current_branch(repo)?, &|_| Ok(())).map(drop)
+/// first remote) and becomes the upstream. `force` overwrites the remote branch, but only if it is still
+/// where the last fetch saw it (`--force-with-lease`); the old tip is logged and kept so undo can put it back.
+pub fn push(repo: &Path, force: bool) -> Result<(), AppError> {
+    push_branch(repo, &current_branch(repo)?, &|_| Ok(()), force).map(drop)
 }
 
 /// Checks a remote URL before anything is pushed to it.
@@ -493,7 +496,7 @@ fn current_branch(repo: &Path) -> Result<String, AppError> {
 }
 
 /// Pushes local `branch` as `push` does; returns the remote and the branch name there.
-fn push_branch(repo: &Path, branch: &str, check: UrlCheck) -> Result<(String, String), AppError> {
+fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool) -> Result<(String, String), AppError> {
     let config = |key: &str| git(repo, &["config", "--get", &format!("branch.{branch}.{key}")]).ok().map(|s| s.trim().to_string());
     let src = format!("refs/heads/{branch}");
     let (remote, dst, new) = match (config("remote"), config("merge")) {
@@ -502,13 +505,30 @@ fn push_branch(repo: &Path, branch: &str, check: UrlCheck) -> Result<(String, St
     };
     ref_arg(&remote)?;
     check(git(repo, &["remote", "get-url", "--", &remote])?.trim())?;
+    let short = dst.strip_prefix("refs/heads/").unwrap_or(&dst).to_string();
+    let tracking = format!("refs/remotes/{remote}/{short}");
+    // Expected remote tip for the lease: what the last fetch saw ("" = must not exist yet).
+    let old = if force { rev(repo, &tracking).ok() } else { None };
+    let lease = format!("--force-with-lease={dst}:{}", old.as_deref().unwrap_or(""));
     let spec = format!("{src}:{dst}");
     let mut args = vec!["push", "-q", &remote, &spec];
     if new {
         args.insert(2, "-u");
     }
+    if force {
+        args.insert(2, &lease);
+    }
     git_net(repo, &args)?;
-    Ok((remote, dst.strip_prefix("refs/heads/").unwrap_or(&dst).to_string()))
+    if let Some(old) = old {
+        let new_tip = rev(repo, &src)?;
+        if old != new_tip {
+            let mut e = crate::oplog::OpEntry::new("force push", Some(old.clone()), Some(new_tip));
+            git(repo, &["update-ref", &format!("refs/git-ai/kept/{}", e.id), &old])?;
+            e.ref_name = Some(tracking);
+            crate::oplog::record(repo, e)?;
+        }
+    }
+    Ok((remote, short))
 }
 
 /// Readies `head` for a pull request into `base`. A local branch ("" = current) is pushed first; a remote
@@ -522,7 +542,7 @@ pub fn pr_branches(repo: &Path, head: &str, base: &str, check: UrlCheck) -> Resu
             let b = if head.is_empty() { current_branch(repo)? } else { head.to_string() };
             rev(repo, &format!("refs/heads/{b}"))
                 .map_err(|_| AppError::new("not_branch", format!("'{b}' isn't a branch. Pick a branch to open the pull request from.")))?;
-            push_branch(repo, &b, check)?
+            push_branch(repo, &b, check, false)?
         }
     };
     let base = remote_branch(base).map_or_else(|| base.to_string(), |(_, b)| b);
@@ -592,9 +612,17 @@ pub fn delete_remote_branch(repo: &Path, name: &str) -> Result<(), AppError> {
 }
 
 /// Recreates remote branch `name` ("origin/feat") at `oid`. Fails if it exists again and moved on.
-pub fn restore_remote_branch(repo: &Path, name: &str, oid: &str) -> Result<(), AppError> {
+/// With `lease`, overwrites the branch instead, but only while its tip is still `lease`.
+pub fn restore_remote_branch(repo: &Path, name: &str, oid: &str, lease: Option<&str>) -> Result<(), AppError> {
     let (remote, branch) = split_remote(repo, name)?;
-    git_net(repo, &["push", "-q", &remote, &format!("{oid}:refs/heads/{branch}")]).map(drop)
+    let dst = format!("refs/heads/{branch}");
+    let spec = format!("{oid}:{dst}");
+    let lease = lease.map(|l| format!("--force-with-lease={dst}:{l}"));
+    let mut args = vec!["push", "-q", &remote, &spec];
+    if let Some(l) = &lease {
+        args.insert(2, l);
+    }
+    git_net(repo, &args).map(drop)
 }
 
 /// "origin/feat" -> ("origin", "feat"), matched against the configured remotes (names may contain '/').
