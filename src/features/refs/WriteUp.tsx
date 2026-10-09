@@ -123,10 +123,10 @@ function Form({ path, initial }: { path: string; initial: State }) {
     // Enter in the PR title must not open the PR; only the button does.
     <form onSubmit={(e) => { e.preventDefault(); if (ok && !pr) generate(); }}>
       <ModalHead id="wu-title" icon="sparkle" title={stash ? "Explain stash" : pr ? (gitlab ? "Merge request" : "Pull request") : explain ? "Explain branch" : "Changelog"}
-        sub={stash ? `${stash.label}. Its changes, untracked files included, go to Gemini.`
-          : pr ? `Pushes the branch, then opens the ${req} on ${host}. Write with AI sends commit messages and the diff to Gemini.`
-          : explain ? "Commit messages and the combined diff go to Gemini, which says what the branch does."
-          : "Commit messages and the combined diff go to Gemini. Edit the result before you use it."} />
+        sub={stash ? `${stash.label}. Its changes, untracked files included, go to your AI provider.`
+          : pr ? `Pushes the branch, then opens the ${req} on ${host}. Write with AI sends commit messages and the diff to your AI provider.`
+          : explain ? "Commit messages and the combined diff go to your AI provider, which says what the branch does."
+          : "Commit messages and the combined diff go to your AI provider. Edit the result before you use it."} />
 
       {!stash && (
         <>
@@ -180,7 +180,7 @@ function Form({ path, initial }: { path: string; initial: State }) {
         <button type="button" onClick={close}>Close</button>
         {text && <button type="button" onClick={copy}>{copied ? "Copied" : "Copy"}</button>}
         <button className={pr ? undefined : "primary"} type={pr ? "button" : "submit"} onClick={pr ? generate : undefined}
-          disabled={!ok} title={hasKey ? undefined : "Add a Gemini API key in Settings first"}>
+          disabled={!ok} title={hasKey ? undefined : "Set up AI in Settings first"}>
           {busy ? "Working…" : pr ? "Write with AI" : explain ? (text ? "Explain again" : "Explain") : text ? "Write again" : "Write"}
         </button>
         {pr && (

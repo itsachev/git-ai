@@ -241,7 +241,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .brand .brand-name { font-size: clamp(2.1rem, 5vw, 3.4rem); }
 .brand .mark { width: clamp(1.9rem, 4.4vw, 3rem); height: auto; aspect-ratio: 1; }
 .lede { max-width: 30rem; margin: 1.5rem 0 2rem; font-size: 1.1rem; color: var(--muted); text-wrap: pretty; }
-.tiles { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); max-width: 34rem; }
+.tiles { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); max-width: 38rem; }
 .tile {
   justify-content: flex-start; gap: 0.85rem; text-align: left; white-space: normal;
   min-height: 4.25rem; padding: 0.75rem 1rem; border-radius: 10px;
@@ -293,16 +293,45 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 @media (hover: none) { .recent .icon-btn { opacity: 1; } }
 .modal .dialog-actions { flex-wrap: wrap; }
 
-.clone, .account .device {
+.account .device {
   display: grid; gap: 0.75rem; margin-top: 1rem; max-width: 34rem; padding: 1rem;
   background: var(--panel); border-radius: 12px; box-shadow: var(--shadow);
   animation: rise 220ms var(--ease);
 }
-.clone label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+/* Clone: two numbered steps (Source, Destination) on sunken cards. Every control shares one height (--field) and
+   the sans font. Pairs (GitHub | GitLab, Parent | Folder) sit side by side from 2 x 15rem, stacked on phones. */
+dialog.clone-dialog { width: min(44rem, 100vw - 2rem); }
+.clone { --field: calc(var(--ctl) + 0.5rem); display: grid; gap: 0.9rem; }
+.clone .modal-head { margin-bottom: 0.2rem; }
+.clone-step {
+  display: grid; gap: 0.85rem; min-width: 0; margin: 0; padding: 1rem 1.1rem 1.1rem; border: 0; border-radius: 14px;
+  background: color-mix(in srgb, var(--sunken) 55%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+}
+.clone-step legend {
+  float: left; display: flex; align-items: center; gap: 0.55rem; padding: 0;
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.clone-step legend + * { clear: left; }
+.clone-step legend span {
+  display: grid; place-items: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; letter-spacing: 0;
+  font-size: 0.75rem; color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.clone-pair { display: grid; gap: 0.85rem 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
+.clone-pair:empty { display: none; }
+.clone label { display: grid; gap: 0.35rem; min-width: 0; font-size: 0.85rem; color: var(--muted); }
+.clone input, .clone .select select { min-height: var(--field); padding-block: 0; font: 0.95rem var(--sans); }
+.clone .select select { padding-left: 0.55rem; }
 .pick-dir { display: flex; gap: 0.4rem; }
+.pick-dir button { min-height: var(--field); padding: 0 0.85rem; }
+.pick-dir button .icon { width: 1.05rem; height: 1.05rem; }
+/* Where the clone lands, built live from the two destination fields. */
+.clone-path { display: flex; gap: 0.5rem; align-items: baseline; margin: 0; font-size: 0.82rem; color: var(--faint); }
+.clone-path code { min-width: 0; overflow-wrap: anywhere; color: var(--fg); }
+.clone .progress:empty, .clone-path:empty { display: none; }
 /* git's progress line, e.g. "Receiving objects:  42% (420/1000)". */
-.clone .progress { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.8rem var(--mono); }
+.clone .progress { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.8rem var(--mono); }
 .clone .error { margin: 0; }
+.clone .dialog-actions { margin-top: 0.35rem; }
 /* Provider accounts (features/github/GitHub.tsx): glass chips in the tiles' grid, so they line up under Open / Clone.
    .account is display: contents so the device-code panel and errors can span the whole row. */
 .accounts { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); max-width: 34rem; margin-top: 1.25rem; }
@@ -870,10 +899,44 @@ dialog.modal[open] .about-grid section { animation: rise 460ms var(--ease) backw
 .feat-how kbd { font-size: 0.74rem; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line-strong), inset 0 0 0 1px var(--line); }
 .about-grid mark { color: inherit; background: color-mix(in srgb, var(--hc) 30%, transparent); border-radius: 3px; padding: 0 0.1em; }
 .about-none { padding: 2rem 0; text-align: center; color: var(--muted); }
-/* 90% wide like About; sections flow into two columns once each can get ~26rem. */
-dialog.modal.settings { width: min(90vw, 100vw - 2rem); }
-.settings-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(max(min(26rem, 100%), 34%), 1fr)); } /* 34% floor caps it at two */
-dialog.settings .setting + .setting { padding-top: 1rem; border-top: 0; }
+/* ---------- Settings (features/settings/Settings.tsx): a status rail beside one hued card per section.
+   The rail shows each section's live value and a readiness dot; wide windows keep it sticky on the left,
+   narrow ones lay it out as a strip above the cards. ---------- */
+dialog.modal.settings { width: min(60rem, 100vw - 2rem); }
+.settings-nav button, .settings-card { --hc: color-mix(in oklab, oklch(0.62 0.17 var(--h)) 82%, var(--fg)); }
+.settings-layout { display: grid; gap: 1rem; }
+.settings-nav { display: grid; gap: 0.4rem; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); }
+.settings-nav button {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 0.65rem; min-height: 44px; padding: 0.5rem 0.65rem;
+  border-radius: 12px; cursor: pointer; background: color-mix(in srgb, var(--sunken) 55%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); transition: box-shadow 160ms var(--ease), background-color 160ms;
+}
+.settings-nav button:hover { background: color-mix(in srgb, var(--hc) 8%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 40%, var(--line)); }
+.settings-nav button:active { scale: 0.985; }
+.settings-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-nav-text { display: grid; flex: 1; min-width: 0; }
+.settings-nav-text strong { font-size: 0.9rem; }
+.settings-nav-text small { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.settings-dot { flex: none; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--faint); }
+.state-ok .settings-dot { background: var(--add); box-shadow: 0 0 0 3px color-mix(in srgb, var(--add) 20%, transparent); }
+.state-todo .settings-dot { background: var(--mod); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mod) 22%, transparent); }
+dialog.modal[open] .settings-nav button { animation: rise 420ms var(--ease) backwards; animation-delay: calc(120ms + var(--i) * 60ms); }
+.settings-cards { display: grid; gap: 0.9rem; min-width: 0; }
+.settings-card { border-radius: 14px; }
+dialog.settings .settings-card .setting {
+  background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, color-mix(in srgb, var(--sunken) 55%, var(--panel));
+  transition: box-shadow 200ms var(--ease);
+}
+dialog.settings .settings-card .setting:focus-within { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 40%, var(--line)); }
+dialog.settings .setting h3 { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
+dialog.settings .setting > p.muted { max-width: 68ch; line-height: 1.5; text-wrap: pretty; }
+.settings-card.lit { animation: lit 1.6s var(--ease); }
+dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards; animation-delay: calc(200ms + var(--i) * 60ms); }
+@media (min-width: 52rem) {
+  .settings-layout { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; }
+  /* Header = pad + 2.6rem badge + 1rem; sticky offsets start at the content edge. */
+  .settings-nav { position: sticky; top: 4.1rem; align-self: start; grid-template-columns: none; }
+}
 /* Section titles inside any modal: larger and heavier than body text so sections scan at a glance. */
 dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg); }
 .modal-text { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
@@ -942,6 +1005,8 @@ dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdro
 .new-branch-dialog .modal-head { margin-bottom: 0; }
 .new-branch-dialog .dialog-actions { margin-top: 0; }
 .nb-field { display: grid; gap: 0.4rem; }
+.prompt-field { margin-bottom: 0.9rem; font-size: 0.85rem; font-weight: 700; }
+.prompt-field input { font-weight: 400; }
 .nb-field > label { font-size: 0.85rem; font-weight: 700; }
 .nb-field input, .select select { min-height: calc(var(--ctl) + 0.4rem); font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0; }
 .nb-field input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
@@ -1056,7 +1121,10 @@ dialog.lfs-dialog { width: min(32rem, 100vw - 2rem); }
 .identity { display: grid; gap: 0.75rem; }
 .identity > label:not(.check) { display: grid; gap: 0.3rem; font-size: 0.85rem; font-weight: 700; }
 .identity input:not([type="checkbox"]) { min-height: calc(var(--ctl) + 0.3rem); font-size: 0.95rem; }
+.identity > label .muted { font-weight: 400; font-size: 0.8rem; }
 .identity .row { margin-top: 0.25rem; align-items: center; }
+.identity .select select { font-family: inherit; font-weight: 400; }
+.identity .key-row { margin: 0; flex-wrap: nowrap; }
 label.check { display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.9rem; line-height: 1.4; cursor: pointer; }
 label.check input { flex: none; width: 1.05rem; height: 1.05rem; margin: 0.12rem 0 0; accent-color: var(--accent); }
 .helper-note, .saved { display: flex; gap: 0.45rem; align-items: center; margin: 0; font-size: 0.9rem; color: var(--add); }

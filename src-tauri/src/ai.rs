@@ -1,10 +1,52 @@
-//! AI features through Gemini (BYOK). The key comes from `GEMINI_API_KEY` (dev), else the OS keychain.
+//! AI features, bring your own key: Gemini, Claude, or any OpenAI-compatible server (OpenAI, OpenRouter,
+//! Ollama, LM Studio). A provider's key comes from its env var (dev), else the OS keychain.
 use crate::errors::AppError;
 use crate::git::read;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::Path;
+use ts_rs::TS;
 
-const MODEL: &str = "gemini-3.5-flash-lite";
+/// Which provider and model AI features use. Saved in the settings store; keys stay in the keychain.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiConfig {
+    /// "gemini" (also when empty), "anthropic" or "openai" (any OpenAI-compatible server).
+    pub provider: String,
+    /// Empty = the provider's default model.
+    pub model: String,
+    /// "openai" only: server base URL, e.g. http://localhost:11434/v1. Empty = api.openai.com. A custom URL
+    /// needs no key (local servers).
+    pub base_url: String,
+}
+
+impl AiConfig {
+    fn provider(&self) -> &str {
+        match self.provider.as_str() {
+            p @ ("anthropic" | "openai") => p,
+            _ => "gemini",
+        }
+    }
+    fn name(&self) -> &'static str {
+        match self.provider() {
+            "anthropic" => "Claude",
+            "openai" if !self.base_url.trim().is_empty() => "the AI server",
+            "openai" => "OpenAI",
+            _ => "Gemini",
+        }
+    }
+    fn model(&self) -> &str {
+        match (self.model.trim(), self.provider()) {
+            ("", "anthropic") => "claude-opus-5-5",
+            ("", "openai") => "gpt-5-mini",
+            ("", _) => "gemini-3.5-flash-lite",
+            (m, _) => m,
+        }
+    }
+    fn keyless(&self) -> bool {
+        self.provider() == "openai" && !self.base_url.trim().is_empty()
+    }
+}
 /// Diff text sent at most (bytes); the rest is cut with a note.
 const MAX_DIFF: usize = 100_000;
 
@@ -46,21 +88,29 @@ both sides so the intent of each change is kept; if they truly contradict, prefe
 more complete. Leave everything outside the blocks exactly as it is. Reply with the whole resolved file only: no \
 conflict markers, no explanation, no code fences.";
 
-fn keychain() -> Result<keyring::Entry, AppError> {
-    keyring::Entry::new("git-ai", "gemini").map_err(|e| AppError::new("keychain", e.to_string()))
+/// Keychain entry `git-ai`/<provider>.
+fn keychain(provider: &str) -> Result<keyring::Entry, AppError> {
+    keyring::Entry::new("git-ai", provider).map_err(|e| AppError::new("keychain", e.to_string()))
 }
 
-fn key() -> Option<String> {
-    std::env::var("GEMINI_API_KEY").ok().or_else(|| keychain().ok()?.get_password().ok()).filter(|k| !k.trim().is_empty())
+fn key(provider: &str) -> Option<String> {
+    let var = match provider {
+        "anthropic" => "ANTHROPIC_API_KEY",
+        "openai" => "OPENAI_API_KEY",
+        _ => "GEMINI_API_KEY",
+    };
+    std::env::var(var).ok().or_else(|| keychain(provider).ok()?.get_password().ok()).filter(|k| !k.trim().is_empty())
 }
 
-pub fn has_key() -> bool {
-    key().is_some()
+/// AI features can run: a key is set, or none is needed.
+pub fn ready(cfg: &AiConfig) -> bool {
+    cfg.keyless() || key(cfg.provider()).is_some()
 }
 
-/// Stores the key in the keychain; None (or blank) removes it.
-pub fn set_key(key: Option<String>) -> Result<(), AppError> {
-    let entry = keychain()?;
+/// Stores `provider`'s key in the keychain; None (or blank) removes it.
+pub fn set_key(provider: &str, key: Option<String>) -> Result<(), AppError> {
+    let cfg = AiConfig { provider: provider.into(), ..Default::default() };
+    let entry = keychain(cfg.provider())?;
     let res = match key.as_deref().map(str::trim).filter(|k| !k.is_empty()) {
         Some(k) => entry.set_password(k),
         None => match entry.delete_credential() {
@@ -83,7 +133,7 @@ fn clip(s: &str, max: usize) -> (&str, bool) {
     (&s[..end], true)
 }
 
-pub fn commit_message(repo: &Path) -> Result<String, AppError> {
+pub fn commit_message(cfg: &AiConfig, repo: &Path) -> Result<String, AppError> {
     let diff = read::staged_patch(repo)?;
     if diff.trim().is_empty() {
         return Err(AppError::new("nothing_staged", "Stage some changes first, then generate a message."));
@@ -98,23 +148,23 @@ pub fn commit_message(repo: &Path) -> Result<String, AppError> {
     if cut {
         input += "\n[diff cut here, too long]";
     }
-    let msg = generate(COMMIT_PROMPT, &input)?;
+    let msg = generate(cfg, COMMIT_PROMPT, &input)?;
     Ok(msg.trim().trim_matches('`').trim().to_string())
 }
 
 /// Plain-language explanation of one commit (message + diff).
-pub fn explain_commit(repo: &Path, oid: &str) -> Result<String, AppError> {
+pub fn explain_commit(cfg: &AiConfig, repo: &Path, oid: &str) -> Result<String, AppError> {
     let (message, diff) = read::commit_patch(repo, oid)?;
     let (diff, cut) = clip(&diff, MAX_DIFF);
     let mut input = format!("Commit message:\n{message}\n\nDiff:\n{diff}");
     if cut {
         input += "\n[diff cut here, too long]";
     }
-    Ok(generate(EXPLAIN_PROMPT, &input)?.trim().to_string())
+    Ok(generate(cfg, EXPLAIN_PROMPT, &input)?.trim().to_string())
 }
 
 /// Plain-language explanation of a stash (tracked changes + untracked files).
-pub fn explain_stash(repo: &Path, oid: &str) -> Result<String, AppError> {
+pub fn explain_stash(cfg: &AiConfig, repo: &Path, oid: &str) -> Result<String, AppError> {
     let (message, diff) = read::stash_patch(repo, oid)?;
     let (diff, cut) = clip(&diff, MAX_DIFF);
     let mut input = format!("Stash message:
@@ -126,11 +176,11 @@ Stashed changes:
         input += "
 [diff cut here, too long]";
     }
-    Ok(generate(STASH_PROMPT, &input)?.trim().to_string())
+    Ok(generate(cfg, STASH_PROMPT, &input)?.trim().to_string())
 }
 
 /// PR title + description (`kind` "pr"), changelog ("changelog") or plain explanation ("explain") for what `head` adds on top of `base`.
-pub fn write_range(repo: &Path, base: &str, head: &str, kind: &str) -> Result<String, AppError> {
+pub fn write_range(cfg: &AiConfig, repo: &Path, base: &str, head: &str, kind: &str) -> Result<String, AppError> {
     let prompt = match kind {
         "pr" => PR_PROMPT,
         "changelog" => CHANGELOG_PROMPT,
@@ -146,11 +196,11 @@ pub fn write_range(repo: &Path, base: &str, head: &str, kind: &str) -> Result<St
     if cut {
         input += "\n[diff cut here, too long]";
     }
-    Ok(generate(prompt, &input)?.trim().to_string())
+    Ok(generate(cfg, prompt, &input)?.trim().to_string())
 }
 
 /// A proposed resolution of the conflicted `file` (the whole file, markers gone). Nothing is written.
-pub fn resolve_conflict(repo: &Path, file: &str) -> Result<String, AppError> {
+pub fn resolve_conflict(cfg: &AiConfig, repo: &Path, file: &str) -> Result<String, AppError> {
     let text = read::work_file(repo, file)?
         .ok_or_else(|| AppError::new("too_big", "Binary files and files over 1 MB can't be resolved with AI."))?;
     if !has_markers(&text) {
@@ -159,10 +209,10 @@ pub fn resolve_conflict(repo: &Path, file: &str) -> Result<String, AppError> {
     if text.len() > MAX_DIFF {
         return Err(AppError::new("too_big", format!("{file} is too long to send whole; resolve it in an editor.")));
     }
-    let out = generate(CONFLICT_PROMPT, &format!("File: {file}\n\n{text}"))?;
+    let out = generate(cfg, CONFLICT_PROMPT, &format!("File: {file}\n\n{text}"))?;
     let out = strip_fence(&out);
     if has_markers(&out) {
-        return Err(AppError::new("ai_error", "Gemini left conflict markers in. Try again or resolve by hand."));
+        return Err(AppError::new("ai_error", format!("{} left conflict markers in. Try again or resolve by hand.", cfg.name())));
     }
     Ok(match_eol(&text, &out))
 }
@@ -189,47 +239,95 @@ fn strip_fence(s: &str) -> &str {
     }
 }
 
-fn generate(system: &str, input: &str) -> Result<String, AppError> {
-    let key = key().ok_or_else(|| AppError::new("ai_no_key", "Add a Gemini API key in Settings to use AI features."))?;
-    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent");
-    let body = json!({
-        "systemInstruction": { "parts": [{ "text": system }] },
-        "contents": [{ "role": "user", "parts": [{ "text": input }] }],
-    });
-    let mut res = ureq::post(&url)
-        .config()
-        .http_status_as_error(false)
-        .build()
-        .header("x-goog-api-key", &key)
-        .send_json(body)
-        .map_err(net)?;
+fn generate(cfg: &AiConfig, system: &str, input: &str) -> Result<String, AppError> {
+    let name = cfg.name();
+    let key = key(cfg.provider());
+    if key.is_none() && !cfg.keyless() {
+        return Err(AppError::new("ai_no_key", format!("Add your {name} API key in Settings to use AI features.")));
+    }
+    let key = key.unwrap_or_default();
+    let model = cfg.model();
+    let (url, body) = match cfg.provider() {
+        "anthropic" => {
+            let mut body = json!({
+                "model": model,
+                "max_tokens": 16000,
+                "system": system,
+                "messages": [{ "role": "user", "content": input }],
+            });
+            if has_fallbacks(model) {
+                body["fallbacks"] = json!("default");
+            }
+            ("https://api.anthropic.com/v1/messages".to_string(), body)
+        }
+        "openai" => {
+            let base = cfg.base_url.trim().trim_end_matches('/');
+            let base = if base.is_empty() { "https://api.openai.com/v1" } else { base };
+            let body = json!({
+                "model": model,
+                "messages": [{ "role": "system", "content": system }, { "role": "user", "content": input }],
+            });
+            (format!("{base}/chat/completions"), body)
+        }
+        _ => {
+            let body = json!({
+                "systemInstruction": { "parts": [{ "text": system }] },
+                "contents": [{ "role": "user", "parts": [{ "text": input }] }],
+            });
+            (format!("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"), body)
+        }
+    };
+    let mut req = ureq::post(&url).config().http_status_as_error(false).build();
+    req = match cfg.provider() {
+        "anthropic" => {
+            req = req.header("x-api-key", &key).header("anthropic-version", "2023-06-01");
+            if has_fallbacks(model) { req.header("anthropic-beta", "server-side-fallback-2026-07-01") } else { req }
+        }
+        "openai" if key.is_empty() => req,
+        "openai" => req.header("Authorization", &format!("Bearer {key}")),
+        _ => req.header("x-goog-api-key", &key),
+    };
+    let mut res = req.send_json(body).map_err(|e| net(name, e))?;
     let status = res.status().as_u16();
     let v: Value = res.body_mut().read_json().unwrap_or_default();
     if status != 200 {
-        return Err(api_error(status, &v));
+        return Err(api_error(name, status, &v));
     }
-    v["candidates"][0]["content"]["parts"][0]["text"]
-        .as_str()
-        .map(String::from)
-        .ok_or_else(|| AppError::new("ai_empty", "Gemini returned no text. Try again."))
+    if v["stop_reason"] == "refusal" {
+        return Err(AppError::new("ai_error", format!("{name} declined this request.")));
+    }
+    let text: Option<String> = match cfg.provider() {
+        // Claude may put thinking or fallback blocks before the text.
+        "anthropic" => v["content"].as_array().map(|c| c.iter().filter(|b| b["type"] == "text").filter_map(|b| b["text"].as_str()).collect()),
+        "openai" => v["choices"][0]["message"]["content"].as_str().map(String::from),
+        _ => v["candidates"][0]["content"]["parts"][0]["text"].as_str().map(String::from),
+    };
+    text.filter(|t| !t.trim().is_empty())
+        .ok_or_else(|| AppError::new("ai_empty", format!("{name} returned no text. Try again.")))
+}
+
+/// Claude models that take server-side refusal fallbacks (`fallbacks: "default"`); others reject the field.
+fn has_fallbacks(model: &str) -> bool {
+    matches!(model, "claude-fable-5-1" | "claude-opus-5-5" | "claude-opus-5" | "claude-sonnet-5-5")
 }
 
 /// Only a rejected key is `ai_key` (the UI opens Settings for it). Other 400s (model gone, bad request)
-/// show Gemini's own message, so a saved, working key isn't blamed.
-fn api_error(status: u16, v: &Value) -> AppError {
+/// show the provider's own message, so a saved, working key isn't blamed.
+fn api_error(name: &str, status: u16, v: &Value) -> AppError {
     let reason_is = |r: &str| v["error"]["details"].as_array().is_some_and(|d| d.iter().any(|x| x["reason"] == r));
     if status == 401 || reason_is("API_KEY_INVALID") {
-        return AppError::new("ai_key", "Gemini didn't accept the API key. Check it, or replace it.");
+        return AppError::new("ai_key", format!("{name} didn't accept the API key. Check it, or replace it."));
     }
     if status == 429 {
-        return AppError::new("ai_limit", "Gemini's rate limit or quota is used up. Try again in a minute.");
+        return AppError::new("ai_limit", format!("{name}'s rate limit or quota is used up. Try again in a minute."));
     }
-    let msg = v["error"]["message"].as_str().unwrap_or("no details");
-    AppError::new("ai_error", format!("Gemini returned an error ({status}): {msg}"))
+    // OpenAI-compatible local servers (Ollama) may send `{"error": "..."}`.
+    let msg = v["error"]["message"].as_str().or(v["error"].as_str()).unwrap_or("no details");
+    AppError::new("ai_error", format!("{name} returned an error ({status}): {msg}"))
 }
 
-fn net(e: ureq::Error) -> AppError {
-    AppError::new("network", format!("Couldn't reach Gemini. Check your internet connection. ({e})"))
+fn net(name: &str, e: ureq::Error) -> AppError {
+    AppError::new("network", format!("Couldn't reach {name}. Check your internet connection or the server URL. ({e})"))
 }
 
 #[cfg(test)]
@@ -255,13 +353,14 @@ mod tests {
     #[test]
     fn only_a_bad_key_blames_the_key() {
         let bad_key = json!({"error": {"message": "API key not valid.", "details": [{"reason": "API_KEY_INVALID"}]}});
-        assert_eq!(api_error(400, &bad_key).code, "ai_key");
+        assert_eq!(api_error("Gemini", 400, &bad_key).code, "ai_key");
         let bad_model = json!({"error": {"message": "models/x is not found"}});
-        let e = api_error(404, &bad_model);
+        let e = api_error("Gemini", 404, &bad_model);
         assert_eq!(e.code, "ai_error");
         assert!(e.message.contains("is not found"));
-        assert_eq!(api_error(400, &json!({})).code, "ai_error");
-        assert_eq!(api_error(429, &json!({})).code, "ai_limit");
+        assert_eq!(api_error("Gemini", 400, &json!({})).code, "ai_error");
+        assert_eq!(api_error("Gemini", 429, &json!({})).code, "ai_limit");
+        assert!(api_error("the AI server", 404, &json!({"error": "model not found"})).message.contains("model not found"));
     }
 
     /// Real merge conflict through Gemini, then apply it. Run: `cargo test live_resolve_conflict -- --ignored --nocapture`.
@@ -286,7 +385,7 @@ mod tests {
         commit("Trim name, integer add");
         assert!(git(&["merge", "feature"]).is_err(), "merge should conflict");
 
-        let out = resolve_conflict(&dir, "app.js").unwrap();
+        let out = resolve_conflict(&AiConfig::default(), &dir, "app.js").unwrap();
         println!("---\n{out}---");
         assert!(!has_markers(&out) && out.ends_with('\n') && out.contains("function add"));
         crate::git::cli::write_resolved(&dir, "app.js", &out).unwrap();
@@ -314,7 +413,7 @@ mod tests {
         git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "Initial commit"]);
         std::fs::write(dir.join("greet.py"), "def greet(name):\n    return f\"Hello, {name}!\"\n").unwrap();
         git(&["add", "--", "greet.py"]);
-        let msg = commit_message(&dir).unwrap();
+        let msg = commit_message(&AiConfig::default(), &dir).unwrap();
         println!("---\n{msg}\n---");
         assert!(!msg.is_empty() && msg.lines().next().unwrap().len() <= 72);
         let _ = std::fs::remove_dir_all(&dir);

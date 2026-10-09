@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge } from "../../lib/ipc";
+import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, revert } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import { Gutter, errorText, kindClass, lineNumbers, useRun } from "../status/Changes";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
@@ -20,7 +20,7 @@ export function History({ path }: { path: string }) {
   const [tagging, setTagging] = useState(false);
   const run = useRun();
   const hasKey = useQuery(aiKeyQuery).data;
-  // Explanations by oid, kept while the view is open so going back to a commit doesn't call Gemini again.
+  // Explanations by oid, kept while the view is open so going back to a commit doesn't call the AI again.
   const [explained, setExplained] = useState<Record<string, string>>({});
   const [explaining, setExplaining] = useState<string | null>(null);
   async function explain(oid: string) {
@@ -67,10 +67,12 @@ export function History({ path }: { path: string }) {
               <div className="commit-actions">
                 <button className="small" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={() => run(() => merge(path, d.oid, true), `Cherry-picked ${d.oid.slice(0, 7)}`)}>Cherry-pick</button>
                 <button className="small" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={() => run(() => merge(path, d.oid, false), `Merged ${d.oid.slice(0, 7)} into the current branch`)}>Merge into current</button>
+                <button className="small" disabled={!d.in_head} title={d.in_head ? "Add a commit that undoes this one" : "Only commits on the current branch can be reverted"}
+                  onClick={() => run(() => revert(path, d.oid), `Reverted ${d.oid.slice(0, 7)}`)}>Revert</button>
                 <button className="small" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}>Tag…</button>
                 <button className="small" disabled={!!noRebase} onClick={() => openRebase(d.oid)} title={noRebase ?? "Reorder, edit, squash or drop the commits after this one"}>Rebase from here…</button>
                 <button className="small" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
-                  title={hasKey ? "Explain this commit in plain words (message and diff sent to Gemini)" : "Add a Gemini API key in Settings first"}>
+                  title={hasKey ? "Explain this commit in plain words (message and diff sent to your AI provider)" : "Set up AI in Settings first"}>
                   {explaining === d.oid ? "Explaining…" : "Explain"}
                 </button>
               </div>

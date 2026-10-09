@@ -230,6 +230,18 @@ pub fn reset_to(repo: &Path, rev_name: &str) -> Result<(), AppError> {
     log_head_move(repo, "reset", || git(repo, &["reset", "-q", "--keep", rev_name]).map(drop))
 }
 
+/// Adds a commit that undoes `oid`. A merge commit is reverted against its first parent (the branch it
+/// was merged into). Logged like a merge; conflicts leave the revert in progress for commit or `abort`.
+pub fn revert(repo: &Path, oid: &str) -> Result<(), AppError> {
+    ref_arg(oid)?;
+    let mut args = vec!["revert", "--no-edit"];
+    if rev(repo, &format!("{oid}^2")).is_ok() {
+        args.extend(["-m", "1"]);
+    }
+    args.push(oid);
+    log_head_move(repo, "revert", || git(repo, &args).map(drop).map_err(|e| stopped(repo, "revert", e)))
+}
+
 /// When git stopped halfway (the op is still in progress), says so instead of git's raw error.
 fn stopped(repo: &Path, op: &str, e: AppError) -> AppError {
     match crate::git::read::operation(repo) {
@@ -416,12 +428,15 @@ pub fn fetch(repo: &Path) -> Result<(), AppError> {
     git_net(repo, &["fetch", "-q", "--all", "--prune"]).map(drop)
 }
 
-/// Merges the upstream into the current branch (never rebases). Logged like a merge, so undo is a soft
-/// reset; conflicts leave the merge in progress.
-pub fn pull(repo: &Path) -> Result<(), AppError> {
-    log_head_move(repo, "pull", || {
-        git_net(repo, &["pull", "-q", "--no-rebase", "--no-edit"]).map(drop).map_err(|e| stopped(repo, "merge", e))
-    })
+/// Brings the upstream into the current branch: merges it, or with `rebase` replays local commits on top
+/// (changed files carried with `--autostash`). Logged, so undo moves HEAD back; conflicts leave it in progress.
+pub fn pull(repo: &Path, rebase: bool) -> Result<(), AppError> {
+    let (op, args): (&str, &[&str]) = if rebase {
+        ("rebase", &["pull", "-q", "--rebase", "--autostash"])
+    } else {
+        ("merge", &["pull", "-q", "--no-rebase", "--no-edit"])
+    };
+    log_head_move(repo, "pull", || git_net(repo, args).map(drop).map_err(|e| stopped(repo, op, e)))
 }
 
 /// Pushes the current branch to its upstream. Without one it goes to the same name on `origin` (or the
@@ -796,6 +811,82 @@ pub fn delete_branch(repo: &Path, name: &str, force: bool) -> Result<(), AppErro
     crate::oplog::record(repo, e)
 }
 
+/// Renames a local branch; its upstream and reflog move with it.
+pub fn rename_branch(repo: &Path, name: &str, new_name: &str) -> Result<(), AppError> {
+    ref_arg(name)?;
+    ref_arg(new_name)?;
+    git(repo, &["branch", "-m", name, new_name]).map(drop)
+}
+
+/// Sets which remote branch ("origin/main") `branch` pulls from and pushes to; None stops tracking.
+pub fn set_upstream(repo: &Path, branch: &str, upstream: Option<&str>) -> Result<(), AppError> {
+    ref_arg(branch)?;
+    match upstream {
+        Some(u) => {
+            ref_arg(u)?;
+            git(repo, &["branch", &format!("--set-upstream-to={u}"), branch])
+        }
+        None => git(repo, &["branch", "--unset-upstream", branch]),
+    }
+    .map(drop)
+}
+
+#[derive(Debug, PartialEq, Serialize, TS)]
+#[ts(export)]
+pub struct Remote {
+    pub name: String,
+    pub url: String,
+}
+
+pub fn remotes(repo: &Path) -> Result<Vec<Remote>, AppError> {
+    git(repo, &["remote"])?
+        .lines()
+        .map(|name| Ok(Remote { name: name.into(), url: git(repo, &["remote", "get-url", "--", name])?.trim().into() }))
+        .collect()
+}
+
+/// Adds remote `name` at `url`, or with `edit` points the existing one at `url`.
+pub fn remote_set(repo: &Path, name: &str, url: &str, edit: bool) -> Result<(), AppError> {
+    ref_arg(name)?;
+    let url = url.trim();
+    if url.is_empty() || url.starts_with('-') {
+        return Err(AppError::new("bad_url", format!("'{url}' is not a valid remote URL.")));
+    }
+    git(repo, &["remote", if edit { "set-url" } else { "add" }, "--", name, url]).map(drop)
+}
+
+/// Removes remote `name` with its remote branches; local branches stop tracking it.
+pub fn remote_remove(repo: &Path, name: &str) -> Result<(), AppError> {
+    ref_arg(name)?;
+    git(repo, &["remote", "remove", "--", name]).map(drop)
+}
+
+/// Creates an empty repository in `dir` (made if missing); the first branch follows `init.defaultBranch`.
+pub fn init(dir: &Path) -> Result<(), AppError> {
+    let dir = dir.to_str().ok_or_else(|| AppError::new("bad_path", "That folder name can't be used."))?;
+    run(None, &["init", "-q", "--", dir], &[], None).map(drop)
+}
+
+/// Appends `pattern` to the top-level .gitignore (created if missing), matching its line endings.
+/// Left unstaged, like any edit.
+pub fn ignore(repo: &Path, pattern: &str) -> Result<(), AppError> {
+    if pattern.trim().is_empty() || pattern.contains(['\r', '\n']) {
+        return Err(AppError::new("bad_pattern", format!("'{pattern}' is not a valid ignore pattern.")));
+    }
+    let file = repo.join(".gitignore");
+    let mut text = std::fs::read_to_string(&file).unwrap_or_default();
+    if text.lines().any(|l| l.trim_end() == pattern) {
+        return Ok(());
+    }
+    let nl = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    if !text.is_empty() && !text.ends_with('\n') {
+        text.push_str(nl);
+    }
+    text.push_str(pattern);
+    text.push_str(nl);
+    std::fs::write(&file, text).map_err(|e| AppError::new("io", e.to_string()))
+}
+
 /// Ref names go in as plain args (switch/branch take no `--`), so a leading '-' would read as an option.
 fn ref_arg(name: &str) -> Result<(), AppError> {
     if name.is_empty() || name.starts_with('-') {
@@ -1017,6 +1108,49 @@ mod tests {
         lfs_track(p, &pats[1], false).unwrap();
         assert_eq!(lfs(p).unwrap().patterns, ["*.psd", "-x"]);
         assert_eq!(lfs_track(p, " ", true).unwrap_err().code, "bad_pattern");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn repo_actions() {
+        let dir = std::env::temp_dir().join(format!("git-ai-test-actions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let p = dir.join("new repo");
+        init(&p).unwrap();
+        git(&p, &["config", "user.name", "T"]).unwrap();
+        git(&p, &["config", "user.email", "t@example.com"]).unwrap();
+        git(&p, &["config", "core.autocrlf", "false"]).unwrap();
+        std::fs::write(p.join("a.txt"), "one\n").unwrap();
+        git(&p, &["add", "a.txt"]).unwrap();
+        git(&p, &["commit", "-q", "-m", "one"]).unwrap();
+        std::fs::write(p.join("a.txt"), "two\n").unwrap();
+        git(&p, &["commit", "-q", "-am", "two"]).unwrap();
+        // revert: content back, logged for undo
+        revert(&p, &rev(&p, "HEAD").unwrap()).unwrap();
+        assert_eq!(std::fs::read_to_string(p.join("a.txt")).unwrap(), "one\n");
+        assert_eq!(crate::oplog::entries(&p, 1).unwrap()[0].op, "revert");
+        // rename, remotes, upstream
+        let b = current_branch(&p).unwrap();
+        rename_branch(&p, &b, "trunk").unwrap();
+        assert_eq!(current_branch(&p).unwrap(), "trunk");
+        assert_eq!(rename_branch(&p, "-x", "y").unwrap_err().code, "bad_name");
+        remote_set(&p, "origin", "https://example.com/a.git", false).unwrap();
+        remote_set(&p, "origin", "https://example.com/b.git", true).unwrap();
+        assert_eq!(remotes(&p).unwrap(), [Remote { name: "origin".into(), url: "https://example.com/b.git".into() }]);
+        assert_eq!(remote_set(&p, "x", "--upload-pack=evil", false).unwrap_err().code, "bad_url");
+        git(&p, &["update-ref", "refs/remotes/origin/trunk", "HEAD"]).unwrap();
+        set_upstream(&p, "trunk", Some("origin/trunk")).unwrap();
+        assert_eq!(git(&p, &["rev-parse", "--abbrev-ref", "trunk@{u}"]).unwrap().trim(), "origin/trunk");
+        set_upstream(&p, "trunk", None).unwrap();
+        assert!(git(&p, &["rev-parse", "--abbrev-ref", "trunk@{u}"]).is_err());
+        remote_remove(&p, "origin").unwrap();
+        assert!(remotes(&p).unwrap().is_empty());
+        // ignore: appended once, CRLF kept
+        std::fs::write(p.join(".gitignore"), "x\r\ny").unwrap();
+        ignore(&p, "/build/").unwrap();
+        ignore(&p, "/build/").unwrap();
+        assert_eq!(std::fs::read_to_string(p.join(".gitignore")).unwrap(), "x\r\ny\r\n/build/\r\n");
+        assert_eq!(ignore(&p, "a\nb").unwrap_err().code, "bad_pattern");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

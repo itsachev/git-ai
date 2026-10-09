@@ -1,14 +1,14 @@
 ﻿import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, resetTo, stash, stashSave, undo } from "../../lib/ipc";
+import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
-import { choose, confirm } from "../../lib/modal";
+import { choose, confirm, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
 /** Checkout that offers to bring conflicting local changes along instead of just failing. */
@@ -23,6 +23,7 @@ export async function switchTo(path: string, name: string, track: boolean) {
 }
 
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
+const remotesQuery = (path: string) => ({ queryKey: ["remotes", path], queryFn: () => remotes(path) });
 
 /** [label, handler, why it is disabled (absent = enabled)] */
 export type Action = [string, () => void, string?];
@@ -79,8 +80,24 @@ export function useRefActions(path: string) {
       // Its upstream has new commits: offer the same choices as checking out the remote branch.
       const up = data.local.find((b) => b.name === name)!;
       const sync: Action[] = up.upstream && up.behind > 0 ? [[`Checkout ${up.upstream}…`, checkoutRemote(up.upstream)]] : [];
-      if (name === head) return [...sync, branchOff, pr, explain];
-      return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, pr, explain, ...onto, ["Delete", async () => {
+      const rename: Action = ["Rename…", async () => {
+        const v = await prompt(`Rename ${name}`, "", [{ label: "New name", value: name }], "Rename");
+        if (v && v[0] !== name) run(() => renameBranch(path, name, v[0]), `Renamed ${name} to ${v[0]}`);
+      }];
+      // Same-named remote branches first: that's almost always the one.
+      const short = (r: string) => r.slice(r.indexOf("/") + 1);
+      const candidates = data.remote.map((r) => r.name).filter((r) => r !== up.upstream && !r.endsWith("/HEAD"))
+        .sort((a, b) => Number(short(b) === name) - Number(short(a) === name));
+      const track: Action = [up.upstream ? "Change tracked branch…" : "Track remote branch…", async () => {
+        const opts = [...candidates.map((r) => ({ label: r, hint: `Pull and Push use ${r}.` })),
+          ...(up.upstream ? [{ label: "Stop tracking", hint: `${name} keeps its commits; Push publishes it again.`, tone: "warn" as const }] : [])];
+        const i = await choose(`What should ${name} track?`, up.upstream ? `It tracks ${up.upstream} now.` : `${name} doesn't track a remote branch yet.`, opts, "remote");
+        if (i < 0) return;
+        const to = i < candidates.length ? candidates[i] : null;
+        run(() => setUpstream(path, name, to), to ? `${name} now tracks ${to}` : `${name} no longer tracks ${up.upstream}`);
+      }, candidates.length || up.upstream ? undefined : "No remote branches yet. Fetch or push first."];
+      if (name === head) return [...sync, branchOff, pr, explain, rename, track];
+      return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, pr, explain, ...onto, rename, track, ["Delete", async () => {
         if (!(await confirm("Delete branch", `Delete branch ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))) return;
         run(async () => {
           try {
@@ -128,6 +145,7 @@ export function RefMenu({ pop, label, actions }: { pop: React.RefObject<HTMLDivE
 /** Branches, remotes, tags and stashes (Sourcetree's left sidebar). Double-click a branch to check it out. */
 export function Sidebar({ path }: { path: string }) {
   const { data, error } = useQuery(refsQuery(path));
+  const remoteList = useQuery(remotesQuery(path)).data;
   const log = useQuery(opLogQuery(path)).data;
   const run = useRun();
   const actions = useRefActions(path);
@@ -173,11 +191,30 @@ export function Sidebar({ path }: { path: string }) {
   const match = (items: RefItem[]) => items.filter((r) => r.name.toLowerCase().includes(f));
   const local = match(data.local);
   // ponytail: remote name = text before the first "/"; a remote named "a/b" would be split wrong.
-  const remotes = new Map<string, RefItem[]>();
+  // Every configured remote gets a group, even before it has branches (just added, not fetched).
+  const groups = new Map<string, RefItem[]>((remoteList ?? []).map((r) => [r.name, []]));
   for (const r of match(data.remote)) {
     const name = r.name.split("/")[0];
-    remotes.set(name, [...(remotes.get(name) ?? []), r]);
+    groups.set(name, [...(groups.get(name) ?? []), r]);
   }
+  async function addRemote() {
+    const v = await prompt("Add remote", "Fetch from it right after to see its branches.",
+      [{ label: "Name", value: groups.size ? "" : "origin", placeholder: "upstream" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add remote", "remote");
+    if (v) run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`);
+  }
+  const remoteActions = (name: string): Action[] => {
+    const url = remoteList?.find((r) => r.name === name)?.url ?? "";
+    return [
+      ["Edit URL…", async () => {
+        const v = await prompt(`URL of ${name}`, "", [{ label: "URL", value: url }], "Save", "remote");
+        if (v && v[0] !== url) run(() => remoteSet(path, name, v[0], true), `${name} now points at ${v[0]}`);
+      }],
+      ["Remove", async () => {
+        if (await confirm("Remove remote", `Remove ${name} (${url})? Its remote branches disappear here and local branches stop tracking it. Nothing changes on the server; add it again with the same URL to get it back.`, "Remove", "danger"))
+          run(() => remoteRemove(path, name), `Removed remote ${name}`);
+      }],
+    ];
+  };
 
   async function dropStash(i: number, s: RefItem) {
     if (await confirm("Drop stash", `Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, "Drop", "danger"))
@@ -201,10 +238,13 @@ export function Sidebar({ path }: { path: string }) {
         </ul>
       </details>
       <details open>
-        <summary><Icon name="remote" />Remotes <span className="count">{data.remote.length}</span></summary>
-        {[...remotes].map(([remote, items]) => (
+        <summary>
+          <Icon name="remote" />Remotes <span className="count">{data.remote.length}</span>
+          <button className="icon-btn" onClick={(e) => { e.preventDefault(); e.currentTarget.closest("details")!.open = true; addRemote(); }} aria-label="Add remote" title="Add remote"><Icon name="add" /></button>
+        </summary>
+        {[...groups].map(([remote, items]) => (
           <details key={remote} open className="nested">
-            <summary>{remote}</summary>
+            <RemoteSummary name={remote} actions={remoteActions(remote)} />
             <ul className="refs">
               {items.map((r) => (
                 <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={actions(r.name)[0][1]} actions={actions(r.name)} dnd={dnd(r.name)} />
@@ -257,6 +297,20 @@ export function Sidebar({ path }: { path: string }) {
       )}
       <RefMenu pop={dropPop} label="Drop branch" actions={dropActions} />
     </section>
+  );
+}
+
+/** A remote's group header with its ⋯ menu (Edit URL, Remove). */
+function RemoteSummary({ name, actions }: { name: string; actions: Action[] }) {
+  const pop = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <summary onContextMenu={(e) => showMenu(pop.current, e)}>
+        {name}
+        <button className="icon-btn" onClick={(e) => showMenu(pop.current, e)} aria-label={`Actions for remote ${name}`} title="Actions"><Icon name="more" /></button>
+      </summary>
+      <RefMenu pop={pop} label={`Remote ${name}`} actions={actions} />
+    </>
   );
 }
 
