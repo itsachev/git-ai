@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fileDiff, headMessage, ignore, openFile, opLog, repoStatus, resolve, stage, unstage, workFile, writeResolved } from "../../lib/ipc";
+import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fetchAll, fileDiff, headMessage, ignore, openFile, opLog, push, repoStatus, resolve, stage, stashSave, unstage, workFile, writeResolved } from "../../lib/ipc";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Side } from "../../bindings/Side";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
@@ -28,7 +29,7 @@ const confirmDiscard = (what: string) =>
 /** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
  * A failure shows in `OpErrorDialog` until OK. */
 let opGen = 0;
-let opError: { title: string; text: string; warn?: boolean } | null = null;
+let opError: { title: string; text: string; warn?: boolean; code?: string; retry?: () => void } | null = null;
 const opSubs = new Set<() => void>();
 const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
 
@@ -51,9 +52,10 @@ export function useRun() {
       return true;
     } catch (e) {
       // "conflicts" = the op paused halfway (still in progress), not a failure.
-      opError = (e as AppError).code === "conflicts"
+      const code = (e as AppError).code;
+      opError = code === "conflicts"
         ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
-        : { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e) };
+        : { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code, retry: () => { run(op, done); } };
       opSubs.forEach((f) => f());
       return false;
     } finally {
@@ -63,9 +65,22 @@ export function useRun() {
   return run;
 }
 
-/** Modal for the last failed op; OK (or Esc) dismisses it. */
-export function OpErrorDialog() {
+/** One-click fixes the error dialog offers, by error code: [button label, action]. */
+const FIXES: Record<string, (path: string, run: Run, retry: () => void) => [string, () => void][]> = {
+  dirty: (p, run, retry) => [["Stash changes and retry", async () => {
+    if (await run(() => stashSave(p, "Stashed by git-ai to retry"))) retry();
+  }]],
+  network: (_p, _run, retry) => [["Try again", retry]],
+  stale_remote: (p, run) => [["Fetch now", () => run(() => fetchAll(p), "Fetched. Check the graph, then push again")]],
+  no_upstream: (p, run) => [["Push this branch", () => run(() => push(p), "Pushed")]],
+  lfs_missing: () => [["Get Git LFS", () => openUrl("https://git-lfs.com")]],
+  git_missing: () => [["Get Git", () => openUrl("https://git-scm.com/downloads")]],
+};
+
+/** Modal for the last failed op, with a fix button when one is known; OK (or Esc) dismisses it. */
+export function OpErrorDialog({ path }: { path: string }) {
   const err = useSyncExternalStore(subscribeOps, () => opError);
+  const run = useRun();
   const dialog = useRef<HTMLDialogElement>(null);
   // Keep the last text through the close transition so the dialog doesn't empty while fading.
   const last = useRef(err);
@@ -75,13 +90,18 @@ export function OpErrorDialog() {
     else dialog.current?.close();
   }, [err]);
   const close = () => { opError = null; opSubs.forEach((f) => f()); };
+  const e = last.current;
+  const fixes = (e?.code && e.retry && FIXES[e.code]?.(path, run, e.retry)) || [];
   return (
     <dialog ref={dialog} className={`modal tone-${last.current?.warn ? "warn" : "danger"}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
       onCancel={(e) => { e.preventDefault(); close(); }}>
       <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
         <ModalHead id="op-error-title" icon="warn" tone={last.current?.warn ? "warn" : "danger"} title={last.current?.title} />
         <p id="op-error-text" className="modal-text">{last.current?.text}</p>
-        <div className="dialog-actions"><button className="primary" autoFocus>OK</button></div>
+        <div className="dialog-actions">
+          {fixes.map(([label, fix]) => <button key={label} type="button" className="primary" onClick={() => { close(); fix(); }}>{label}</button>)}
+          <button className={fixes.length ? undefined : "primary"} autoFocus>{fixes.length ? "Close" : "OK"}</button>
+        </div>
       </form>
     </dialog>
   );

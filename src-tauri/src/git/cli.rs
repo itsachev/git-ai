@@ -408,7 +408,7 @@ fn net_error(e: AppError) -> AppError {
     let m = e.message.as_str();
     let has = |pats: &[&str]| pats.iter().any(|p| m.contains(p));
     let (code, text) = if has(&["(stale info)"]) {
-        ("stale", "The remote branch changed since your last fetch. Fetch, check what's there, then force push again.")
+        ("stale_remote", "The remote branch changed since your last fetch. Fetch, check what's there, then force push again.")
     } else if has(&["[rejected]", "non-fast-forward", "fetch first"]) {
         ("rejected", "The remote has commits you don't have yet. Pull first, then push.")
     } else if has(&["Authentication failed", "Permission denied", "could not read Username", "could not read Password", "Host key verification failed"]) {
@@ -457,7 +457,7 @@ pub fn clone(url: &str, dest: &Path, mut progress: impl FnMut(&str)) -> Result<(
     }
     let status = child.wait().map_err(missing)?;
     if !status.success() {
-        return Err(net_error(AppError::new("git", all.trim())));
+        return Err(net_error(AppError::from_stderr(&all)));
     }
     Ok(())
 }
@@ -518,7 +518,20 @@ fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool) -> Resul
     if force {
         args.insert(2, &lease);
     }
-    git_net(repo, &args)?;
+    git_net(repo, &args).map_err(|e| {
+        // The last-fetched remote tip was once this branch's own tip and isn't in it anymore: the user
+        // rewrote it (rebase, amend, reset), so a force push is the fix. Otherwise someone else pushed, and pulling is.
+        let mine = || {
+            let tip = rev(repo, &tracking).ok()?;
+            let gone = git(repo, &["merge-base", "--is-ancestor", &tip, &src]).is_err();
+            Some(gone && git(repo, &["log", "-g", "--format=%H", &src]).ok()?.lines().any(|l| l == tip))
+        };
+        if e.code == "rejected" && mine() == Some(true) {
+            AppError::new("rewritten", format!("You rewrote {branch} (rebase, amend or reset), so its old commits on the remote aren't in it anymore."))
+        } else {
+            e
+        }
+    })?;
     if let Some(old) = old {
         let new_tip = rev(repo, &src)?;
         if old != new_tip {

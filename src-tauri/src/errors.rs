@@ -26,6 +26,9 @@ impl AppError {
         if stderr.contains("git-lfs") && (stderr.contains("not found") || stderr.contains("is not a git command")) {
             return Self::new("lfs_missing", "This repository uses Git LFS, but Git LFS isn't installed. Install it from git-lfs.com, then try again.");
         }
+        if stderr.contains("already exists and is not an empty directory") {
+            return Self::new("exists", "That folder already exists and isn't empty. Pick another folder name.");
+        }
         Self::new("git", stderr.trim())
     }
 }
@@ -58,6 +61,7 @@ Aborting
         let lfs = "git-lfs filter-process: git-lfs: command not found\nfatal: the remote end hung up unexpectedly\n";
         assert_eq!(AppError::from_stderr(lfs).code, "lfs_missing");
         assert_eq!(AppError::from_stderr("This repository is configured for Git LFS but 'git-lfs' was not found on your path.").code, "lfs_missing");
+        assert_eq!(AppError::from_stderr("fatal: destination path 'x' already exists and is not an empty directory.\n").code, "exists");
     }
 
     #[test]

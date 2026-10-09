@@ -371,7 +371,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <SettingsButton />
         </header>
         <Notice />
-        <OpErrorDialog />
+        <OpErrorDialog path={repo.path} />
         <NewBranchDialog path={path} />
         <WriteUpDialog path={path} />
         <RebaseDialog path={path} />

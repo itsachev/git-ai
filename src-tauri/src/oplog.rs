@@ -446,10 +446,16 @@ mod tests {
         cli::push(&b, false).unwrap();
         let theirs = cli::rev(&b, "HEAD").unwrap();
         commit(a, "e.txt", "rewritten");
-        assert_eq!(cli::push(a, true).unwrap_err().code, "stale");
+        // Someone else pushed: a plain "rejected" (pull is the fix).
+        assert_eq!(cli::push(a, false).unwrap_err().code, "rejected");
+        assert_eq!(cli::push(a, true).unwrap_err().code, "stale_remote");
         cli::fetch(a).unwrap();
         cli::push(a, true).unwrap();
         assert_eq!(cli::rev(&bare, "refs/heads/main").unwrap(), cli::rev(a, "HEAD").unwrap());
+        // a rewrote what it pushed: "rewritten" (force push is the fix). Nothing is pushed.
+        git(a, &["commit", "-q", "--amend", "-m", "rewritten again"]).unwrap();
+        assert_eq!(cli::push(a, false).unwrap_err().code, "rewritten");
+        git(a, &["reset", "-q", "--hard", "HEAD@{1}"]).unwrap();
         assert_eq!(top().op, "force push");
         super::undo(a, &top().id).unwrap();
         assert_eq!(cli::rev(&bare, "refs/heads/main").unwrap(), theirs);
@@ -480,7 +486,7 @@ mod tests {
         cli::clone(s.to_str().unwrap(), &dest, |l| lines.push(l.to_string())).unwrap();
         assert_eq!(fs::read_to_string(dest.join("b.txt")).unwrap().trim_end(), "base"); // global autocrlf may add CR
         assert!(!lines.is_empty(), "no progress lines");
-        assert_eq!(cli::clone(s.to_str().unwrap(), &dest, |_| {}).unwrap_err().code, "git"); // dest not empty
+        assert_eq!(cli::clone(s.to_str().unwrap(), &dest, |_| {}).unwrap_err().code, "exists"); // dest not empty
         assert_eq!(cli::clone("-x", &dest, |_| {}).unwrap_err().code, "bad_url");
 
         // feat edits a.txt and deletes b.txt; main edits both.
