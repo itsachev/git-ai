@@ -82,9 +82,8 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ]],
   ["command", "Everywhere", [
     ["Command palette", "Ctrl+K or Ctrl+Shift+P", "Type to find any action by name and see its shortcut and the git command it runs: switch views, check out a branch, change theme and more."],
-    ["Terminal", "Terminal button · Ctrl+Shift+T", "A shell already in the repository folder, in a panel under the current view, for anything you'd rather type. Or pick a terminal app in Settings (Windows Terminal, Git Bash, iTerm, Konsole…) and the button opens that instead."],
     ["Theme", "Theme button, or Ctrl+K", "System, light or dark."],
-    ["Settings", "Gear button", "A status overview shows what is set up and what still needs doing; click one to jump to it. Your git name and email, saving HTTPS sign-ins, your SSH key, your AI provider (Gemini, Claude, OpenAI or a local model) with its key, and which terminal the Terminal button opens. Stored on this computer only."],
+    ["Settings", "Gear button", "A status overview shows what is set up and what still needs doing; click one to jump to it. Your git name and email, saving HTTPS sign-ins, your SSH key and your AI provider (Gemini, Claude, OpenAI or a local model) with its key. Stored on this computer only."],
     ["First-run setup", "On first launch, or Settings → Run setup again", "A short walkthrough of the settings above."],
     ["Plain-language errors", "Automatic", "When git fails, you get what went wrong and what to do next, not just git's raw message. Common fixes are one button: stash and retry, try again, fetch now, push this branch."],
     ["Updates", "Notice in the bottom-right corner", "When a new version is out, install it and restart with one click, or later."],

@@ -1,5 +1,4 @@
-import { Channel, invoke as tauriInvoke } from "@tauri-apps/api/core";
-import type { Terminals } from "../bindings/Terminals";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type { RepoInfo } from "../bindings/RepoInfo";
 import type { Status } from "../bindings/Status";
 import type { LineOp } from "../bindings/LineOp";
@@ -186,16 +185,6 @@ export const workFile = (path: string, file: string) => invoke<string | null>("w
 export const openFile = (path: string, file: string, editor: string | null) => invoke<void>("open_file", { path, file, editor });
 /** Installed editors and the last one used. */
 export const editors = () => invoke<Editors>("editors");
-/** Opens the chosen terminal app in the repo folder. */
-export const openTerminal = (path: string) => invoke<void>("open_terminal", { path });
-/** The built-in panel plus installed terminal apps, and the chosen one. */
-export const terminals = () => invoke<Terminals>("terminals");
-export const terminalSet = (name: string) => invoke<void>("terminal_set", { name });
-/** Starts a shell in `path` for the built-in panel; its output arrives on `out` (null = exited). Returns the session id. */
-export const ptyOpen = (path: string, cols: number, rows: number, out: Channel<string | null>) => invoke<number>("pty_open", { path, cols, rows, out });
-export const ptyWrite = (id: number, data: string) => invoke<void>("pty_write", { id, data });
-export const ptyResize = (id: number, cols: number, rows: number) => invoke<void>("pty_resize", { id, cols, rows });
-export const ptyClose = (id: number) => invoke<void>("pty_close", { id });
 /** Answers an "askpass" prompt; null cancels (git then fails). */
 export const askpassReply = (id: number, answer: string | null) => invoke<void>("askpass_reply", { id, answer });
 // GitHub sign-in (OAuth device flow). The token stays in the OS keychain; git gets it via askpass.

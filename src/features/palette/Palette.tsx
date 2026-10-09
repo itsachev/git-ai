@@ -28,8 +28,6 @@ export function Palette({ commands }: { commands: Command[] }) {
       // A modal (askpass, this palette) owns the keyboard while open.
       if (e.repeat || document.querySelector("dialog[open]")) return;
       const c = combo(e);
-      // In the terminal, plain Ctrl keys belong to the shell (Ctrl+K, Ctrl+R…); only Ctrl+Shift ones reach the app.
-      if ((e.target as Element | null)?.closest?.(".xterm") && !c.startsWith("Ctrl+Shift+")) return;
       const cmd = latest.current.find((x) => x.keys === c);
       if (!OPEN.includes(c) && !cmd) return;
       e.preventDefault();
