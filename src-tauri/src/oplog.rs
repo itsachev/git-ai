@@ -59,7 +59,7 @@ pub fn backup(repo: &Path, op: &str, paths: &[String]) -> Result<String, AppErro
 /// Commits the working-tree content of `paths` (tracked and untracked) on top of HEAD and stores it at
 /// `refs/git-ai/backup/<id>`. Uses a throwaway index instead of `git stash create`, which can't take
 /// paths or untracked files.
-fn snapshot(repo: &Path, op: &str, paths: &[String]) -> Result<OpEntry, AppError> {
+pub(crate) fn snapshot(repo: &Path, op: &str, paths: &[String]) -> Result<OpEntry, AppError> {
     let index = git_ai_dir(repo)?.join("backup.index");
     let _ = fs::remove_file(&index);
     let env = [("GIT_INDEX_FILE", index.as_os_str())];
@@ -120,8 +120,20 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
         .find(|e| e.id == id)
         .ok_or_else(|| AppError::new("not_found", "That operation is no longer in the undo history."))?;
     let op = format!("undo {}", e.op);
+    let moved = |r: &str| {
+        let name = r.strip_prefix("refs/heads/").unwrap_or(r);
+        AppError::new("moved", format!("{name} has changed since this operation (a newer commit, checkout or branch), so it can't be undone."))
+    };
+    let dirty = || AppError::new("dirty", "Your uncommitted changes touch files this undo would change. Commit, stash or discard them first.");
     let mut u = if let Some(backup) = &e.backup {
         let u = snapshot(repo, &op, &e.paths)?;
+        // reset --hard: HEAD goes back first, then the backed-up changes on top.
+        if let (Some(old), Some(new)) = (&e.head, &e.new_head) {
+            if git(repo, &["rev-parse", "HEAD"])?.trim() != new {
+                return Err(moved("HEAD"));
+            }
+            git(repo, &["reset", "-q", "--keep", old]).map_err(|_| dirty())?;
+        }
         let args: Vec<&str> = ["restore", "--source", backup, "--worktree", "--"]
             .into_iter()
             .chain(e.paths.iter().map(String::as_str))
@@ -145,23 +157,23 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
         // Compare-and-swap back to `head`: "" as the old value means "must not exist", -d deletes.
         let r = e.ref_name.as_deref().unwrap_or("HEAD");
         // Rebase, pull, merge: files must follow HEAD back. `reset --keep` keeps local edits and
-        // refuses when they'd be overwritten. Amend only moves HEAD (its changes stay staged).
-        let files = r == "HEAD" && e.op.trim_start_matches("undo ") != "amend";
+        // refuses when they'd be overwritten. Amend and soft/mixed resets left their changes in the
+        // index / working tree, so the same mode puts HEAD (and index) back without touching files.
+        let mode = match e.op.trim_start_matches("undo ") {
+            "amend" | "reset --soft" => "--soft",
+            "reset --mixed" => "--mixed",
+            _ => "--keep",
+        };
         let res = match (&e.head, &e.new_head) {
-            (Some(old), Some(new)) if files && git(repo, &["rev-parse", "HEAD"])?.trim() == new => {
-                git(repo, &["reset", "-q", "--keep", old]).map_err(|_| {
-                    AppError::new("dirty", "Your uncommitted changes touch files this undo would change. Commit, stash or discard them first.")
-                })?;
+            (Some(old), Some(new)) if r == "HEAD" && git(repo, &["rev-parse", "HEAD"])?.trim() == new => {
+                git(repo, &["reset", "-q", mode, old]).map_err(|_| dirty())?;
                 Ok(String::new())
             }
             (Some(old), new) => git(repo, &["update-ref", "-m", "git-ai: undo", r, old, new.as_deref().unwrap_or("")]),
             (None, Some(new)) => git(repo, &["update-ref", "-m", "git-ai: undo", "-d", r, new]),
             (None, None) => unreachable!(),
         };
-        res.map_err(|_| {
-            let name = r.strip_prefix("refs/heads/").unwrap_or(r);
-            AppError::new("moved", format!("{name} has changed since this operation (a newer commit, checkout or branch), so it can't be undone."))
-        })?;
+        res.map_err(|_| moved(r))?;
         let mut u = OpEntry::new(&op, e.new_head.clone(), e.head.clone());
         u.ref_name = e.ref_name.clone();
         u
@@ -202,6 +214,7 @@ mod tests {
     /// Merge (conflict, abort, finish), cherry-pick, tags and stashes, with undo.
     #[test]
     fn reset_to_and_undo() {
+        use cli::ResetMode::*;
         let dir = temp_repo("reset");
         let p = dir.as_path();
         let commit = |text: &str| {
@@ -217,18 +230,38 @@ mod tests {
 
         // An edit to a file the reset changes: refused, nothing moves.
         fs::write(dir.join("a.txt"), "edit\n").unwrap();
-        assert_eq!(cli::reset_to(p, "other").unwrap_err().code, "dirty");
+        assert_eq!(cli::reset_to(p, "other", Keep).unwrap_err().code, "dirty");
         assert_eq!(cli::rev(p, "HEAD").unwrap(), mine);
         git(p, &["checkout", "--", "a.txt"]).unwrap();
 
-        cli::reset_to(p, "other").unwrap();
+        cli::reset_to(p, "other", Keep).unwrap();
         assert_eq!(cli::rev(p, "HEAD").unwrap(), base);
         assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "base\n");
-        let e = super::entries(p, 1).unwrap()[0].clone();
-        assert_eq!(e.op, "reset");
-        super::undo(p, &e.id).unwrap();
+        let top = || super::entries(p, 1).unwrap()[0].clone();
+        assert_eq!(top().op, "reset");
+        super::undo(p, &top().id).unwrap();
         assert_eq!(cli::rev(p, "HEAD").unwrap(), mine);
         assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "mine\n");
+        let clean = || git(p, &["status", "--porcelain"]).unwrap();
+
+        // Soft: the dropped change stays staged; mixed: unstaged. Undo leaves a clean tree at `mine`.
+        for (mode, st) in [(Soft, "M  a.txt\n"), (Mixed, " M a.txt\n")] {
+            cli::reset_to(p, &base, mode).unwrap();
+            assert_eq!((cli::rev(p, "HEAD").unwrap(), clean()), (base.clone(), st.to_string()));
+            super::undo(p, &top().id).unwrap();
+            assert_eq!((cli::rev(p, "HEAD").unwrap(), clean()), (mine.clone(), String::new()));
+        }
+
+        // Hard: edits to tracked files are wiped (untracked stay); one undo brings back HEAD and the edits.
+        fs::write(dir.join("a.txt"), "edit\n").unwrap();
+        fs::write(dir.join("u.txt"), "untracked\n").unwrap();
+        cli::reset_to(p, &base, Hard).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "base\n");
+        assert_eq!((cli::rev(p, "HEAD").unwrap(), clean()), (base.clone(), "?? u.txt\n".to_string()));
+        assert_eq!(top().op, "reset --hard");
+        super::undo(p, &top().id).unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), mine);
+        assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap(), "edit\n");
     }
 
     #[test]

@@ -70,7 +70,7 @@ export function useRefActions(path: string) {
         run(async () => {
           if (head !== short) await switchTo(path, short, false);
           if (pick === 0) await merge(path, name, false);
-          if (pick === 1) await resetTo(path, name);
+          if (pick === 1) await resetTo(path, name, "Keep");
         }, pick < 2 ? `${pick ? "Recreated" : "Updated"} ${short} from ${name}` : undefined);
       };
     };
