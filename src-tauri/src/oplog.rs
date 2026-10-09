@@ -18,7 +18,7 @@ pub struct OpEntry {
     /// Unix time in ms, also the backup ref name.
     pub id: String,
     /// "discard", "amend", "merge", "cherry-pick", "abort <op>", "delete branch", "delete tag",
-    /// "drop stash", "pull", "delete remote branch", or "undo <op>" for the undo of an op.
+    /// "drop stash", "pull", "delete remote branch", "force push", or "undo <op>" for the undo of an op.
     pub op: String,
     /// HEAD (or `ref_name`) before the op; None = the ref didn't exist.
     pub head: Option<String>,
@@ -149,9 +149,10 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
         let msg = git(repo, &["log", "-1", "--format=%s", oid])?;
         git(repo, &["stash", "store", "-m", msg.trim(), oid])?;
         OpEntry::new(&op, None, None)
-    } else if let ("delete remote branch", Some(oid), Some(r)) = (e.op.as_str(), &e.head, &e.ref_name) {
-        crate::git::cli::restore_remote_branch(repo, r.strip_prefix("refs/remotes/").unwrap_or(r), oid)?;
-        // Not undoable itself (no refs to swap back); delete the branch again from the sidebar instead.
+    } else if let ("delete remote branch" | "force push", Some(oid), Some(r)) = (e.op.as_str(), &e.head, &e.ref_name) {
+        // A force push is undone by force-pushing the old tip back, only while the remote is still at ours.
+        crate::git::cli::restore_remote_branch(repo, r.strip_prefix("refs/remotes/").unwrap_or(r), oid, e.new_head.as_deref())?;
+        // Not undoable itself (no refs to swap back); delete or force push again instead.
         OpEntry::new(&op, None, None)
     } else if e.head.is_some() || e.new_head.is_some() {
         // Compare-and-swap back to `head`: "" as the old value means "must not exist", -d deletes.
@@ -381,10 +382,10 @@ mod tests {
         };
         let top = || super::entries(a, 20).unwrap()[0].clone();
 
-        assert_eq!(cli::push(a).unwrap_err().code, "no_remote");
+        assert_eq!(cli::push(a, false).unwrap_err().code, "no_remote");
         git(a, &["remote", "add", "origin", bare_s]).unwrap();
         commit(a, "a.txt", "one");
-        cli::push(a).unwrap();
+        cli::push(a, false).unwrap();
         assert_eq!(git(a, &["config", "branch.main.merge"]).unwrap().trim(), "refs/heads/main");
 
         // A second clone pushes first, so a's push is rejected until it pulls (a merge, undoable).
@@ -393,10 +394,10 @@ mod tests {
             git(&b, &["config", kv[0], kv[1]]).unwrap();
         }
         commit(&b, "b.txt", "from b");
-        cli::push(&b).unwrap();
+        cli::push(&b, false).unwrap();
         commit(a, "c.txt", "from a");
         let before = cli::rev(a, "HEAD").unwrap();
-        assert_eq!(cli::push(a).unwrap_err().code, "rejected");
+        assert_eq!(cli::push(a, false).unwrap_err().code, "rejected");
         cli::fetch(a).unwrap();
         assert_eq!(cli::rev(a, "origin/main").unwrap(), cli::rev(&b, "HEAD").unwrap());
         cli::pull(a, false).unwrap();
@@ -406,7 +407,7 @@ mod tests {
         assert_eq!(cli::rev(a, "HEAD").unwrap(), before);
         git(a, &["reset", "-q", "--hard"]).unwrap();
         cli::pull(a, false).unwrap();
-        cli::push(a).unwrap();
+        cli::push(a, false).unwrap();
 
         // Tag push.
         cli::create_tag(a, "v1", "HEAD", "").unwrap();
@@ -438,6 +439,20 @@ mod tests {
         assert_eq!(cli::rev(&bare, "refs/heads/feat").unwrap(), tip);
         assert_eq!(top().op, "undo delete remote branch");
         assert_eq!(super::undo(a, &top().id).unwrap_err().code, "not_undoable");
+
+        // Force push: refused while a hasn't seen b's commit (lease), then overwrites; undo puts b's tip back.
+        git(&b, &["pull", "-q", "--no-rebase"]).unwrap();
+        commit(&b, "d.txt", "from b again");
+        cli::push(&b, false).unwrap();
+        let theirs = cli::rev(&b, "HEAD").unwrap();
+        commit(a, "e.txt", "rewritten");
+        assert_eq!(cli::push(a, true).unwrap_err().code, "stale");
+        cli::fetch(a).unwrap();
+        cli::push(a, true).unwrap();
+        assert_eq!(cli::rev(&bare, "refs/heads/main").unwrap(), cli::rev(a, "HEAD").unwrap());
+        assert_eq!(top().op, "force push");
+        super::undo(a, &top().id).unwrap();
+        assert_eq!(cli::rev(&bare, "refs/heads/main").unwrap(), theirs);
         for d in [&bare, &b, &a.to_path_buf()] {
             let _ = fs::remove_dir_all(d);
         }

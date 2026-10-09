@@ -551,7 +551,7 @@ export function opLabel(e: OpEntry): string {
   const depth = e.op.match(/^(undo )*/)![0].length / 5;
   if (depth) return `${depth % 2 ? "Undo" : "Redo"}: ${opLabel({ ...e, op: e.op.slice(depth * 5) })}`;
   const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
-  const name = e.ref_name?.replace(/^refs\/(heads|tags)\//, "");
+  const name = e.ref_name?.replace(/^refs\/(heads|tags|remotes)\//, "");
   const labels: Record<string, string> = {
     discard: `Discard ${what}`,
     amend: "Amend commit",
@@ -565,6 +565,7 @@ export function opLabel(e: OpEntry): string {
     "delete branch": `Delete branch ${name}`,
     "delete tag": `Delete tag ${name}`,
     "drop stash": "Drop stash",
+    "force push": `Force push ${name}`,
   };
   if (e.op.startsWith("take ")) return `${e.op[0].toUpperCase()}${e.op.slice(1)} for ${what}`;
   if (e.op.startsWith("abort ")) return `Abort ${e.op.slice(6)} (backup of ${what})`;
@@ -576,6 +577,9 @@ export function undoHint(e: OpEntry): string | undefined {
   const short = (oid: string) => oid.slice(0, 7);
   if (e.backup) return `git restore --source ${e.backup} --worktree -- ${e.paths.join(" ")}`;
   const r = e.ref_name ?? "HEAD";
+  // Remote branch ops are undone by pushing the old tip back ("refs/remotes/origin/feat" -> origin, feat).
+  const remote = r.match(/^refs\/remotes\/([^/]+)\/(.+)$/);
+  if (remote && e.head) return `git push ${e.new_head ? `--force-with-lease=${remote[2]}:${short(e.new_head)} ` : ""}${remote[1]} ${short(e.head)}:refs/heads/${remote[2]}`;
   if (!e.head) return e.new_head ? `git update-ref -d ${r}` : undefined;
   return r === "HEAD" ? `git reset --keep ${short(e.head)}` : `git update-ref ${r} ${short(e.head)}`;
 }
