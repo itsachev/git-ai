@@ -628,14 +628,16 @@ export function opLabel(e: OpEntry): string {
   const depth = e.op.match(/^(undo )*/)![0].length / 5;
   if (depth) return `${depth % 2 ? "Undo" : "Redo"}: ${opLabel({ ...e, op: e.op.slice(depth * 5) })}`;
   const what = e.paths.length === 1 ? e.paths[0] : `${e.paths.length} files`;
-  const name = e.ref_name?.replace(/^refs\/(heads|tags|remotes)\//, "");
+  // Older undo entries have no ref_name: the label just drops it.
+  const name = e.ref_name?.replace(/^refs\/(heads|tags|remotes)\//, "") ?? "";
   const labels: Record<string, string> = {
     discard: `Discard ${what}`,
     amend: "Amend commit",
     merge: "Merge",
+    rebase: "Rebase",
     "cherry-pick": "Cherry-pick",
     revert: "Revert commit",
-    reset: "Reset branch",
+    reset: "Reset branch (keep)",
     "reset --soft": "Reset branch (soft)",
     "reset --mixed": "Reset branch (mixed)",
     "reset --hard": e.backup ? `Reset branch (hard, backup of ${what})` : "Reset branch (hard)",
@@ -646,7 +648,7 @@ export function opLabel(e: OpEntry): string {
   };
   if (e.op.startsWith("take ")) return `${e.op[0].toUpperCase()}${e.op.slice(1)} for ${what}`;
   if (e.op.startsWith("abort ")) return `Abort ${e.op.slice(6)} (backup of ${what})`;
-  return labels[e.op] ?? e.op;
+  return (labels[e.op] ?? e.op).trimEnd();
 }
 
 /** Roughly what undoing `e` runs, for the palette's terminal hint. */

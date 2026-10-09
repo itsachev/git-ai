@@ -207,10 +207,18 @@ fn log_head_move(repo: &Path, op: &str, f: impl FnOnce() -> Result<(), AppError>
 /// commit on top. Conflicts leave the op in progress (code "conflicts") for commit or `abort`.
 pub fn merge(repo: &Path, rev_name: &str, cherry_pick: bool) -> Result<(), AppError> {
     ref_arg(rev_name)?;
-    let (op, args): (&str, &[&str]) =
-        if cherry_pick { ("cherry-pick", &["cherry-pick", rev_name]) } else { ("merge", &["merge", "--no-edit", rev_name]) };
+    let op = if cherry_pick { "cherry-pick" } else { "merge" };
+    let mut args = vec![op, "--no-edit"];
+    // A bare commit id gets "Merge commit 'abc1234' into dev" instead of git's full-sha default.
+    let msg;
+    if !cherry_pick && rev_name.len() == 40 && rev_name.bytes().all(|b| b.is_ascii_hexdigit()) {
+        let into = current_branch(repo).map(|b| format!(" into {b}")).unwrap_or_default();
+        msg = format!("Merge commit '{}'{into}", &rev_name[..7]);
+        args.extend(["-m", &msg]);
+    }
+    args.push(rev_name);
     log_head_move(repo, op, || {
-        git(repo, args).map(drop).map_err(|e| stopped(repo, op, e))
+        git(repo, &args).map(drop).map_err(|e| stopped(repo, op, e))
     })
 }
 

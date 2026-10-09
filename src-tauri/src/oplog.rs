@@ -181,6 +181,8 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
     } else {
         return Err(AppError::new("not_undoable", "This operation can't be undone."));
     };
+    // Keeps the name for the label ("Undo: Force push origin/main").
+    u.ref_name = u.ref_name.or_else(|| e.ref_name.clone());
     u.undoes = Some(e.id);
     record(repo, u)
 }

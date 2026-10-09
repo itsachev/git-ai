@@ -458,6 +458,8 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 }
 /* Stage panes follow the stage's own width: the resizable sidebar takes part of the window. */
 .toolbar { container: toolbar / inline-size; }
+/* Phone width: the branch name matters more than the view title (the drawer shows the view). */
+@container toolbar (max-width: 30rem) { .toolbar h1 { display: none; } }
 .stage-body { container: stage / inline-size; }
 /* Narrow toolbar: labels become screen-reader only; icons carry it. */
 @container toolbar (max-width: 44rem) {
@@ -534,6 +536,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 /* Undo history: label over its time, Undo always visible. */
 .ops .name { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0.3rem 0.25rem 0.3rem 1.6rem; font-family: inherit; }
 .ops .name small { color: var(--muted); font-size: 0.74rem; }
+.ops .name > span { max-width: 100%; }
 .new-branch { display: grid; gap: 0.4rem; margin: 0.25rem 0 0.5rem; padding: 0.6rem; background: var(--panel); border-radius: 8px; box-shadow: var(--shadow); animation: rise 180ms var(--ease); }
 .new-branch button { justify-self: end; }
 
