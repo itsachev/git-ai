@@ -164,8 +164,8 @@ pub fn merge(path: String, rev: String, cherry_pick: bool) -> Result<(), AppErro
 }
 
 #[tauri::command]
-pub fn reset_to(path: String, rev: String) -> Result<(), AppError> {
-    cli::reset_to(Path::new(&path), &rev)
+pub fn reset_to(path: String, rev: String, mode: cli::ResetMode) -> Result<(), AppError> {
+    cli::reset_to(Path::new(&path), &rev, mode)
 }
 
 #[tauri::command]

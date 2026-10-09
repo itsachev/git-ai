@@ -34,6 +34,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Commit details", "Click a commit", "Its message, author, date, parent commits, the files it changed and each file's diff."],
     ["Cherry-pick", "Click a commit → Cherry-pick", "Copies that one commit's change onto your current branch as a new commit. Use it to bring a single fix over from another branch without merging everything else."],
     ["Revert a commit", "Click a commit on your branch → Revert", "Adds a new commit that undoes that one's change, without rewriting history, so it is safe on shared branches. Recorded, so it can be undone."],
+    ["Reset branch to a commit", "Right-click a commit → Reset to here…", "Moves your branch back (or forward) to that commit. Soft keeps the changes staged, Mixed keeps them as edits, Keep updates files but leaves your edits, Hard makes files match the commit. Undo history can reverse it; a hard reset backs up your edits first."],
     ["Merge a commit", "Click a commit → Merge into current", "Brings that commit, and everything before it, into the branch you are on."],
     ["Tag a commit", "Click a commit → Tag…", "Gives the commit a permanent name such as v1.2, usually to mark a release."],
     ["Interactive rebase", "Click a commit → Rebase from here…", "Tidies up the commits after it before you share them: reorder them, edit messages, squash or fixup several into one, or drop one."],

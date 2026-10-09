@@ -223,11 +223,48 @@ pub fn rebase_onto(repo: &Path, onto: &str) -> Result<(), AppError> {
     })
 }
 
-/// Moves the current branch to `rev`, dropping its commits that `rev` lacks ("recreate from the remote").
-/// `reset --keep` keeps local edits and refuses when they'd be overwritten. Logged; undo moves it back.
-pub fn reset_to(repo: &Path, rev_name: &str) -> Result<(), AppError> {
+/// How `reset_to` treats the index and the working tree.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, TS)]
+#[ts(export)]
+pub enum ResetMode {
+    /// Moves only the branch: the dropped commits' changes stay staged.
+    Soft,
+    /// Also resets the index: those changes stay as unstaged edits.
+    Mixed,
+    /// Files follow the branch; local edits stay, and git refuses (code "dirty") when they'd be overwritten.
+    Keep,
+    /// Files and index match `rev`; uncommitted changes to tracked files are backed up first. Untracked files stay.
+    Hard,
+}
+
+/// Moves the current branch (or detached HEAD) to `rev`, dropping its commits that `rev` lacks.
+/// Logged as "reset" (keep) or "reset --<mode>"; undo moves it back, and for hard also restores the backup.
+pub fn reset_to(repo: &Path, rev_name: &str, mode: ResetMode) -> Result<(), AppError> {
     ref_arg(rev_name)?;
-    log_head_move(repo, "reset", || git(repo, &["reset", "-q", "--keep", rev_name]).map(drop))
+    let flag = match mode {
+        ResetMode::Soft => "--soft",
+        ResetMode::Mixed => "--mixed",
+        ResetMode::Keep => "--keep",
+        ResetMode::Hard => "--hard",
+    };
+    let op = if mode == ResetMode::Keep { "reset".to_string() } else { format!("reset {flag}") };
+    let reset = || git(repo, &["reset", "-q", flag, rev_name]).map(drop);
+    let mut paths: Vec<String> = Vec::new();
+    if mode == ResetMode::Hard {
+        let st = status(repo)?;
+        let changed = st.staged.iter().chain(&st.unstaged).chain(&st.conflicted).filter(|f| f.kind != "?");
+        paths = changed.flat_map(|f| std::iter::once(f.path.clone()).chain(f.orig_path.clone())).collect();
+        paths.sort();
+        paths.dedup();
+    }
+    if paths.is_empty() {
+        return log_head_move(repo, &op, reset);
+    }
+    // One entry holds both the HEAD move and the snapshot, so a single undo brings everything back.
+    let mut e = crate::oplog::snapshot(repo, &op, &paths)?;
+    reset()?;
+    e.new_head = Some(rev(repo, "HEAD")?);
+    crate::oplog::record(repo, e)
 }
 
 /// Adds a commit that undoes `oid`. A merge commit is reverted against its first parent (the branch it

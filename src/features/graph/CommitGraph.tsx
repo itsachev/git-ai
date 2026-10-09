@@ -1,10 +1,21 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useQueries } from "@tanstack/react-query";
-import { graphRows } from "../../lib/ipc";
+import { flushSync } from "react-dom";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { graphRows, resetTo } from "../../lib/ipc";
 import type { GraphRow } from "../../bindings/GraphRow";
 import type { GraphOpts } from "../../bindings/GraphOpts";
-import { errorText } from "../status/Changes";
-import { RefMenu, showMenu, useRefActions } from "../refs/Sidebar";
+import { errorText, useRun } from "../status/Changes";
+import { RefMenu, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
+import { choose } from "../../lib/modal";
+import type { ResetMode } from "../../bindings/ResetMode";
+
+/** Reset choices: [label, hint, tone, mode]. */
+const RESETS: [string, string, "accent" | "warn" | "danger", ResetMode][] = [
+  ["Soft", "Only the branch moves. The changes of the dropped commits stay staged, ready to commit again.", "accent", "Soft"],
+  ["Mixed", "The branch and staging move. Those changes stay as unstaged edits.", "accent", "Mixed"],
+  ["Keep", "Files follow the branch; your uncommitted edits stay. Nothing happens if an edit would be overwritten.", "warn", "Keep"],
+  ["Hard", "Files match the commit exactly. Uncommitted edits to tracked files are lost (backed up for Undo); untracked files stay.", "danger", "Hard"],
+];
 
 const ROW = 24; // px, fixed so row i sits at i * ROW
 const PAGE = 500;
@@ -56,6 +67,25 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState({ top: 0, height: 0 });
+  const branch = useQuery(refsQuery(path)).data?.head;
+  const run = useRun();
+  const menuPop = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<Action[]>([]);
+
+  /** Right-click on a commit row: picks it and opens its actions. */
+  function rowMenu(e: React.MouseEvent<HTMLDivElement>, i: number, r: GraphRow) {
+    onSelect({ i, oid: r.oid });
+    const at = r.oid.slice(0, 7);
+    const target = branch ?? "HEAD";
+    flushSync(() => setMenu([
+      [`Reset ${target} to here…`, async () => {
+        const i = await choose(`Reset ${target} to ${at}`, `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
+          RESETS.map(([label, hint, tone]) => ({ label, hint, tone })), "branch");
+        if (i >= 0) run(() => resetTo(path, r.oid, RESETS[i][3]), `Reset ${target} to ${at} (${RESETS[i][3].toLowerCase()})`);
+      }],
+    ]));
+    showMenu(menuPop.current, e);
+  }
 
   useLayoutEffect(() => {
     const el = scroller.current!;
@@ -160,7 +190,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
           {visible.map(([i, r]) => (
             <div key={i} id={`c-${r.oid}`} role="option" aria-selected={sel?.oid === r.oid}
               className={`grow${sel?.oid === r.oid ? " sel" : ""}${r.head ? " head" : ""}`}
-              style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })}>
+              style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}>
               <span />
               <span className="desc">
                 {r.refs.map((n) => <RefChip key={n} name={n} path={path} />)}
@@ -173,6 +203,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
           ))}
         </div>
       </div>
+      <RefMenu pop={menuPop} label="Commit actions" actions={menu} />
     </section>
   );
 }
@@ -183,7 +214,7 @@ function RefChip({ name, path }: { name: string; path: string }) {
   const actions = useRefActions(path)(name);
   return (
     <>
-      <span className="ref" title={`${name} (right-click for actions)`} onContextMenu={(e) => showMenu(pop.current, e)}>{name}</span>
+      <span className="ref" title={`${name} (right-click for actions)`} onContextMenu={(e) => { e.stopPropagation(); showMenu(pop.current, e); }}>{name}</span>
       {actions.length > 0 && <RefMenu pop={pop} label={name} actions={actions} />}
     </>
   );

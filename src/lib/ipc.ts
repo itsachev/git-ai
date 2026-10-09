@@ -20,6 +20,7 @@ import type { GitSetup } from "../bindings/GitSetup";
 import type { GhRepo } from "../bindings/GhRepo";
 import type { Lfs } from "../bindings/Lfs";
 import type { Remote } from "../bindings/Remote";
+import type { ResetMode } from "../bindings/ResetMode";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,7 +60,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   forget_repo: () => "Failed to remove the repository",
   trash_repo: () => "Failed to delete the repository",
   ai_set_key: () => "Failed to save the API key",
-  reset_to: (a) => `Failed to reset to ${a.rev}`,
+  reset_to: (a) => `Failed to reset to ${short(a.rev)}`,
   revert: (a) => `Failed to revert ${short(a.rev)}`,
   rename_branch: (a) => `Failed to rename ${a.name}`,
   set_upstream: (a) => `Failed to change what ${a.branch} tracks`,
@@ -128,7 +129,7 @@ export const deleteBranch = (path: string, name: string, force: boolean) => invo
 export const merge = (path: string, rev: string, cherryPick: boolean) => invoke<void>("merge", { path, rev, cherryPick });
 /** Rebases the current branch onto `onto`. Code "conflicts" = paused, continue from File Status. Undoable. */
 /** Moves the current branch to `rev` (reset --keep); undoable. */
-export const resetTo = (path: string, rev: string) => invoke<void>("reset_to", { path, rev });
+export const resetTo = (path: string, rev: string, mode: ResetMode) => invoke<void>("reset_to", { path, rev, mode });
 export const rebaseOnto =(path: string, onto: string) => invoke<void>("rebase_onto", { path, onto });
 /** Adds a commit undoing `rev` (a merge against its first parent). Code "conflicts" = stopped halfway. Undoable. */
 export const revert = (path: string, rev: string) => invoke<void>("revert", { path, rev });
