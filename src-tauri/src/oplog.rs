@@ -366,13 +366,13 @@ mod tests {
         assert_eq!(cli::push(a).unwrap_err().code, "rejected");
         cli::fetch(a).unwrap();
         assert_eq!(cli::rev(a, "origin/main").unwrap(), cli::rev(&b, "HEAD").unwrap());
-        cli::pull(a).unwrap();
+        cli::pull(a, false).unwrap();
         assert_eq!(fs::read_to_string(a.join("b.txt")).unwrap(), "from b");
         assert_eq!(top().op, "pull");
         super::undo(a, &top().id).unwrap();
         assert_eq!(cli::rev(a, "HEAD").unwrap(), before);
         git(a, &["reset", "-q", "--hard"]).unwrap();
-        cli::pull(a).unwrap();
+        cli::pull(a, false).unwrap();
         cli::push(a).unwrap();
 
         // Tag push.

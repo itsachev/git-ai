@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, missingRepos, openRepo, recentRepos,stage, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -16,7 +16,7 @@ import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs
 import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { RebaseDialog } from "./features/graph/Rebase";
 import { FileHistoryDialog } from "./features/graph/FileHistory";
-import { AskpassDialog, CloneForm, SyncButtons, useSync } from "./features/remote/Remote";
+import { AskpassDialog, CloneDialog, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
@@ -167,6 +167,18 @@ function App() {
     if (dir) load(dir);
   }
 
+  async function create() {
+    const dir = await open({ directory: true, title: "Folder for the new repository" });
+    if (!dir) return;
+    try {
+      setError(null);
+      setRepo(await initRepo(dir));
+      refresh();
+    } catch (e) {
+      setError((e as AppError).message ?? String(e));
+    }
+  }
+
   async function cloned(info: RepoInfo) {
     setCloning(false);
     setRepo(info);
@@ -187,12 +199,16 @@ function App() {
             <Icon name="open" />
             <span><strong>Open repository</strong><small>A folder that contains .git</small></span>
           </button>
-          <button className="tile" aria-expanded={cloning} onClick={() => setCloning((v) => !v)}>
+          <button className="tile" aria-haspopup="dialog" onClick={() => setCloning(true)}>
             <Icon name="clone" />
             <span><strong>Clone</strong><small>From a URL</small></span>
           </button>
+          <button className="tile" onClick={create}>
+            <Icon name="add" />
+            <span><strong>Create</strong><small>A new, empty repository</small></span>
+          </button>
         </div>
-        {cloning && <CloneForm onCloned={cloned} />}
+        {cloning && <CloneDialog onCloned={cloned} onClose={() => setCloning(false)} />}
         {error && <p className="error" role="alert">{error}</p>}
         <div className="accounts" aria-label="Accounts" role="group">
           <GitHubAccount />
@@ -310,6 +326,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
+    { label: "Pull with rebase", git: "git pull --rebase --autostash", run: sync.pullRebase },
   ];
   if (status?.unstaged.length)
     commands.push({ label: "Stage all changes", keys: "Ctrl+Shift+S", git: "git add -A", run: () => run(() => stage(path, pathsOf(status.unstaged))) });

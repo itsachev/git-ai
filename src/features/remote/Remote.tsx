@@ -8,7 +8,7 @@ import type { GhRepo } from "../../bindings/GhRepo";
 import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
 import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
-import { refsQuery } from "../refs/Sidebar";
+import { RefMenu, refsQuery, showMenu } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
 import { Brand, ModalHead } from "../../lib/modal";
 
@@ -30,6 +30,7 @@ export function useSync(path: string, run: Run) {
   });
   return {
     busy,
+    pullRebase: op("Pull with rebase", "Pulling…", `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true)).go,
     ops: [
       op("Fetch", "Fetching…", "Fetched all remotes", () => fetchAll(path)),
       op("Pull", "Pulling…", `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
@@ -42,22 +43,28 @@ export function useSync(path: string, run: Run) {
 
 /** Sourcetree's toolbar buttons for `useSync`. */
 export function SyncButtons({ sync, children }: { sync: Sync; children?: React.ReactNode }) {
+  const pullPop = useRef<HTMLDivElement>(null);
   return (
     <span className="sync">
       {sync.ops.map((o) => (
-        <button key={o.label} disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing} title={o.label}>
+        <button key={o.label} disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing}
+          title={o.label === "Pull" ? "Pull (right-click: pull with rebase)" : o.label}
+          onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
           <Icon name={o.label.toLowerCase() as IconName} />
           <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
           {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
         </button>
       ))}
+      <RefMenu pop={pullPop} label="Pull" actions={[["Pull (merge)", sync.ops[1].go], ["Pull with rebase", sync.pullRebase]]} />
       {children}
     </span>
   );
 }
 
-/** URL + parent folder + folder name; shows git's latest progress line while cloning. */
-export function CloneForm({ onCloned }: { onCloned: (repo: RepoInfo) => void }) {
+/** Clone modal: URL + parent folder + folder name; shows git's latest progress line while cloning.
+ *  Mounted only while open. Can't be dismissed mid-clone, so `onCloned` never fires after a close. */
+export function CloneDialog({ onCloned, onClose }: { onCloned: (repo: RepoInfo) => void; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   const [url, setUrl] = useState("");
   const [parent, setParent] = useState("");
   const [name, setName] = useState("");
@@ -68,6 +75,7 @@ export function CloneForm({ onCloned }: { onCloned: (repo: RepoInfo) => void }) 
     const off = listen<string>("clone-progress", (e) => setProgress(e.payload));
     return () => { off.then((f) => f()); };
   }, []);
+  useEffect(() => { dialog.current?.showModal(); }, []);
   // "https://host/team/repo.git" or "git@host:team/repo.git" -> "repo"
   const guess = url.trim().replace(/[\/\\]+$/, "").split(/[\/\\:]/).pop()?.replace(/\.git$/, "") ?? "";
   const folder = nameEdited ? name : guess;
@@ -88,33 +96,48 @@ export function CloneForm({ onCloned }: { onCloned: (repo: RepoInfo) => void }) 
     }
   }
   return (
-    <form className="clone" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-      <label>
-        Repository URL
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/user/repo.git"
-          autoFocus spellCheck={false} autoComplete="off" disabled={busy} />
-      </label>
-      <RepoPicker name="GitHub" query={userQuery} list={githubRepos} url={url} setUrl={setUrl} busy={busy} />
-      <RepoPicker name="GitLab" query={gitlabUserQuery} list={gitlabRepos} url={url} setUrl={setUrl} busy={busy} />
-      <label>
-        Parent folder
-        <span className="pick-dir">
-          <input value={parent} onChange={(e) => setParent(e.target.value)} spellCheck={false} disabled={busy} />
-          <button type="button" onClick={browse} disabled={busy}>Browse…</button>
-        </span>
-      </label>
-      <label>
-        Folder name
-        <input value={folder} onChange={(e) => { setName(e.target.value); setNameEdited(true); }} spellCheck={false} disabled={busy} />
-      </label>
-      <div className="commit-row">
-        <span className="muted progress" role="status">{progress}</span>
-        <button className="primary" disabled={busy || !url.trim() || !parent.trim() || !folder.trim()}>
-          {busy ? "Cloning…" : "Clone"}
-        </button>
-      </div>
-      {error && <p className="error" role="alert">{error}</p>}
-    </form>
+    <dialog ref={dialog} className="modal clone-dialog" aria-labelledby="clone-title" onCancel={(e) => { e.preventDefault(); if (!busy) onClose(); }}>
+      <form className="clone" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <ModalHead id="clone-title" icon="clone" title="Clone a repository" sub="Copy a remote repository into a folder on this computer." />
+        <fieldset className="clone-step" disabled={busy}>
+          <legend><span>1</span>Source</legend>
+          <label>
+            Repository URL
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/user/repo.git"
+              autoFocus spellCheck={false} autoComplete="off" />
+          </label>
+          <div className="clone-pair">
+            <RepoPicker name="GitHub" query={userQuery} list={githubRepos} url={url} setUrl={setUrl} busy={busy} />
+            <RepoPicker name="GitLab" query={gitlabUserQuery} list={gitlabRepos} url={url} setUrl={setUrl} busy={busy} />
+          </div>
+        </fieldset>
+        <fieldset className="clone-step" disabled={busy}>
+          <legend><span>2</span>Destination</legend>
+          <div className="clone-pair">
+            <label>
+              Parent folder
+              <span className="pick-dir">
+                <input value={parent} onChange={(e) => setParent(e.target.value)} placeholder="Choose a folder" spellCheck={false} />
+                <button type="button" onClick={browse}><Icon name="folder" />Browse…</button>
+              </span>
+            </label>
+            <label>
+              Folder name
+              <input value={folder} onChange={(e) => { setName(e.target.value); setNameEdited(true); }} placeholder="repo" spellCheck={false} />
+            </label>
+          </div>
+          <p className="clone-path">{parent.trim() && folder.trim() && <>Clones into <code>{`${parent.trim().replace(/[\/\\]+$/, "")}/${folder.trim()}`}</code></>}</p>
+        </fieldset>
+        {error && <p className="error" role="alert">{error}</p>}
+        <p className="muted progress" role="status">{progress}</p>
+        <div className="dialog-actions">
+          <button type="button" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="primary" disabled={busy || !url.trim() || !parent.trim() || !folder.trim()}>
+            {busy ? "Cloning…" : "Clone"}
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 

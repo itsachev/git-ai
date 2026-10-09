@@ -4,6 +4,7 @@ import type { Status } from "../bindings/Status";
 import type { LineOp } from "../bindings/LineOp";
 import type { OpEntry } from "../bindings/OpEntry";
 import type { GraphPage } from "../bindings/GraphPage";
+import type { AiConfig } from "../bindings/AiConfig";
 import type { GraphOpts } from "../bindings/GraphOpts";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
@@ -18,6 +19,7 @@ import type { Blame } from "../bindings/Blame";
 import type { GitSetup } from "../bindings/GitSetup";
 import type { GhRepo } from "../bindings/GhRepo";
 import type { Lfs } from "../bindings/Lfs";
+import type { Remote } from "../bindings/Remote";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,6 +60,13 @@ const FAILED: Record<string, (a: Args) => string> = {
   trash_repo: () => "Failed to delete the repository",
   ai_set_key: () => "Failed to save the API key",
   reset_to: (a) => `Failed to reset to ${a.rev}`,
+  revert: (a) => `Failed to revert ${short(a.rev)}`,
+  rename_branch: (a) => `Failed to rename ${a.name}`,
+  set_upstream: (a) => `Failed to change what ${a.branch} tracks`,
+  remote_set: (a) => (a.edit ? `Failed to change the URL of ${a.name}` : `Failed to add remote ${a.name}`),
+  remote_remove: (a) => `Failed to remove remote ${a.name}`,
+  ignore: (a) => `Failed to ignore ${a.pattern}`,
+  init_repo: () => "Failed to create the repository",
   ai_commit_message: () => "Failed to write a commit message",
   ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
   create_pr: () => "Failed to open the pull request",
@@ -121,6 +130,20 @@ export const merge = (path: string, rev: string, cherryPick: boolean) => invoke<
 /** Moves the current branch to `rev` (reset --keep); undoable. */
 export const resetTo = (path: string, rev: string) => invoke<void>("reset_to", { path, rev });
 export const rebaseOnto =(path: string, onto: string) => invoke<void>("rebase_onto", { path, onto });
+/** Adds a commit undoing `rev` (a merge against its first parent). Code "conflicts" = stopped halfway. Undoable. */
+export const revert = (path: string, rev: string) => invoke<void>("revert", { path, rev });
+export const renameBranch = (path: string, name: string, newName: string) => invoke<void>("rename_branch", { path, name, newName });
+/** `upstream`: remote branch like "origin/main"; null stops tracking. */
+export const setUpstream = (path: string, branch: string, upstream: string | null) => invoke<void>("set_upstream", { path, branch, upstream });
+export const remotes = (path: string) => invoke<Remote[]>("remotes", { path });
+/** Adds remote `name`, or with `edit` changes its URL. */
+export const remoteSet = (path: string, name: string, url: string, edit: boolean) => invoke<void>("remote_set", { path, name, url, edit });
+/** Removes the remote and its remote branches. */
+export const remoteRemove = (path: string, name: string) => invoke<void>("remote_remove", { path, name });
+/** Appends a pattern to the top-level .gitignore; left unstaged. */
+export const ignore = (path: string, pattern: string) => invoke<void>("ignore", { path, pattern });
+/** `git init` in `dir` (made if missing), then opens it. */
+export const initRepo = (dir: string) => invoke<RepoInfo>("init_repo", { dir });
 /** Aborts the in-progress merge/cherry-pick (changed files backed up first). */
 export const abortOp = (path: string) => invoke<void>("abort", { path });
 /** Commits after `base` on the current branch, oldest first. Codes "has_merges", "too_many", "not_ancestor". */
@@ -141,8 +164,8 @@ export const stashSave = (path: string, message: string) => invoke<void>("stash_
 export const stash = (path: string, op: StashOp, index: number, oid: string) => invoke<void>("stash", { path, op, index, oid });
 // Network ops. git may ask for credentials meanwhile through the "askpass" event (see AskpassDialog).
 export const fetchAll = (path: string) => invoke<void>("fetch", { path });
-/** Merges the upstream (no rebase); code "conflicts" = stopped halfway. Undoable. */
-export const pull = (path: string) => invoke<void>("pull", { path });
+/** Merges the upstream, or with `rebase` replays local commits on it; code "conflicts" = stopped halfway. Undoable. */
+export const pull = (path: string, rebase = false) => invoke<void>("pull", { path, rebase });
 /** Pushes the current branch; without an upstream it goes to origin and becomes the upstream. Code "rejected" = pull first. */
 export const push = (path: string) => invoke<void>("push", { path });
 export const pushTag = (path: string, name: string) => invoke<void>("push_tag", { path, name });
@@ -195,19 +218,22 @@ export const gitSetup = () => invoke<GitSetup>("git_setup");
 export const gitSetupSet = (name: string, email: string, helper: boolean) => invoke<void>("git_setup_set", { name, email, helper });
 export const setupDone = () => invoke<boolean>("setup_done");
 export const setupFinish = () => invoke<void>("setup_finish");
-// AI (Gemini, bring your own key). The key stays in the OS keychain (or GEMINI_API_KEY in dev).
+// AI, bring your own key: Gemini, Claude or an OpenAI-compatible server. Keys stay in the OS keychain (or <PROVIDER>_API_KEY in dev).
+export const aiConfig = () => invoke<AiConfig>("ai_config");
+export const aiSetConfig = (config: AiConfig) => invoke<void>("ai_set_config", { config });
+/** True when the chosen provider has a key, or needs none (a custom OpenAI-compatible URL). */
 export const aiHasKey = () => invoke<boolean>("ai_has_key");
 /** null removes the stored key. */
-export const aiSetKey = (key: string | null) => invoke<void>("ai_set_key", { key });
-/** Writes a commit message from the staged diff (sent to Gemini). Codes: "ai_no_key", "ai_key" (rejected), "ai_limit", "nothing_staged". */
+export const aiSetKey = (provider: string, key: string | null) => invoke<void>("ai_set_key", { provider, key });
+/** Writes a commit message from the staged diff (sent to the AI provider). Codes: "ai_no_key", "ai_key" (rejected), "ai_limit", "nothing_staged". */
 export const aiCommitMessage = (path: string) => invoke<string>("ai_commit_message", { path });
-/** Explains one commit from its message and diff (sent to Gemini). Codes as above, minus "nothing_staged". */
+/** Explains one commit from its message and diff (sent to the AI provider). Codes as above, minus "nothing_staged". */
 export const aiExplainCommit = (path: string, oid: string) => invoke<string>("ai_explain_commit", { path, oid });
-/** Explains a stash: tracked changes plus untracked files (sent to Gemini). */
+/** Explains a stash: tracked changes plus untracked files (sent to the AI provider). */
 export const aiExplainStash = (path: string, oid: string) => invoke<string>("ai_explain_stash", { path, oid });
 export const aiWriteRange = (path: string, base: string, head: string, kind: "pr" | "changelog" | "explain") =>
   invoke<string>("ai_write_range", { path, base, head, kind });
-/** Proposes a resolution for a conflicted file (sent whole to Gemini). Writes nothing; apply it with `writeResolved`. */
+/** Proposes a resolution for a conflicted file (sent whole to the AI provider). Writes nothing; apply it with `writeResolved`. */
 export const aiResolveConflict = (path: string, file: string) => invoke<string>("ai_resolve_conflict", { path, file });
 // Git LFS. Not installed = `installed` false, no patterns.
 export const lfs = (path: string) => invoke<Lfs>("lfs", { path });

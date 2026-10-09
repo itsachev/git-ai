@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fileDiff, headMessage, openFile, opLog, repoStatus, resolve, stage, unstage, workFile, writeResolved } from "../../lib/ipc";
+import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fileDiff, headMessage, ignore, openFile, opLog, repoStatus, resolve, stage, unstage, workFile, writeResolved } from "../../lib/ipc";
 import type { Side } from "../../bindings/Side";
 import type { FileChange } from "../../bindings/FileChange";
 import type { AppError } from "../../bindings/AppError";
@@ -8,7 +8,7 @@ import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon } from "../../lib/icons";
 import { Splitter } from "../../lib/splitter";
-import { ModalHead, confirm } from "../../lib/modal";
+import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
 
@@ -129,6 +129,12 @@ export function Changes({ path }: { path: string }) {
   const resolved = !!cur && cur.staged && hadConflict.current.has(cur.file);
 
   const list = { sel: cur, onSelect: setSel };
+  async function ignoreFile(file: string) {
+    const pats = ignorePatterns(file);
+    const i = await choose("Ignore", `Git stops listing matching untracked files. The pattern goes into .gitignore, which you commit like any file.`,
+      pats.map(([pattern, hint]) => ({ label: pattern, hint })), "changes");
+    if (i >= 0) run(() => ignore(path, pats[i][0]), `Added ${pats[i][0]} to .gitignore`);
+  }
   return (
     <div className="changes">
       <div className="side">
@@ -157,7 +163,7 @@ export function Changes({ path }: { path: string }) {
             <FileList {...list} title="Staged" files={data.staged} staged
               action="Unstage" onAction={(fs) => run(() => unstage(path, pathsOf(fs)))} />
             <FileList {...list} title="Changes" files={data.unstaged} staged={false}
-              action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} />
+              action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} onIgnore={ignoreFile} />
           </>
         )}
         </div>
@@ -239,7 +245,7 @@ function CommitBox({ path, canCommit, finishing, conflicts, run, onCommit }: Com
       />
       <div className="commit-row">
         <button type="button" className="small" disabled={!canCommit || amend || !!finishing || writing} onClick={generate}
-          title={hasKey ? "Write a message from the staged changes (sent to Gemini)" : "Add a Gemini API key in Settings first"}>
+          title={hasKey ? "Write a message from the staged changes (sent to your AI provider)" : "Set up AI in Settings first"}>
           {writing ? "Writing…" : "Generate message"}
         </button>
         <label className="check">
@@ -261,11 +267,13 @@ type ListProps = {
   action: string;
   onAction: (files: FileChange[]) => void;
   onDiscard?: (files: FileChange[]) => void;
+  /** Untracked files get an Ignore button. */
+  onIgnore?: (file: string) => void;
   sel: Selection | null;
   onSelect: (s: Selection) => void;
 };
 
-function FileList({ title, files, staged, action, onAction, onDiscard, sel, onSelect }: ListProps) {
+function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore, sel, onSelect }: ListProps) {
   if (!files.length) return null;
   return (
     <section>
@@ -288,6 +296,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, sel, onSe
                   {slash > 0 && <small>{f.path.slice(0, slash)}</small>}
                 </span>
               </button>
+              {onIgnore && f.kind === "?" && f.path !== ".gitignore" && <button className="small" onClick={() => onIgnore(f.path)}>Ignore</button>}
               {onDiscard && <button className="small" onClick={() => onDiscard([f])}>Discard</button>}
               <button className="small" onClick={() => onAction([f])}>{action}</button>
             </li>
@@ -365,7 +374,7 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
         <span className="conflict-actions">
           {!resolved && <>
           <button className="small" disabled={asking || typeof data !== "string"} onClick={askAi}
-            title={hasKey ? "Propose a merge of both sides (file sent to Gemini); you review it before it's applied" : "Add a Gemini API key in Settings first"}>
+            title={hasKey ? "Propose a merge of both sides (file sent to your AI provider); you review it before it's applied" : "Set up AI in Settings first"}>
             <Icon name="sparkle" />{asking ? "Resolving…" : "Resolve with AI"}</button>
           <button className="small" onClick={() => run(() => resolve(path, [file], mine))}
             title={`Keep ${rebasing ? "your commit's" : "your branch's"} version (backed up first)`}>Keep mine</button>
@@ -548,6 +557,7 @@ export function opLabel(e: OpEntry): string {
     amend: "Amend commit",
     merge: "Merge",
     "cherry-pick": "Cherry-pick",
+    revert: "Revert commit",
     reset: "Reset branch",
     "delete branch": `Delete branch ${name}`,
     "delete tag": `Delete tag ${name}`,
@@ -565,6 +575,19 @@ export function undoHint(e: OpEntry): string | undefined {
   const r = e.ref_name ?? "HEAD";
   if (!e.head) return e.new_head ? `git update-ref -d ${r}` : undefined;
   return r === "HEAD" ? `git reset --keep ${short(e.head)}` : `git update-ref ${r} ${short(e.head)}`;
+}
+
+/** [pattern, hint] choices for ignoring `file`: itself, its extension, its folder. Wildcards in names are escaped; a leading "/" anchors to the repo root. */
+export function ignorePatterns(file: string): [string, string][] {
+  const esc = (s: string) => s.replace(/[\\*?[]/g, "\\$&").replace(/ $/, "\\ ");
+  const name = file.slice(file.lastIndexOf("/") + 1);
+  const dot = name.lastIndexOf(".");
+  const dir = file.slice(0, file.lastIndexOf("/") + 1);
+  return [
+    [`/${esc(file)}`, "Just this file."],
+    ...(dot > 0 ? [[`*${esc(name.slice(dot))}`, `Every ${name.slice(dot)} file, in any folder.`] as [string, string]] : []),
+    ...(dir ? [[`/${esc(dir)}`, `Everything in ${dir}`] as [string, string]] : []),
+  ];
 }
 
 // Two letters = conflict; "?" = untracked (shown like an add).

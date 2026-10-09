@@ -169,6 +169,48 @@ pub fn reset_to(path: String, rev: String) -> Result<(), AppError> {
 }
 
 #[tauri::command]
+pub fn revert(path: String, rev: String) -> Result<(), AppError> {
+    cli::revert(Path::new(&path), &rev)
+}
+
+#[tauri::command]
+pub fn rename_branch(path: String, name: String, new_name: String) -> Result<(), AppError> {
+    cli::rename_branch(Path::new(&path), &name, &new_name)
+}
+
+#[tauri::command]
+pub fn set_upstream(path: String, branch: String, upstream: Option<String>) -> Result<(), AppError> {
+    cli::set_upstream(Path::new(&path), &branch, upstream.as_deref())
+}
+
+#[tauri::command]
+pub fn remotes(path: String) -> Result<Vec<cli::Remote>, AppError> {
+    cli::remotes(Path::new(&path))
+}
+
+#[tauri::command]
+pub fn remote_set(path: String, name: String, url: String, edit: bool) -> Result<(), AppError> {
+    cli::remote_set(Path::new(&path), &name, &url, edit)
+}
+
+#[tauri::command]
+pub fn remote_remove(path: String, name: String) -> Result<(), AppError> {
+    cli::remote_remove(Path::new(&path), &name)
+}
+
+#[tauri::command]
+pub fn ignore(path: String, pattern: String) -> Result<(), AppError> {
+    cli::ignore(Path::new(&path), &pattern)
+}
+
+/// Creates an empty repository in `dir`, then opens it like `open_repo`.
+#[tauri::command]
+pub fn init_repo(app: AppHandle, dir: String) -> Result<read::RepoInfo, AppError> {
+    cli::init(Path::new(&dir))?;
+    open_repo(app, dir)
+}
+
+#[tauri::command]
 pub fn rebase_onto(path: String, onto: String) -> Result<(), AppError> {
     cli::rebase_onto(Path::new(&path), &onto)
 }
@@ -206,8 +248,8 @@ pub async fn fetch(path: String) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub async fn pull(path: String) -> Result<(), AppError> {
-    cli::pull(Path::new(&path))
+pub async fn pull(path: String, rebase: bool) -> Result<(), AppError> {
+    cli::pull(Path::new(&path), rebase)
 }
 
 #[tauri::command]
@@ -440,45 +482,61 @@ pub fn ssh_detect(app: AppHandle) -> Vec<String> {
     keys
 }
 
-// AI (Gemini, BYOK).
-#[tauri::command]
-pub fn ai_has_key() -> bool {
-    crate::ai::has_key()
+// AI (bring your own key: Gemini, Claude or an OpenAI-compatible server).
+fn ai_cfg(app: &AppHandle) -> crate::ai::AiConfig {
+    app.store(STORE).ok().and_then(|s| s.get("ai")).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default()
 }
 
 #[tauri::command]
-pub fn ai_set_key(key: Option<String>) -> Result<(), AppError> {
-    crate::ai::set_key(key)
+pub fn ai_config(app: AppHandle) -> crate::ai::AiConfig {
+    ai_cfg(&app)
 }
 
-/// Sends the staged diff to Gemini; async because it goes over the network.
 #[tauri::command]
-pub async fn ai_commit_message(path: String) -> Result<String, AppError> {
-    crate::ai::commit_message(Path::new(&path))
+pub fn ai_set_config(app: AppHandle, config: crate::ai::AiConfig) -> Result<(), AppError> {
+    app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?.set("ai", json!(config));
+    Ok(())
 }
 
-/// Sends one commit's message and diff to Gemini.
+/// The chosen provider has a key, or needs none.
 #[tauri::command]
-pub async fn ai_explain_commit(path: String, oid: String) -> Result<String, AppError> {
-    crate::ai::explain_commit(Path::new(&path), &oid)
+pub fn ai_has_key(app: AppHandle) -> bool {
+    crate::ai::ready(&ai_cfg(&app))
 }
 
-/// Sends one stash's changes (untracked files too) to Gemini.
 #[tauri::command]
-pub async fn ai_explain_stash(path: String, oid: String) -> Result<String, AppError> {
-    crate::ai::explain_stash(Path::new(&path), &oid)
+pub fn ai_set_key(provider: String, key: Option<String>) -> Result<(), AppError> {
+    crate::ai::set_key(&provider, key)
 }
 
-/// Sends a commit range (messages + combined diff) to Gemini for a PR description, changelog or explanation.
+/// Sends the staged diff to the AI provider; async because it goes over the network.
 #[tauri::command]
-pub async fn ai_write_range(path: String, base: String, head: String, kind: String) -> Result<String, AppError> {
-    crate::ai::write_range(Path::new(&path), &base, &head, &kind)
+pub async fn ai_commit_message(app: AppHandle, path: String) -> Result<String, AppError> {
+    crate::ai::commit_message(&ai_cfg(&app), Path::new(&path))
 }
 
-/// Sends a conflicted file to Gemini; returns the proposed resolution without writing it.
+/// Sends one commit's message and diff to the AI provider.
 #[tauri::command]
-pub async fn ai_resolve_conflict(path: String, file: String) -> Result<String, AppError> {
-    crate::ai::resolve_conflict(Path::new(&path), &file)
+pub async fn ai_explain_commit(app: AppHandle, path: String, oid: String) -> Result<String, AppError> {
+    crate::ai::explain_commit(&ai_cfg(&app), Path::new(&path), &oid)
+}
+
+/// Sends one stash's changes (untracked files too) to the AI provider.
+#[tauri::command]
+pub async fn ai_explain_stash(app: AppHandle, path: String, oid: String) -> Result<String, AppError> {
+    crate::ai::explain_stash(&ai_cfg(&app), Path::new(&path), &oid)
+}
+
+/// Sends a commit range (messages + combined diff) to the AI provider for a PR description, changelog or explanation.
+#[tauri::command]
+pub async fn ai_write_range(app: AppHandle, path: String, base: String, head: String, kind: String) -> Result<String, AppError> {
+    crate::ai::write_range(&ai_cfg(&app), Path::new(&path), &base, &head, &kind)
+}
+
+/// Sends a conflicted file to the AI provider; returns the proposed resolution without writing it.
+#[tauri::command]
+pub async fn ai_resolve_conflict(app: AppHandle, path: String, file: String) -> Result<String, AppError> {
+    crate::ai::resolve_conflict(&ai_cfg(&app), Path::new(&path), &file)
 }
 
 /// Commits in `base..HEAD` (oldest first) for the interactive rebase dialog.
