@@ -104,6 +104,36 @@ pub fn open(name: &str, file: &Path) -> Result<(), AppError> {
     cmd.arg(file).spawn().map(drop).map_err(fail)
 }
 
+/// Opens the OS terminal in `dir` (the repo folder), like Sourcetree's Terminal button.
+pub fn open_terminal(dir: &Path) -> Result<(), AppError> {
+    let fail = |e: std::io::Error| AppError::new("open", format!("Couldn't open a terminal: {e}"));
+    if !dir.is_dir() {
+        return Err(AppError::new("open", format!("'{}' is not a folder.", dir.display())));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NEW_CONSOLE: u32 = 0x10;
+        // A new console opens in the user's default terminal app (Windows Terminal on Windows 11).
+        Command::new("powershell.exe").arg("-NoLogo").current_dir(dir).creation_flags(CREATE_NEW_CONSOLE).spawn().map(drop).map_err(fail)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").args(["-a", "Terminal"]).arg(dir).spawn().map(drop).map_err(fail)
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let mut err = None;
+        for t in ["x-terminal-emulator", "gnome-terminal", "konsole", "xfce4-terminal", "xterm"] {
+            match Command::new(t).current_dir(dir).spawn() {
+                Ok(_) => return Ok(()),
+                Err(e) => err = Some(e),
+            }
+        }
+        Err(fail(err.unwrap()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

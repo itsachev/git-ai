@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -326,6 +326,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
     { label: "Git LFS…", git: "git lfs track", run: () => openLfs() },
+    { label: "Open in terminal", keys: "Ctrl+Shift+T", run: () => run(() => openTerminal(path)) },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
@@ -370,6 +371,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
           <h1>{tab === "status" ? "File Status" : "History"}</h1>
           <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
           <SyncButtons sync={sync}><NewBranchButton /></SyncButtons>
+          <button className="icon-btn" onClick={() => run(() => openTerminal(path))} aria-label="Open in terminal" title="Open in terminal (Ctrl+Shift+T)"><Icon name="terminal" /></button>
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>
