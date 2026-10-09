@@ -10,8 +10,8 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const HOST: &str = "https://gitlab.com";
-/// `read_api`: user + project list. `write_repository`: clone/push over HTTPS.
-const SCOPE: &str = "read_api write_repository";
+/// `api`: user, project list and merge requests. `write_repository`: clone/push over HTTPS.
+const SCOPE: &str = "api write_repository";
 
 /// The "git-ai" gitlab.com OAuth app (not confidential, device grant on). Client ids are public, not secrets.
 const DEFAULT_CLIENT_ID: &str = "a52a0538edda1b08b01c64c25826bb7078186980d1994fbac20ff9ed9cddc116";
@@ -182,6 +182,40 @@ pub fn repos() -> Result<Vec<GhRepo>, AppError> {
         }
     }
     Ok(out)
+}
+
+/// "group/name" of a gitlab.com remote URL, if it is one.
+pub fn remote_slug(remote_url: &str) -> Option<String> {
+    crate::github::remote_path(remote_url, "gitlab.com")
+}
+
+/// Opens a merge request of `head` into `base` on the gitlab.com project behind `remote_url`; returns its web URL.
+pub fn create_mr(remote_url: &str, head: &str, base: &str, title: &str, body: &str) -> Result<String, AppError> {
+    let slug = remote_slug(remote_url).ok_or_else(|| AppError::new("not_hosted", format!("The remote ({remote_url}) isn't a gitlab.com project.")))?;
+    let token = token().ok_or_else(|| AppError::new("signed_out", "Sign in to GitLab first."))?;
+    let mut res = ureq::post(&format!("{HOST}/api/v4/projects/{}/merge_requests", slug.replace('/', "%2F")))
+        .config()
+        .http_status_as_error(false)
+        .build()
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "git-ai")
+        .send_json(serde_json::json!({ "source_branch": head, "target_branch": base, "title": title, "description": body }))
+        .map_err(net)?;
+    let status = res.status().as_u16();
+    let v: Value = res.body_mut().read_json().unwrap_or_default();
+    if let Some(url) = v["web_url"].as_str().filter(|_| status == 201) {
+        return Ok(url.into());
+    }
+    // "message" is a string or a list ("Another open merge request already exists for this source branch: !5").
+    let msg = v["message"].as_str().or(v["message"][0].as_str()).or(v["error_description"].as_str()).unwrap_or("unexpected response");
+    Err(match status {
+        401 => AppError::new("signed_out", "GitLab no longer accepts your sign-in. Sign in again."),
+        403 if v["error"] == "insufficient_scope" => {
+            AppError::new("signed_out", "Your GitLab sign-in predates merge requests. Sign out of GitLab and sign in again.")
+        }
+        403 | 404 => AppError::new("gitlab", format!("GitLab refused: {msg}. Check that your account can push to {slug}.")),
+        _ => AppError::new("gitlab", format!("GitLab refused the merge request: {msg}")),
+    })
 }
 
 pub fn sign_out() -> Result<(), AppError> {
