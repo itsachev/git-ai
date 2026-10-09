@@ -78,6 +78,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ### ⌨️ Everywhere
 - Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>) and keyboard shortcuts
+- **Built-in terminal** in the repo folder (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>), or open your own terminal app
 - Light, dark or system theme; first-run setup; auto-update
 
 </td></tr>
@@ -152,6 +153,7 @@ npm run tauri dev      # native window with hot reload (first Rust build takes ~
 │   ├─ git/graph.rs  lane layout, computed once, served in pages of 500 rows       │
 │   ├─ git/cli.rs    writes + network via system git (no shell, porcelain v2 -z)   │
 │   ├─ oplog.rs      undo log + backup refs (refs/git-ai/backup/*)                 │
+│   ├─ terminal.rs   built-in terminal (PTY) + launching terminal apps             │
 │   └─ errors.rs     git stderr → error code + plain-language explanation          │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```

@@ -320,10 +320,48 @@ pub fn open_file(app: AppHandle, path: String, file: String, editor: Option<Stri
     }
 }
 
-/// Opens the system terminal in the repo folder.
+fn terminal_choice(app: &AppHandle) -> Option<String> {
+    app.store(STORE).ok()?.get("terminal")?.as_str().map(String::from)
+}
+
+/// The built-in panel plus installed terminal apps, and which one the Terminal button opens.
 #[tauri::command]
-pub fn open_terminal(path: String) -> Result<(), AppError> {
-    crate::editors::open_terminal(Path::new(&path))
+pub fn terminals(app: AppHandle) -> crate::terminal::Terminals {
+    crate::terminal::list(terminal_choice(&app))
+}
+
+#[tauri::command]
+pub fn terminal_set(app: AppHandle, name: String) -> Result<(), AppError> {
+    app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?.set("terminal", json!(name));
+    Ok(())
+}
+
+/// Opens the chosen terminal app in the repo folder (the built-in panel is opened by the UI).
+#[tauri::command]
+pub fn open_terminal(app: AppHandle, path: String) -> Result<(), AppError> {
+    let name = crate::terminal::list(terminal_choice(&app)).chosen;
+    crate::terminal::open_app(&name, Path::new(&path))
+}
+
+/// Starts a shell for the built-in panel; output streams to `out`.
+#[tauri::command]
+pub fn pty_open(path: String, cols: u16, rows: u16, out: tauri::ipc::Channel<Option<String>>) -> Result<u32, AppError> {
+    crate::terminal::open(Path::new(&path), cols, rows, out)
+}
+
+#[tauri::command]
+pub fn pty_write(id: u32, data: String) -> Result<(), AppError> {
+    crate::terminal::write(id, &data)
+}
+
+#[tauri::command]
+pub fn pty_resize(id: u32, cols: u16, rows: u16) -> Result<(), AppError> {
+    crate::terminal::resize(id, cols, rows)
+}
+
+#[tauri::command]
+pub fn pty_close(id: u32) {
+    crate::terminal::close(id)
 }
 
 #[tauri::command]
