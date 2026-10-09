@@ -29,7 +29,7 @@ const confirmDiscard = (what: string) =>
 /** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
  * A failure shows in `OpErrorDialog` until OK. */
 let opGen = 0;
-let opError: { title: string; text: string; warn?: boolean; code?: string; retry?: () => void } | null = null;
+let opError: { title: string; text: string; warn?: boolean; code?: string; retry?: (extra?: string) => void } | null = null;
 const opSubs = new Set<() => void>();
 const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
 
@@ -55,7 +55,9 @@ export function useRun() {
       const code = (e as AppError).code;
       opError = code === "conflicts"
         ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
-        : { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code, retry: () => { run(op, done); } };
+        : { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code,
+            // `extra` is appended to the success notice ("… Your changes are in the stash.").
+            retry: (extra?: string) => { run(op, extra ? () => `${(typeof done === "function" ? done() : done) ?? "Done"}. ${extra}` : done); } };
       opSubs.forEach((f) => f());
       return false;
     } finally {
@@ -66,11 +68,11 @@ export function useRun() {
 }
 
 /** One-click fixes the error dialog offers, by error code: [button label, action]. */
-const FIXES: Record<string, (path: string, run: Run, retry: () => void) => [string, () => void][]> = {
+const FIXES: Record<string, (path: string, run: Run, retry: (extra?: string) => void) => [string, () => void][]> = {
   dirty: (p, run, retry) => [["Stash changes and retry", async () => {
-    if (await run(() => stashSave(p, "Stashed by git-ai to retry"))) retry();
+    if (await run(() => stashSave(p, "Stashed by git-ai to retry"))) retry("Your changes are in the stash: apply it to get them back");
   }]],
-  network: (_p, _run, retry) => [["Try again", retry]],
+  network: (_p, _run, retry) => [["Try again", () => retry()]],
   stale_remote: (p, run) => [["Fetch now", () => run(() => fetchAll(p), "Fetched. Check the graph, then push again")]],
   no_upstream: (p, run) => [["Push this branch", () => run(() => push(p), "Pushed")]],
   lfs_missing: () => [["Get Git LFS", () => openUrl("https://git-lfs.com")]],
