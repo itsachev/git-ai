@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, stashSave, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -369,8 +369,12 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
         <header className="toolbar">
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : "History"}</h1>
-          <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
-          <SyncButtons sync={sync}><NewBranchButton /></SyncButtons>
+          <SyncButtons sync={sync}>
+            <button disabled={!changed} onClick={() => run(() => stashSave(path, ""))} title="Stash all changes, untracked files included">
+              <Icon name="stash" /><span className="btn-label">Stash</span>
+            </button>
+            <NewBranchButton />
+          </SyncButtons>
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>

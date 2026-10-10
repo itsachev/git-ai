@@ -401,7 +401,6 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   animation: pop 320ms var(--spring);
 }
 .branch-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toolbar .branch-chip { flex-shrink: 1; margin-right: auto; }
 .views { display: grid; gap: 2px; padding: 0.25rem 0.5rem 0.5rem; border-bottom: 1px solid var(--line); }
 .views button { justify-content: flex-start; background: none; box-shadow: none; color: var(--muted); gap: 0.6rem; padding: 0 0.6rem; font-weight: 500; }
 .views button span:not(.count) { flex: 1; text-align: left; }
@@ -421,7 +420,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 }
 .toolbar h1 { font: 650 1.25rem var(--display); letter-spacing: -0.03em; white-space: nowrap; }
 .stage-body { flex: 1; min-height: 0; overflow: auto; padding: 0.75rem; animation: rise 260ms var(--ease); }
-.sync { display: flex; border-radius: var(--r); box-shadow: var(--tool-edge); }
+.sync { display: flex; margin-left: auto; border-radius: var(--r); box-shadow: var(--tool-edge); }
 .sync button { border-radius: 0; box-shadow: var(--tool-lit); }
 .sync button:hover:not(:disabled) { box-shadow: var(--tool-lit), var(--veil); }
 .sync button + button { border-left: 1px solid rgb(0 0 0 / 0.45); }
