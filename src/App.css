@@ -610,7 +610,14 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 }
 .commit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; min-width: 0; }
 .commit-head label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-.commit-head label .mono { text-transform: none; letter-spacing: 0; font-size: 0.78rem; color: var(--accent-fg); }
+.commit-head label { display: inline-flex; align-items: center; gap: 0.45rem; }
+.branch-tag {
+  display: inline-flex; align-items: center; gap: 0.3rem; min-width: 0; padding: 0.1rem 0.45rem; border-radius: 6px;
+  font: 600 0.74rem var(--mono); text-transform: none; letter-spacing: 0; color: var(--accent-fg);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.branch-tag .icon { flex: none; width: 0.85rem; height: 0.85rem; }
 .subject-len { flex: none; font: 600 0.72rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; transition: color 160ms; }
 .subject-len.over { color: var(--danger); }
 .commit textarea {
@@ -618,10 +625,25 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
   background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .commit textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
-.commit-row { display: flex; align-items: center; gap: 0.35rem 0.6rem; flex-wrap: wrap; }
-.commit-row .check { margin-right: auto; font-size: 0.85rem; }
-.commit-row .ghost .icon { color: var(--accent-fg); }
-.commit-row .primary { min-width: 8.5rem; }
+.commit-row { display: flex; align-items: center; gap: 0.35rem 0.5rem; flex-wrap: wrap; }
+/* Beats the global label.check (top-aligned, for multi-line setting labels). */
+.commit-row label.check { align-items: center; gap: 0.45rem; margin-right: auto; min-height: 2.1rem; padding: 0 0.55rem; border-radius: 8px; font-size: 0.85rem; line-height: 1; transition: background-color 160ms, color 160ms; }
+.commit-row label.check:hover { color: var(--fg); background: var(--pick); }
+.commit-row label.check input { margin: 0; }
+.commit-row label.check:has(input:checked) { color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.commit-row label.check:has(input:disabled) { opacity: 0.5; cursor: default; background: none; }
+/* AI action: tinted pill, so it reads as a feature and not as disabled text. */
+.commit-row button.ai-gen {
+  min-height: 2.1rem; padding: 0 0.7rem; gap: 0.4rem; border-radius: 8px; font-weight: 600; color: var(--accent-fg);
+  background: color-mix(in srgb, var(--accent) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.commit-row button.ai-gen:hover:not(:disabled) { color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent); }
+.commit-row button.ai-gen .icon { color: inherit; transition: rotate 400ms var(--spring); }
+.commit-row button.ai-gen:hover:not(:disabled) .icon { rotate: 20deg; }
+.commit-row button.ai-gen[aria-busy="true"] .icon { animation: spin 1.2s linear infinite; }
+.commit-row .primary { min-width: 8.5rem; min-height: 2.1rem; }
+@media (pointer: coarse) { .commit-row button.ai-gen, .commit-row label.check, .commit-row .primary { min-height: 2.75rem; } }
+@media (prefers-reduced-motion: reduce) { .commit-row button.ai-gen .icon { animation: none; transition: none; } }
 .banner {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding: 0.6rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--mod) 45%, transparent); border-radius: 10px;
@@ -680,13 +702,26 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff .del .ln span { color: var(--danger); }
 /* Hunk headers stick to the top while their lines scroll by. */
 .diff .hunk {
-  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 2px; margin: 0.6rem 0 0.15rem; padding: 0.15rem 0.5rem;
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 2px; margin: 1.4rem 0 0.25rem; padding: 0.5rem 0.6rem;
   font-size: 0.76rem; color: var(--info); background: color-mix(in srgb, var(--info) 7%, var(--panel));
   border-block: 1px solid color-mix(in srgb, var(--info) 14%, transparent);
 }
 .diff .hunk:first-child { margin-top: 0; border-top: 0; }
+/* Breathing room after each hunk's last line, before the next header or the end of the diff. */
+.diff pre > div:has(+ .hunk), .diff pre > div:last-child { margin-bottom: 0.75rem; }
 .diff .hunk > span { padding: 0.15rem 0.3rem; opacity: 0.85; }
-.diff .hunk button { font-family: var(--sans); min-height: 1.5rem; padding: 0 0.5rem; font-size: 0.76rem; color: var(--info); }
+/* Hunk actions: solid chips that lift off the tinted strip; hover tints them by intent. */
+.diff .hunk button {
+  font-family: var(--sans); min-height: 1.55rem; padding: 0 0.6rem; margin-right: 2px; font-size: 0.76rem; font-weight: 600; border-radius: 6px;
+  color: var(--fg); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong), 0 1px 2px rgb(0 0 0 / 0.06);
+  transition: background-color 150ms var(--ease), color 150ms var(--ease), box-shadow 150ms var(--ease);
+}
+.diff .hunk button:hover:not(:disabled), .diff .hunk button:focus-visible {
+  --tint: var(--accent); color: var(--accent-fg);
+  background: color-mix(in srgb, var(--tint) 12%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint) 45%, transparent);
+}
+.diff .hunk button[data-op="Discard"]:hover:not(:disabled), .diff .hunk button[data-op="Discard"]:focus-visible { --tint: var(--danger); color: var(--danger); }
+@media (pointer: coarse) { .diff .hunk button { min-height: 2.25rem; } }
 .diff .pick { cursor: pointer; }
 .diff .pick:hover { box-shadow: inset 3px 0 var(--faint); }
 .diff .pick.on { box-shadow: inset 3px 0 var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
@@ -759,8 +794,8 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
   min-height: 1.75rem; padding: 0 0.75rem; border-radius: 7px; font-size: 0.8rem; font-weight: 600;
   color: var(--muted); background: none; box-shadow: none; transition: color 160ms, background-color 160ms, box-shadow 200ms, scale 200ms var(--spring);
 }
-.seg button:hover:not(:disabled) { color: var(--fg); box-shadow: none; }
-.seg button[aria-pressed="true"] { color: var(--fg); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), inset 0 0 0 1px var(--line); }
+.seg button:hover:not(:disabled, [aria-pressed="true"]) { color: var(--fg); box-shadow: none; }
+.seg button[aria-pressed="true"] { color: var(--tool-ink); background: var(--tool); box-shadow: var(--tool-lit), var(--tool-edge); }
 @media (pointer: coarse) { .seg button { min-height: 2.5rem; } }
 .graph {
   --graph-cols: minmax(0, 1fr) 9.5rem 9.5rem 4.75rem;

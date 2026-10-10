@@ -50,7 +50,7 @@ impl AiConfig {
 /// Diff text sent at most (bytes); the rest is cut with a note.
 const MAX_DIFF: usize = 100_000;
 
-const COMMIT_PROMPT: &str = "You write git commit messages. From the staged diff, write one message: \
+const COMMIT_PROMPT: &str = "You write git commit messages. From the diff, write one message: \
 an imperative subject line of at most 72 characters, then, only if the change needs explaining, a blank \
 line and a short body (why, not a line-by-line what). Match the style of the recent subjects if given. \
 Plain text only: no Markdown, no code fences, no quotes around the message.";
@@ -134,9 +134,13 @@ fn clip(s: &str, max: usize) -> (&str, bool) {
 }
 
 pub fn commit_message(cfg: &AiConfig, repo: &Path) -> Result<String, AppError> {
-    let diff = read::staged_patch(repo)?;
+    // Nothing staged: describe every change, staged or not.
+    let mut diff = read::staged_patch(repo)?;
     if diff.trim().is_empty() {
-        return Err(AppError::new("nothing_staged", "Stage some changes first, then generate a message."));
+        diff = read::work_patch(repo)?;
+    }
+    if diff.trim().is_empty() {
+        return Err(AppError::new("nothing_staged", "No changes to describe."));
     }
     let (diff, cut) = clip(&diff, MAX_DIFF);
     let recent = read::recent_subjects(repo, 10).unwrap_or_default().join("\n");
@@ -144,7 +148,7 @@ pub fn commit_message(cfg: &AiConfig, repo: &Path) -> Result<String, AppError> {
     if !recent.is_empty() {
         input += &format!("Recent commit subjects:\n{recent}\n\n");
     }
-    input += &format!("Staged diff:\n{diff}");
+    input += &format!("Diff:\n{diff}");
     if cut {
         input += "\n[diff cut here, too long]";
     }

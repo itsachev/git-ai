@@ -105,6 +105,17 @@ pub fn staged_patch(repo: &Path) -> Result<String, AppError> {
     patch_text(&diff)
 }
 
+/// HEAD → working tree (staged or not, untracked files too), binary files as in `staged_patch`.
+pub fn work_patch(repo: &Path) -> Result<String, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let mut opts = git2::DiffOptions::new();
+    opts.max_size(1 << 20).include_untracked(true).recurse_untracked_dirs(true).show_untracked_content(true);
+    let head = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
+    let mut diff = repo.diff_tree_to_workdir_with_index(head.as_ref(), Some(&mut opts))?;
+    diff.find_similar(None)?;
+    patch_text(&diff)
+}
+
 /// Message and whole patch (first parent → commit) of one commit, binary files as in `staged_patch`.
 pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError> {
     let repo = git2::Repository::open(repo)?;

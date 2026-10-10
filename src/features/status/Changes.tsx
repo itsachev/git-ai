@@ -261,7 +261,7 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
   return (
     <form className="commit" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <div className="commit-head">
-        <label htmlFor="commit-msg">{amend ? "Amend" : "Commit"} to <span className="mono">{branch ?? "detached HEAD"}</span></label>
+        <label htmlFor="commit-msg">{amend ? "Amend" : "Commit"} to <span className="branch-tag mono"><Icon name="branch" />{branch ?? "detached HEAD"}</span></label>
         {/* Git convention: a subject line of 72 characters at most. */}
         {subject > 0 && <span className={`subject-len${subject > 72 ? " over" : ""}`} title="Subject line length (72 max by convention)">{subject}/72</span>}
       </div>
@@ -275,8 +275,9 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
       />
       <div className="commit-row">
-        <button type="button" className="small ghost" disabled={!canCommit || amend || !!finishing || writing} onClick={generate}
-          title={hasKey ? "Write a message from the staged changes (sent to your AI provider)" : "Set up AI in Settings first"}>
+        {/* Nothing staged: the backend describes all changes instead. */}
+        <button type="button" className="small ghost ai-gen" disabled={amend || !!finishing || writing} aria-busy={writing} onClick={generate}
+          title={hasKey ? `Write a message from the ${canCommit ? "staged" : "changed"} files (sent to your AI provider)` : "Set up AI in Settings first"}>
           <Icon name="sparkle" />{writing ? "Writing…" : "Generate"}
         </button>
         <label className="check">
@@ -587,7 +588,7 @@ function Diff({ path, sel, kind, run }: DiffProps) {
             return (
               <div key={i} className="hunk">
                 {ops.map(([op, label]) => (
-                  <button key={op} className="small ghost" onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
+                  <button key={op} className="small" data-op={op} onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
                 ))}
                 <span>{l}</span>
               </div>
