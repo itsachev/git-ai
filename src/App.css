@@ -420,14 +420,14 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 }
 .toolbar h1 { font: 650 1.25rem var(--display); letter-spacing: -0.03em; white-space: nowrap; }
 .stage-body { flex: 1; min-height: 0; overflow: auto; padding: 0.75rem; animation: rise 260ms var(--ease); }
-.sync { display: flex; margin-left: auto; border-radius: var(--r); box-shadow: var(--tool-edge); }
-.sync button { border-radius: 0; box-shadow: var(--tool-lit); }
-.sync button:hover:not(:disabled) { box-shadow: var(--tool-lit), var(--veil); }
-.sync button + button { border-left: 1px solid rgb(0 0 0 / 0.45); }
-.sync button:first-child { border-radius: var(--r) 0 0 var(--r); }
-.sync button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.sync { display: flex; gap: 3px; margin-left: auto; }
+.sync button { border-radius: var(--r); box-shadow: var(--tool-edge), var(--tool-lit); }
+.sync button:hover:not(:disabled) { box-shadow: var(--tool-edge), var(--tool-lit), var(--veil); }
 .sync button[aria-busy="true"] .icon { animation: spin 900ms linear infinite; }
 .sync .count { color: var(--accent-ink); background: var(--accent); }
+/* Pull's menu half: a narrow chevron segment joined to Pull (no gap) by a faint seam. */
+.sync button:has(+ .split-menu) { border-radius: var(--r) 0 0 var(--r); }
+.sync button.split-menu { margin-left: -3px; width: 1.7rem; padding: 0; border-radius: 0 var(--r) var(--r) 0; border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent); }
 /* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
 .statusbar { display: flex; justify-content: flex-end; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
 .palette-trigger { min-height: 1.75rem; padding: 0 0.5rem; font-size: 0.8rem; color: var(--muted); background: none; box-shadow: none; }
