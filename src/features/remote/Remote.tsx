@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -74,13 +74,21 @@ export function SyncButtons({ sync, children }: { sync: Sync; children?: React.R
   return (
     <span className="sync">
       {sync.ops.map((o) => (
-        <button key={o.label} disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing}
-          title={o.label === "Pull" ? "Pull (right-click: pull with rebase)" : o.label}
-          onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
-          <Icon name={o.label.toLowerCase() as IconName} />
-          <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
-          {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
-        </button>
+        <Fragment key={o.label}>
+          <button disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing}
+            title={o.label === "Pull" ? "Pull (right-click: pull with rebase)" : o.label}
+            onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
+            <Icon name={o.label.toLowerCase() as IconName} />
+            <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
+            {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
+          </button>
+          {o.label === "Pull" && (
+            <button className="split-menu"disabled={!!sync.busy} aria-label="Pull options" title="Pull options"
+              aria-haspopup="menu" onClick={(e) => showMenu(pullPop.current, e)}>
+              <Icon name="chevron" />
+            </button>
+          )}
+        </Fragment>
       ))}
       <RefMenu pop={pullPop} label="Pull" actions={[["Pull (merge)", sync.ops[1].go], ["Pull with rebase", sync.pullRebase]]} />
       {children}
