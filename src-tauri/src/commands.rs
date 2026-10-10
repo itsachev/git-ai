@@ -123,6 +123,17 @@ pub async fn graph_rows(
     graph::rows(&cache, Path::new(&path), opts, offset, limit)
 }
 
+/// History search: matching graph rows as (row, oid).
+#[tauri::command]
+pub async fn graph_search(
+    cache: State<'_, graph::GraphCache>,
+    path: String,
+    opts: graph::GraphOpts,
+    query: String,
+) -> Result<Vec<(u32, String)>, AppError> {
+    graph::search(&cache, Path::new(&path), opts, &query)
+}
+
 #[tauri::command]
 pub async fn commit_details(path: String, oid: String) -> Result<read::CommitDetails, AppError> {
     read::commit_details(Path::new(&path), &oid)

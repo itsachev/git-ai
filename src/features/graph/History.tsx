@@ -7,7 +7,7 @@ import { Icon } from "../../lib/icons";
 import { ago } from "../refs/NewBranch";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm, refsQuery } from "../refs/Sidebar";
-import { Avatar, CommitGraph, GraphOptions, savedOpts, type Picked } from "./CommitGraph";
+import { Avatar, CommitGraph, CommitSearch, GraphOptions, savedOpts, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
 import { openFileHistory } from "./FileHistory";
@@ -20,6 +20,7 @@ export function History({ path }: { path: string }) {
   const [opts, setOpts] = useState(savedOpts);
   const [file, setFile] = useState<string | null>(null);
   const [tagging, setTagging] = useState(false);
+  const [hits, setHits] = useState<Set<string>>();
   const run = useRun();
   const hasKey = useQuery(aiKeyQuery).data;
   // Explanations by oid, kept while the view is open so going back to a commit doesn't call the AI again.
@@ -59,8 +60,11 @@ export function History({ path }: { path: string }) {
     <div className="history-view">
       <div className="graph-wrap">
         {/* New options = new rows: drop the pick so the newest commit gets selected. */}
-        <GraphOptions opts={opts} onChange={(o) => { setOpts(o); setSel(null); }} />
-        <CommitGraph path={path} opts={opts} sel={sel} onSelect={setSel} />
+        <div className="graph-bar">
+          <GraphOptions opts={opts} onChange={(o) => { setOpts(o); setSel(null); }} />
+          <CommitSearch path={path} opts={opts} sel={sel} onSelect={setSel} onHits={setHits} />
+        </div>
+        <CommitGraph path={path} opts={opts} sel={sel} onSelect={setSel} hits={hits} />
       </div>
       <Splitter name="graph-h" axis="y" label="Resize commit list" />
       <div className="history-bottom">

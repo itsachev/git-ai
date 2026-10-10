@@ -320,6 +320,7 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   const commands: Command[] = [
     { label: "Go to File Status", keys: "Ctrl+1", git: "git status", run: () => show("status") },
     { label: "Go to History", keys: "Ctrl+2", git: "git log --graph --oneline --all", run: () => show("history") },
+    { label: "Search commits", keys: "Ctrl+F", git: "git log --all -i --grep=<text>", run: () => { show("history"); setTimeout(() => document.getElementById("commit-search")?.focus()); } },
     { label: "Toggle branches", keys: "Ctrl+B", git: "git branch -a", run: () => setSide((v) => !v) },
     { label: "New branch", keys: "Ctrl+Shift+B", git: "git switch -c <name>", run: () => openNewBranch() },
     { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },

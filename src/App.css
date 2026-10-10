@@ -747,6 +747,13 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .graph-wrap { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .graph-wrap > .graph { flex: 1; }
 .graph-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.graph-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 0.6rem; }
+.commit-search { display: flex; align-items: center; gap: 0.3rem; flex: 0 1 22rem; min-width: min(100%, 14rem); }
+.commit-search .search { flex: 1; min-width: 0; }
+.commit-search .search input { width: 100%; min-height: 1.95rem; }
+.commit-search .count { font-size: 0.78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.commit-search .step { min-width: 1.95rem; padding: 0; font-size: 0.65rem; }
+@media (pointer: coarse) { .commit-search .search input, .commit-search .step { min-height: 2.5rem; min-width: 2.5rem; } }
 /* Segmented control: sunken track, the pressed option a raised pill. */
 .seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--sunken); }
 .seg button {
@@ -773,6 +780,8 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .grow { transition: background-color 120ms; }
 .grow:hover { background: var(--raised); }
 .grow.head:not(.sel) { background: var(--active); box-shadow: var(--active-bar); }
+.grow.hit:not(.sel) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.grow.hit:not(.sel) .sum { font-weight: 650; }
 .grow.sel { background: var(--accent); color: var(--accent-ink); }
 .grow.sel .c-date, .grow.sel .c-author, .grow.sel .c-oid { color: inherit; opacity: 0.85; }
 .grow.sel .ref { color: inherit; background: rgb(255 255 255 / 0.18); border-color: rgb(255 255 255 / 0.45); }
