@@ -31,6 +31,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ["history", "History", [
     ["Commit graph", "History tab · Ctrl+2", "Every commit, with lanes that show where branches split and merge, and branch and tag labels. Arrow keys and Page Up / Down move the selection. Fast on 100k+ commits."],
     ["History options", "Options above the graph", "Show all branches or just the current one, hide or show remote branches, and sort by date or ancestor order."],
+    ["Search commits", "Search box above the graph · Ctrl+F", "Finds commits by message, author, email or commit id and highlights every match. Enter and Shift+Enter (or ▲ ▼) step through them, Esc clears."],
     ["Commit details", "Click a commit", "Its message, author, date, parent commits, the files it changed and each file's diff. Click the short id to copy the full one."],
     ["Cherry-pick", "Click a commit → Cherry-pick", "Copies that one commit's change onto your current branch as a new commit. Use it to bring a single fix over from another branch without merging everything else."],
     ["Revert a commit", "Click a commit on your branch → Revert", "Adds a new commit that undoes that one's change, without rewriting history, so it is safe on shared branches. Recorded, so it can be undone."],
@@ -45,7 +46,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ]],
   ["branch", "Branches, tags and stashes", [
     ["Sidebar", "Always visible on wide windows · Ctrl+B or ☰ on narrow ones", "Local and remote branches, tags, stashes and undo history, with a filter. ↑ and ↓ counts show commits waiting to be pushed or pulled."],
-    ["Check out a branch", "Double-click a branch, right-click → Checkout, or Ctrl+K → Checkout", "Switches your files to that branch. Uncommitted changes come along when git can. A remote branch becomes a local branch that tracks it. If the remote branch is ahead of yours, pick: fast-forward or merge, recreate yours from it, switch as is, or branch off."],
+    ["Check out a branch", "Double-click a branch, right-click → Checkout, or Ctrl+K → Checkout", "Switches your files to that branch. Uncommitted changes come along when git can. When they also differ on that branch, pick: bring them along (if they clash, nothing is switched) or stash them and switch. A remote branch becomes a local branch that tracks it. If the remote branch is ahead of yours, pick: fast-forward or merge, recreate yours from it, switch as is, or branch off."],
     ["New branch", "Branch button, + in the sidebar, Ctrl+Shift+B, or right-click → New branch from here", "A branch is a movable name for a line of work. Start from any branch, tag or commit, use feature/ fix/ chore/ prefixes, and switch to it right away. The dialog shows the exact git command."],
     ["Merge a branch", "Right-click a branch → Merge <branch> into <current>", "Combines that branch's work into the branch you are on."],
     ["Drag and drop branches", "Drag a branch onto the current branch, or the current branch onto another", "Drop to pick Merge or Rebase, the same as the right-click menu. Remote branches work too."],
@@ -54,7 +55,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Track a remote branch", "Right-click a local branch → Track remote branch…", "Picks which remote branch Pull and Push use for it, or stops tracking."],
     ["Delete a branch", "Right-click a branch → Delete", "Removes a local branch (asks again if its work is not merged anywhere) or a branch on the remote. Both can be undone."],
     ["Tags", "Sidebar → Tags, right-click a tag", "Push a tag to the remote, delete it, branch from it, or write an AI changelog since it."],
-    ["Stashes", "Sidebar → Stashes → +", "Parks your uncommitted changes so you get a clean folder, e.g. to switch branches. Apply brings them back and keeps the stash, Pop brings them back and removes it, Drop deletes it."],
+    ["Stashes", "Stash button in the toolbar, or Sidebar → Stashes → +", "Parks your uncommitted changes so you get a clean folder, e.g. to switch branches. Apply brings them back and keeps the stash, Pop brings them back and removes it, Drop deletes it."],
     ["Explain a branch (AI)", "Right-click a local branch → Explain branch (AI), or Ctrl+K", "A plain-words summary of what the branch changes compared with another branch. Its commits and diff are sent to your AI provider."],
     ["Explain a stash (AI)", "Right-click a stash → Explain (AI)", "A plain-words summary of what the stash holds, new untracked files included. Its diff is sent to your AI provider."],
   ]],

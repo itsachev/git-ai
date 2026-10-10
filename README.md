@@ -55,6 +55,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ### 🕸️ History
 - Commit graph with all-branches or current-branch view and date or topological sort
+- **Search commits** by message, author or id (Ctrl+F)
 - Commit details and diffs, **AI explanations**, file history and blame
 - Right-click any commit to branch, merge, rebase, revert or reset (soft, mixed, keep or hard, all undoable)
 
@@ -64,7 +65,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - Create, switch (carrying your changes), rename, track, delete
 - Merge, cherry-pick and **interactive rebase**
 - **Drag and drop** a branch onto another to merge or rebase
-- Tags and stashes, with AI explanations for branches and stashes
+- Tags and stashes (one-click Stash in the toolbar), with AI explanations for branches and stashes
 
 ### ☁️ Remotes & hosting
 - Fetch, pull (merge or rebase) and push, with ahead/behind counts
