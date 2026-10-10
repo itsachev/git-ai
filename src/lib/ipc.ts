@@ -110,6 +110,9 @@ export const fileDiff = (path: string, file: string, staged: boolean) =>
 /** Graph rows `offset..offset + limit`, newest first. */
 export const graphRows = (path: string, opts: GraphOpts, offset: number, limit: number) =>
   invoke<GraphPage>("graph_rows", { path, opts, offset, limit });
+/** Matching rows of the same graph as (row, oid), newest first. */
+export const graphSearch = (path: string, opts: GraphOpts, query: string) =>
+  invoke<[number, string][]>("graph_search", { path, opts, query });
 export const commitDetails = (path: string, oid: string) => invoke<CommitDetails>("commit_details", { path, oid });
 /** null = binary or over 1 MB. */
 export const commitFileDiff = (path: string, oid: string, file: string) =>

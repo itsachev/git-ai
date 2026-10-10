@@ -5,7 +5,7 @@ use git2::{Oid, Repository};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use ts_rs::TS;
 
 #[derive(Debug, Serialize, TS)]
@@ -63,18 +63,7 @@ pub struct GraphCache(Mutex<Option<Layout>>);
 /// Rows `offset..offset + limit`, newest first. Recomputes the layout when any ref moved.
 pub fn rows(cache: &GraphCache, path: &Path, opts: GraphOpts, offset: usize, limit: usize) -> Result<GraphPage, AppError> {
     let repo = Repository::open(path)?;
-    let tips = tips(&repo, opts.remotes);
-    let head = repo.head().ok().and_then(|h| h.target());
-    let starts: &[_] = if opts.all { &tips } else { &[] };
-    let mut key: Vec<Oid> = starts.iter().map(|t| t.1).chain(head).collect();
-    key.sort();
-    key.dedup();
-    let name = path.to_string_lossy().into_owned();
-
-    let mut cache = cache.0.lock().unwrap_or_else(|e| e.into_inner());
-    if !matches!(&*cache, Some(l) if l.repo == name && l.opts == opts && l.key == key) {
-        *cache = Some(compute(&repo, name, opts, key)?);
-    }
+    let (cache, tips, head) = fresh(cache, &repo, path, opts)?;
     let l = cache.as_ref().unwrap();
 
     let mut names: HashMap<Oid, Vec<String>> = HashMap::new();
@@ -96,6 +85,50 @@ pub fn rows(cache: &GraphCache, path: &Path, opts: GraphOpts, offset: usize, lim
         })
     });
     Ok(GraphPage { total: l.rows.len() as u32, lanes: l.lanes, rows: rows.collect::<Result<_, AppError>>()? })
+}
+
+/// Rows whose message, author name or email contains `q` (any case), or whose id starts with it: (row, oid), newest first.
+pub fn search(cache: &GraphCache, path: &Path, opts: GraphOpts, q: &str) -> Result<Vec<(u32, String)>, AppError> {
+    let q = q.trim().to_lowercase();
+    if q.is_empty() {
+        return Ok(vec![]);
+    }
+    let repo = Repository::open(path)?;
+    // Copy the oids out so paging isn't blocked while this runs.
+    let oids: Vec<Oid> = fresh(cache, &repo, path, opts)?.0.as_ref().unwrap().rows.iter().map(|r| r.0).collect();
+    let has = |b: &[u8]| String::from_utf8_lossy(b).to_lowercase().contains(&q);
+    // ponytail: parses every commit per search (~1 s per 100k); keep messages in the layout if that's slow.
+    let mut hits = vec![];
+    for (i, oid) in oids.into_iter().enumerate() {
+        let id = oid.to_string();
+        let c = repo.find_commit(oid)?;
+        let a = c.author();
+        if id.starts_with(&q) || has(c.message_bytes()) || has(a.name_bytes()) || has(a.email_bytes()) {
+            hits.push((i as u32, id));
+        }
+    }
+    Ok(hits)
+}
+
+/// The cached layout for `opts`, recomputed when the repo, the options or any ref changed. Also the tips and HEAD.
+fn fresh<'a>(
+    cache: &'a GraphCache,
+    repo: &Repository,
+    path: &Path,
+    opts: GraphOpts,
+) -> Result<(MutexGuard<'a, Option<Layout>>, Vec<(String, Oid)>, Option<Oid>), AppError> {
+    let tips = tips(repo, opts.remotes);
+    let head = repo.head().ok().and_then(|h| h.target());
+    let starts: &[_] = if opts.all { &tips } else { &[] };
+    let mut key: Vec<Oid> = starts.iter().map(|t| t.1).chain(head).collect();
+    key.sort();
+    key.dedup();
+    let name = path.to_string_lossy().into_owned();
+    let mut cache = cache.0.lock().unwrap_or_else(|e| e.into_inner());
+    if !matches!(&*cache, Some(l) if l.repo == name && l.opts == opts && l.key == key) {
+        *cache = Some(compute(repo, name, opts, key)?);
+    }
+    Ok((cache, tips, head))
 }
 
 /// (short name, commit) for every branch, remote branch (if `remotes`) and tag. Tags are peeled to their commit.
@@ -205,7 +238,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let repo = git2::Repository::init(&dir).unwrap();
         let tree = repo.find_tree(repo.treebuilder(None).unwrap().write().unwrap()).unwrap();
-        let mut at = |r: &str, msg: &str, t: i64, parents: &[git2::Oid]| {
+        let at = |r: &str, msg: &str, t: i64, parents: &[git2::Oid]| {
             let sig = git2::Signature::new("T", "t@t", &git2::Time::new(t, 0)).unwrap();
             let ps: Vec<_> = parents.iter().map(|p| repo.find_commit(*p).unwrap()).collect();
             repo.commit(Some(r), &sig, &sig, msg, &tree, &ps.iter().collect::<Vec<_>>()).unwrap()
@@ -216,7 +249,7 @@ mod tests {
         let b1 = at("refs/heads/b", "b1", 300, &[base]);
         let a2 = at("refs/heads/a", "a2", 400, &[a1]);
         at("refs/heads/b", "b2", 500, &[b1]);
-        at("refs/remotes/origin/x", "x", 600, &[a2]);
+        let x = at("refs/remotes/origin/x", "x", 600, &[a2]);
         repo.set_head("refs/heads/a").unwrap();
         let on = GraphOpts { all: true, remotes: true, by_date: true };
         let order = |o| rows(&GraphCache::default(), &dir, o, 0, 100).unwrap().rows.into_iter().map(|r| r.summary).collect::<Vec<_>>();
@@ -236,6 +269,12 @@ mod tests {
         assert_eq!(rows(&cache, &dir, on, 0, 100).unwrap().total, 6);
         assert_eq!(rows(&cache, &dir, off, 0, 100).unwrap().total, 5);
         assert_eq!(rows(&cache, &dir, GraphOpts { all: false, ..off }, 0, 100).unwrap().total, 3);
+        // Search: message, author, id prefix; rows match the page order.
+        let find = |q: &str| super::search(&cache, &dir, on, q).unwrap().into_iter().map(|h| h.0).collect::<Vec<_>>();
+        assert_eq!(find("A2"), [2]);
+        assert_eq!(find("t@T").len(), 6);
+        assert_eq!(find(&x.to_string()[..7]), [0]);
+        assert!(find("  ").is_empty() && find("nope").is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -38,6 +38,7 @@ pub fn run() {
             commands::op_log,
             commands::undo,
             commands::graph_rows,
+            commands::graph_search,
             commands::commit_details,
             commands::commit_file_diff,
             commands::refs,

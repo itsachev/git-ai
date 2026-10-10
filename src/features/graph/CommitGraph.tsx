@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { commitDetails, graphRows, merge, rebaseOnto, resetTo } from "../../lib/ipc";
+import { commitDetails, graphRows, graphSearch, merge, rebaseOnto, resetTo } from "../../lib/ipc";
 import { openNewBranch } from "../refs/NewBranch";
 import type { GraphRow } from "../../bindings/GraphRow";
 import type { GraphOpts } from "../../bindings/GraphOpts";
@@ -9,6 +9,7 @@ import { errorText, useRun } from "../status/Changes";
 import { RefMenu, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
 import { choose } from "../../lib/modal";
 import type { ResetMode } from "../../bindings/ResetMode";
+import { Icon } from "../../lib/icons";
 
 /** Reset choices: [label, hint, tone, mode]. */
 const RESETS: [string, string, "accent" | "warn" | "danger", ResetMode][] = [
@@ -30,7 +31,7 @@ const x = (lane: number) => LANE / 2 + 3 + lane * LANE;
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export type Picked = { i: number; oid: string };
-type Props = { path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void };
+type Props = { path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void; hits?: Set<string> };
 
 const OPTS_KEY = "graph-opts";
 /** Last-used history options, kept in localStorage (a per-window convenience). */
@@ -63,8 +64,60 @@ export function GraphOptions({ opts, onChange }: { opts: GraphOpts; onChange: (o
   );
 }
 
+/** Search box for the commit table: matches on message, author, email or id prefix. Enter / Shift+Enter step through them. */
+export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
+  path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void; onHits: (h: Set<string>) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [term, setTerm] = useState("");
+  useEffect(() => { const t = setTimeout(() => setTerm(q.trim()), 250); return () => clearTimeout(t); }, [q]);
+  const { data, isFetching, error } = useQuery({
+    queryKey: ["graph-search", path, opts, term], queryFn: () => graphSearch(path, opts, term), enabled: !!term,
+  });
+  const hits = term ? data ?? [] : [];
+  // Highlight every result; jump to the first only for a new search, not a refetch after a repo change.
+  const jumped = useRef("");
+  useEffect(() => {
+    onHits(new Set(hits.map((h) => h[1])));
+    if (!term) jumped.current = "";
+    const key = `${JSON.stringify(opts)}|${term}`;
+    if (!data || jumped.current === key) return;
+    jumped.current = key;
+    if (hits.length) onSelect({ i: hits[0][0], oid: hits[0][1] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, term]);
+  const at = hits.findIndex((h) => h[1] === sel?.oid);
+  function step(d: 1 | -1) {
+    if (!hits.length) return;
+    const from = sel?.i ?? -1;
+    const h = d > 0 ? hits.find((h) => h[0] > from) ?? hits[0] : [...hits].reverse().find((h) => h[0] < from) ?? hits[hits.length - 1];
+    onSelect({ i: h[0], oid: h[1] });
+  }
+  const status = !term ? "" : error ? errorText(error) : isFetching && !data ? "Searching…"
+    : !hits.length ? "No matches" : at >= 0 ? `${at + 1} of ${hits.length}` : `${hits.length} match${hits.length === 1 ? "" : "es"}`;
+  return (
+    <div className="commit-search" role="search">
+      <label className="search">
+        <Icon name="search" />
+        <input id="commit-search" type="search" placeholder="Search commits" aria-label="Search commits (message, author or id)"
+          title="Message, author, email or commit id. Enter: next match, Shift+Enter: previous" spellCheck={false} autoComplete="off"
+          value={q} onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+            else if (e.key === "Escape" && q) { e.preventDefault(); setQ(""); }
+          }} />
+      </label>
+      {term && <>
+        <span className="muted count" aria-live="polite">{status}</span>
+        <button type="button" className="small ghost step" disabled={!hits.length} onClick={() => step(-1)} aria-label="Previous match" title="Previous match (Shift+Enter)">▲</button>
+        <button type="button" className="small ghost step" disabled={!hits.length} onClick={() => step(1)} aria-label="Next match" title="Next match (Enter)">▼</button>
+      </>}
+    </div>
+  );
+}
+
 /** Virtualized commit table: only the visible rows are in the DOM, their graph on one canvas. */
-export function CommitGraph({ path, opts, sel, onSelect }: Props) {
+export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState({ top: 0, height: 0 });
@@ -182,10 +235,16 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
     const r = rowAt(i);
     if (!r) return;
     onSelect({ i, oid: r.oid });
-    const el = scroller.current!;
-    if (i * ROW < el.scrollTop) el.scrollTop = i * ROW;
-    else if ((i + 1) * ROW > el.scrollTop + el.clientHeight) el.scrollTop = (i + 1) * ROW - el.clientHeight;
   }
+
+  // Keep the picked row in view (keys, search jumps).
+  const selI = sel?.i;
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || selI === undefined) return;
+    if (selI * ROW < el.scrollTop) el.scrollTop = selI * ROW;
+    else if ((selI + 1) * ROW > el.scrollTop + el.clientHeight) el.scrollTop = (selI + 1) * ROW - el.clientHeight;
+  }, [selI]);
 
   const cols = { gridTemplateColumns: `${gw}px var(--graph-cols)` };
   const err = pages.find((p) => p.error)?.error;
@@ -209,7 +268,7 @@ export function CommitGraph({ path, opts, sel, onSelect }: Props) {
           <canvas ref={canvas} style={{ position: "absolute", top: first * ROW, left: 0, width: gw, height: (last - first + 1) * ROW, zIndex: 1, pointerEvents: "none" }} />
           {visible.map(([i, r]) => (
             <div key={i} id={`c-${r.oid}`} role="option" aria-selected={sel?.oid === r.oid}
-              className={`grow${sel?.oid === r.oid ? " sel" : ""}${r.head ? " head" : ""}`}
+              className={`grow${sel?.oid === r.oid ? " sel" : ""}${r.head ? " head" : ""}${hits?.has(r.oid) ? " hit" : ""}`}
               style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}>
               <span />
               <span className="desc">
