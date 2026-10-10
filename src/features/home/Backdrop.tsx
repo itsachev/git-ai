@@ -18,6 +18,7 @@ const PULSES = 9;
 const DUST = 36;
 const SPEED = 150; // artwork px per second
 const SHIFT = 14; // max parallax, px
+const PACE = 0.6; // overall animation speed (1 = original)
 
 type Pt = { x: number; y: number };
 type Route = { pts: Pt[]; len: number[]; at: number }; // polyline, cumulative lengths, index where it passes F
@@ -156,7 +157,7 @@ export function Backdrop() {
     }
 
     function frame(t: number) {
-      const dt = Math.min(t - last, 50) / 1000;
+      const dt = (Math.min(t - last, 50) / 1000) * PACE;
       last = t;
       time += dt;
       tick(dt);
