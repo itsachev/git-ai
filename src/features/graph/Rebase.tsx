@@ -44,8 +44,38 @@ function Form({ path, base }: { path: string; base: string }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (list.data) setRows(list.data.map((c) => ({ c, action: "Pick", message: c.message }))); }, [list.data]);
 
+  const olRef = useRef<HTMLOListElement>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
   const set = (i: number, r: Partial<Row>) => setRows((rs) => rs!.map((x, k) => (k === i ? { ...x, ...r } : x)));
-  const move = (i: number, d: number) => setRows((rs) => { const n = [...rs!]; [n[i], n[i + d]] = [n[i + d], n[i]]; return n; });
+  // Moves row `from` to index `to`.
+  const moveTo = (from: number, to: number) => setRows((rs) => { const n = [...rs!]; n.splice(to, 0, ...n.splice(from, 1)); return n; });
+  // ▲/▼: the row moves away from the pointer, so focus follows it (keyboard users keep moving the same commit).
+  function move(i: number, d: number, label: string) {
+    const oid = rows![i].c.oid;
+    moveTo(i, i + d);
+    requestAnimationFrame(() => olRef.current?.querySelector<HTMLButtonElement>(`[data-oid="${oid}"] [aria-label="${label}"]:not(:disabled)`)?.focus());
+  }
+  // Drag by the grip: the row follows the pointer live. Listeners on window, since reordering moves the <li> nodes.
+  function grab(e: React.PointerEvent, oid: string) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setDragging(oid);
+    const onMove = (ev: PointerEvent) => {
+      const ol = olRef.current;
+      if (!ol) return;
+      const box = ol.getBoundingClientRect();
+      if (ev.clientY < box.top + 24) ol.scrollTop -= 8;
+      else if (ev.clientY > box.bottom - 24) ol.scrollTop += 8;
+      const lis = [...ol.children] as HTMLElement[];
+      const from = lis.findIndex((li) => li.dataset.oid === oid);
+      const to = lis.findIndex((li) => { const r = li.getBoundingClientRect(); return ev.clientY >= r.top && ev.clientY < r.bottom; });
+      if (from >= 0 && to >= 0 && to !== from) moveTo(from, to);
+    };
+    const onUp = () => { setDragging(null); removeEventListener("pointermove", onMove); removeEventListener("pointerup", onUp); removeEventListener("pointercancel", onUp); };
+    addEventListener("pointermove", onMove);
+    addEventListener("pointerup", onUp);
+    addEventListener("pointercancel", onUp);
+  }
   const firstKept = rows?.find((r) => r.action !== "Drop");
   const problem = !rows ? null
     : !rows.length ? "No commits after this one."
@@ -79,13 +109,14 @@ function Form({ path, base }: { path: string; base: string }) {
 
       {list.error ? <p className="nb-hint error" role="alert">{errorText(list.error)}</p> : null}
       {rows && (
-        <ol className="rb-list">
+        <ol className="rb-list" ref={olRef}>
           {rows.map((r, i) => {
             const id = r.c.oid;
             const reworded = r.message !== r.c.message;
             return (
-              <li key={id} className={r.action === "Drop" ? "dropped" : undefined}>
+              <li key={id} data-oid={id} className={[r.action === "Drop" && "dropped", dragging === id && "dragging"].filter(Boolean).join(" ") || undefined}>
                 <div className="rb-row">
+                  <span className="rb-grip" title="Drag to reorder" aria-hidden="true" onPointerDown={(e) => grab(e, id)}><Icon name="grip" /></span>
                   <div className="select rb-action">
                     <select aria-label={`Action for ${subjectOf(r.c.message)}`} value={r.action}
                       onChange={(e) => set(i, { action: e.target.value as RebaseAction })}>
@@ -100,8 +131,8 @@ function Form({ path, base }: { path: string; base: string }) {
                   <span className="rb-btns">
                     <button type="button" className="small" aria-expanded={editing === id} disabled={r.action === "Drop"}
                       onClick={() => setEditing(editing === id ? null : id)}>Message</button>
-                    <button type="button" className="small icon-btn up" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}><Icon name="chevron" /></button>
-                    <button type="button" className="small icon-btn" aria-label="Move down" disabled={i === rows.length - 1} onClick={() => move(i, 1)}><Icon name="chevron" /></button>
+                    <button type="button" className="small icon-btn up" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1, "Move up")}><Icon name="chevron" /></button>
+                    <button type="button" className="small icon-btn" aria-label="Move down" disabled={i === rows.length - 1} onClick={() => move(i, 1, "Move down")}><Icon name="chevron" /></button>
                   </span>
                 </div>
                 {editing === id && r.action !== "Drop" && (
