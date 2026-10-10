@@ -55,7 +55,7 @@ export function useRun() {
       const code = (e as AppError).code;
       opError = code === "conflicts"
         ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
-        : { title: (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code,
+        : { title: code === "clash" ? "Nothing was switched" : (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code,
             // `extra` is appended to the success notice ("… Your changes are in the stash.").
             retry: (extra?: string) => { run(op, extra ? () => `${(typeof done === "function" ? done() : done) ?? "Done"}. ${extra}` : done); } };
       opSubs.forEach((f) => f());

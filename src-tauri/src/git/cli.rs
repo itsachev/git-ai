@@ -845,7 +845,7 @@ pub fn checkout(repo: &Path, name: &str, track: bool, carry: bool) -> Result<(),
 }
 
 /// Runs the switch in `args` with the uncommitted changes stashed, then puts them back on `name`.
-/// If they clash there, everything goes back as it was (code "conflicts"): never a half-done switch
+/// If they clash there, everything goes back as it was (code "clash"): never a half-done switch
 /// full of conflict markers.
 fn switch_carrying(repo: &Path, args: &[&str], name: &str) -> Result<(), AppError> {
     let from = status(repo)?.branch;
@@ -878,7 +878,7 @@ fn switch_carrying(repo: &Path, args: &[&str], name: &str) -> Result<(), AppErro
         None => git(repo, &["switch", "-q", "--detach", &from_oid]),
     }?;
     git(repo, &["stash", "pop", "-q"])?;
-    Err(AppError::new("conflicts", format!("Your changes clash with {name}, so nothing was switched. Commit or stash them first, then switch.")))
+    Err(AppError::new("clash", format!("Your changes clash with {name}, so nothing was switched. Commit or stash them first, then switch.")))
 }
 
 /// New branch at HEAD, optionally switched to.
@@ -895,7 +895,7 @@ pub fn create_branch(repo: &Path, name: &str, from: Option<&str>, checkout: bool
         // The start point differs where the changes are: carry them like a branch switch does.
         // On a clash the switch is rolled back, so drop the branch it just created too.
         Err(e) if checkout && e.code == "dirty" => switch_carrying(repo, &args, name).inspect_err(|e| {
-            if e.code == "conflicts" {
+            if e.code == "clash" {
                 let _ = git(repo, &["branch", "-q", "-D", name]);
             }
         }),

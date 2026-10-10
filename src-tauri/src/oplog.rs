@@ -641,7 +641,7 @@ mine
 mine
 ");
         // Clash: rolled back to main with the changes, no conflict markers, no stash left.
-        assert_eq!(cli::checkout(p, "feat", false, true).unwrap_err().code, "conflicts");
+        assert_eq!(cli::checkout(p, "feat", false, true).unwrap_err().code, "clash");
         let st = cli::status(p).unwrap();
         assert_eq!(st.branch.as_deref(), Some("main"));
         assert!(st.conflicted.is_empty());
@@ -679,7 +679,7 @@ mine
         commit("feat\n");
         cli::checkout(r, "main", false, false).unwrap();
         fs::write(dir3.join("a.txt"), "mine\n").unwrap();
-        assert_eq!(cli::create_branch(r, "nb", Some("feat"), true).unwrap_err().code, "conflicts");
+        assert_eq!(cli::create_branch(r, "nb", Some("feat"), true).unwrap_err().code, "clash");
         assert_eq!(cli::status(r).unwrap().branch.as_deref(), Some("main"));
         assert_eq!(fs::read_to_string(dir3.join("a.txt")).unwrap(), "mine\n");
         let refs = crate::git::read::refs(r).unwrap();
