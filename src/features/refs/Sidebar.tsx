@@ -17,7 +17,7 @@ export async function switchTo(path: string, name: string, track: boolean) {
     await checkout(path, name, track);
   } catch (e) {
     if ((e as AppError).code !== "dirty") throw e;
-    if (await confirm("Bring your changes along?", `Some changed files also differ on ${name}. Stash them, switch, and put them back on ${name}? If they clash, they stay in Stashes and the conflicts show in File Status.`, "Switch and bring changes"))
+    if (await confirm("Bring your changes along?", `Some changed files also differ on ${name}. Stash them, switch, and put them back on ${name}? If they clash, nothing is switched and your changes stay here.`, "Switch and bring changes"))
       await checkout(path, name, track, true);
   }
 }

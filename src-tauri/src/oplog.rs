@@ -640,10 +640,16 @@ mine
         assert_eq!(fs::read_to_string(dir.join("b.txt")).unwrap(), "b
 mine
 ");
+        // Clash: rolled back to main with the changes, no conflict markers, no stash left.
         assert_eq!(cli::checkout(p, "feat", false, true).unwrap_err().code, "conflicts");
-        assert_eq!(cli::status(p).unwrap().branch.as_deref(), Some("feat"));
-        assert!(dir.join("new.txt").exists());
-        assert_eq!(crate::git::read::refs(p).unwrap().stashes.len(), 1);
+        let st = cli::status(p).unwrap();
+        assert_eq!(st.branch.as_deref(), Some("main"));
+        assert!(st.conflicted.is_empty());
+        assert_eq!(fs::read_to_string(dir.join("b.txt")).unwrap(), "b
+mine
+");
+        assert_eq!(fs::read_to_string(dir.join("new.txt")).unwrap(), "new");
+        assert!(crate::git::read::refs(p).unwrap().stashes.is_empty());
 
         // Non-conflicting edit: clean carry, no stash left behind.
         let dir2 = temp_repo("carry2");
@@ -660,7 +666,7 @@ mine
 ");
         assert!(crate::git::read::refs(q).unwrap().stashes.is_empty());
 
-        // New branch from a start point that clashes with the changes: carried like a switch.
+        // New branch from a start point that clashes with the changes: rolled back, branch not left behind.
         let dir3 = temp_repo("carry3");
         let r = dir3.as_path();
         let commit = |text: &str| {
@@ -674,8 +680,10 @@ mine
         cli::checkout(r, "main", false, false).unwrap();
         fs::write(dir3.join("a.txt"), "mine\n").unwrap();
         assert_eq!(cli::create_branch(r, "nb", Some("feat"), true).unwrap_err().code, "conflicts");
-        assert_eq!(cli::status(r).unwrap().branch.as_deref(), Some("nb"));
-        assert_eq!(crate::git::read::refs(r).unwrap().stashes.len(), 1);
+        assert_eq!(cli::status(r).unwrap().branch.as_deref(), Some("main"));
+        assert_eq!(fs::read_to_string(dir3.join("a.txt")).unwrap(), "mine\n");
+        let refs = crate::git::read::refs(r).unwrap();
+        assert!(refs.stashes.is_empty() && !refs.local.iter().any(|b| b.name == "nb"));
         let _ = fs::remove_dir_all(&dir);
         let _ = fs::remove_dir_all(&dir2);
         let _ = fs::remove_dir_all(&dir3);

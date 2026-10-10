@@ -834,7 +834,7 @@ pub fn stash(repo: &Path, op: StashOp, index: usize, oid: &str) -> Result<(), Ap
 
 /// Switches to a local branch, or with `track` creates a local branch tracking the remote branch `name`.
 /// Git refuses (code "dirty", no data lost) when local changes would be overwritten. With `carry`, the
-/// changes are stashed, the branch switched, and the stash popped on top; a conflicting pop keeps the stash.
+/// changes are stashed, the branch switched, and the stash popped on top.
 pub fn checkout(repo: &Path, name: &str, track: bool, carry: bool) -> Result<(), AppError> {
     ref_arg(name)?;
     let args: &[&str] = if track { &["switch", "-q", "--track", name] } else { &["switch", "-q", name] };
@@ -845,8 +845,11 @@ pub fn checkout(repo: &Path, name: &str, track: bool, carry: bool) -> Result<(),
 }
 
 /// Runs the switch in `args` with the uncommitted changes stashed, then puts them back on `name`.
-/// If they clash there, the stash is kept and the conflicts show.
+/// If they clash there, everything goes back as it was (code "conflicts"): never a half-done switch
+/// full of conflict markers.
 fn switch_carrying(repo: &Path, args: &[&str], name: &str) -> Result<(), AppError> {
+    let from = status(repo)?.branch;
+    let from_oid = rev(repo, "HEAD")?;
     let before = rev(repo, "refs/stash").ok();
     git(repo, &["stash", "push", "-q", "-u", "-m", &format!("carried to {name}")])?;
     let stashed = rev(repo, "refs/stash").ok() != before;
@@ -858,11 +861,24 @@ fn switch_carrying(repo: &Path, args: &[&str], name: &str) -> Result<(), AppErro
     // ponytail: no --index, so staged changes come back unstaged; add it if people miss their staging.
     let popped = git(repo, &["stash", "pop", "-q"]);
     switched?;
-    popped.map(drop).map_err(|e| if status(repo).is_ok_and(|s| !s.conflicted.is_empty()) {
-        AppError::new("conflicts", "Switched, but your changes conflict with this branch. They were kept as a stash; resolve the conflicts in File Status.")
-    } else {
-        e
-    })
+    let Err(e) = popped else { return Ok(()) };
+    if !status(repo).is_ok_and(|s| !s.conflicted.is_empty()) {
+        return Err(e);
+    }
+    // Clashed: the stash still holds every change, so wipe the half-applied pop (tracked files, plus the
+    // untracked ones it restored from stash^3), switch back and pop cleanly where it was made.
+    git(repo, &["reset", "-q", "--hard"])?;
+    if let Ok(untracked) = git(repo, &["ls-tree", "-r", "-z", "--name-only", "refs/stash^3"]) {
+        for f in untracked.split('\0').filter(|f| !f.is_empty()) {
+            let _ = std::fs::remove_file(repo.join(f));
+        }
+    }
+    match &from {
+        Some(b) => git(repo, &["switch", "-q", b]),
+        None => git(repo, &["switch", "-q", "--detach", &from_oid]),
+    }?;
+    git(repo, &["stash", "pop", "-q"])?;
+    Err(AppError::new("conflicts", format!("Your changes clash with {name}, so nothing was switched. Commit or stash them first, then switch.")))
 }
 
 /// New branch at HEAD, optionally switched to.
@@ -877,7 +893,12 @@ pub fn create_branch(repo: &Path, name: &str, from: Option<&str>, checkout: bool
     }
     match git(repo, &args) {
         // The start point differs where the changes are: carry them like a branch switch does.
-        Err(e) if checkout && e.code == "dirty" => switch_carrying(repo, &args, name),
+        // On a clash the switch is rolled back, so drop the branch it just created too.
+        Err(e) if checkout && e.code == "dirty" => switch_carrying(repo, &args, name).inspect_err(|e| {
+            if e.code == "conflicts" {
+                let _ = git(repo, &["branch", "-q", "-D", name]);
+            }
+        }),
         r => r.map(drop),
     }
 }

@@ -117,7 +117,7 @@ export const commitFileDiff = (path: string, oid: string, file: string) =>
 export const refs = (path: string) => invoke<Refs>("refs", { path });
 /** `track`: create a local branch tracking remote branch `name` ("origin/feat") and switch to it.
  * Code "dirty" = local changes in the way; `carry` stashes them, switches and pops them back
- * (code "conflicts" = they clash with the branch and stay stashed). */
+ * (code "conflicts" = they clash with the branch; nothing switched, changes left where they were). */
 export const checkout = (path: string, name: string, track: boolean, carry = false) =>
   invoke<void>("checkout", { path, name, track, carry });
 /** `from`: start point (branch, remote branch, tag); null = HEAD. Never tracks `from`. */
