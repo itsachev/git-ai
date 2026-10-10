@@ -41,6 +41,47 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm ci
+      # Code signing. Each OS signs only when its secrets are set; otherwise its installers ship unsigned.
+      # macOS (Developer ID + notarization): APPLE_CERTIFICATE (base64 .p12), APPLE_CERTIFICATE_PASSWORD,
+      #   APPLE_SIGNING_IDENTITY ("Developer ID Application: Name (TEAMID)"), APPLE_ID, APPLE_PASSWORD
+      #   (app-specific password), APPLE_TEAM_ID. Tauri reads them from the env.
+      # Windows (Azure Trusted Signing): AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, and
+      #   AZURE_SIGN_ENDPOINT (e.g. https://wus2.codesigning.azure.net), AZURE_SIGN_ACCOUNT, AZURE_SIGN_PROFILE.
+      #   Written to tauri.windows.conf.json here (Tauri merges it on Windows), so local builds stay unsigned.
+      - name: Code signing setup
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
+          AZURE_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
+          AZURE_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
+        run: |
+          # Multi-line safe (a base64 .p12 may wrap).
+          export_env() { for v in "$@"; do { echo "$v<<SIGN_EOF"; echo "${!v}"; echo SIGN_EOF; } >> "$GITHUB_ENV"; done; }
+          if [ "$RUNNER_OS" = macOS ]; then
+            if [ -n "$APPLE_CERTIFICATE" ]; then
+              export_env APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+            else
+              echo "::warning::APPLE_CERTIFICATE not set: macOS build is unsigned and not notarized."
+            fi
+          elif [ "$RUNNER_OS" = Windows ]; then
+            if [ -n "$AZURE_CLIENT_ID" ]; then
+              cargo install trusted-signing-cli --locked
+              export_env AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID
+              printf '{"bundle":{"windows":{"signCommand":"trusted-signing-cli -e %s -a %s -c %s -d git-ai %%1"}}}' \
+                "$AZURE_SIGN_ENDPOINT" "$AZURE_SIGN_ACCOUNT" "$AZURE_SIGN_PROFILE" > src-tauri/tauri.windows.conf.json
+            else
+              echo "::warning::AZURE_CLIENT_ID not set: Windows installers are unsigned (SmartScreen will warn)."
+            fi
+          fi
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
