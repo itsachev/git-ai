@@ -11,14 +11,21 @@ import { openExplainStash, openWriteUp } from "./WriteUp";
 import { choose, confirm, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
-/** Checkout that offers to bring conflicting local changes along instead of just failing. */
+/** Checkout that offers to bring conflicting local changes along, or stash them, instead of just failing. */
 export async function switchTo(path: string, name: string, track: boolean) {
   try {
     await checkout(path, name, track);
   } catch (e) {
     if ((e as AppError).code !== "dirty") throw e;
-    if (await confirm("Bring your changes along?", `Some changed files also differ on ${name}. Stash them, switch, and put them back on ${name}? If they clash, nothing is switched and your changes stay here.`, "Switch and bring changes"))
-      await checkout(path, name, track, true);
+    const pick = await choose("Bring your changes along?", `Some changed files also differ on ${name}. What should happen to them?`, [
+      { label: "Switch and bring changes", hint: `Stashes them, switches, and puts them back on ${name}. If they clash, nothing is switched and your changes stay here.` },
+      { label: "Stash and switch", hint: `Parks them in Stashes and switches to a clean ${name}. Apply or Pop the stash later to get them back.` },
+    ]);
+    if (pick === 0) await checkout(path, name, track, true);
+    if (pick === 1) {
+      await stashSave(path, `before switching to ${name}`);
+      await checkout(path, name, track);
+    }
   }
 }
 
