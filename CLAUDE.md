@@ -11,6 +11,8 @@ Tauri scaffold in place (create-tauri-app react-ts template). The plan and the s
 - The `## Features` list in `progress.md`.
 - The `## Features` section in `README.md` (the GitHub landing page). Also update its other sections when a change affects them (AI providers, install requirements, commands, architecture).
 
+**Changelog.** Every user-visible change (feature, fix, behavior change) gets a line under `## [Unreleased]` in `CHANGELOG.md`, in the same commit, under Added / Changed / Fixed. Write for users, not developers: what they can do now or what stopped going wrong, with no file or function names.
+
 ## Commands
 
 - `npm install`: install frontend deps.
@@ -19,6 +21,7 @@ Tauri scaffold in place (create-tauri-app react-ts template). The plan and the s
 - `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests; also regenerates `src/bindings/*.ts` (commit them).
 - `GITAI_REPO=<path> cargo test --release --manifest-path src-tauri/Cargo.toml open_real_repo -- --ignored --nocapture`: times what opening a repo runs (refs, status, graph, details) on a real repo. Add `GITAI_SWITCH=<branch>` to also time a branch switch there and back, plus the refetch after it.
 - `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`: times the graph on a generated 100k-commit repo (last run: 0.53 s first page, 6 ms cached page).
+- Releasing: rename `## [Unreleased]` in `CHANGELOG.md` to `## [x.y.z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the compare links at the bottom. Bump the version (`tauri.conf.json`, `package.json`, `package-lock.json`, `Cargo.toml`, `Cargo.lock`), commit, then tag `vx.y.z` and push the tag. `release.yml` copies that changelog section into the GitHub release notes and the updater's `latest.json`.
 - The exe name comes from `mainBinaryName` in `src-tauri/tauri.conf.json`. Keep it `gitai`.
 
 ## What this is

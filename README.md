@@ -88,7 +88,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ## Install
 
-Get the installer for your platform from the **[latest release](https://github.com/itsachev/git-ai/releases/latest)**:
+Get the installer for your platform from the **[latest release](https://github.com/itsachev/git-ai/releases/latest)** (what's new: [CHANGELOG.md](CHANGELOG.md)):
 
 | Platform | Package |
 | --- | --- |

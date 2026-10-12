@@ -82,6 +82,19 @@ jobs:
               echo "::warning::AZURE_CLIENT_ID not set: Windows installers are unsigned (SmartScreen will warn)."
             fi
           fi
+      # Release notes: this tag's section of CHANGELOG.md ("## [0.2.0] - date" for tag v0.2.0).
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          notes=$(awk -v h="## [$ver]" 'index($0, h) == 1 { p = 1; next } /^## \[/ { p = 0 } /^\[[^]]+\]: / { p = 0 } p' CHANGELOG.md)
+          if [ -z "$(echo "$notes" | tr -d '[:space:]')" ]; then
+            echo "::warning::No '## [$ver]' section in CHANGELOG.md: the release has no notes."
+            notes="See the commits since the previous release."
+          fi
+          notes="$notes"$'\n\n'"Full history: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md)"
+          { echo "body<<NOTES_EOF"; echo "$notes"; echo NOTES_EOF; } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
         id: tauri
         env:
@@ -91,6 +104,8 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: git-ai ${{ github.ref_name }}
+          # Also lands in latest.json as the update notes.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           # Updater artifacts only here, so local `tauri build` needs no private key.
           args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}
