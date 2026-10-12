@@ -83,6 +83,7 @@ jobs:
             fi
           fi
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -93,3 +94,13 @@ jobs:
           releaseDraft: true
           # Updater artifacts only here, so local `tauri build` needs no private key.
           args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}
+      # Portable Windows build: the bare exe (frontend is embedded; needs only WebView2, built into Windows 10/11).
+      - name: Upload portable exe
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          out="git-ai_${{ steps.tauri.outputs.appVersion }}_x64-portable.exe"
+          cp src-tauri/target/release/gitai.exe "$out"
+          gh release upload "${{ github.ref_name }}" "$out" --clobber

@@ -92,7 +92,7 @@ Get the installer for your platform from the **[latest release](https://github.c
 
 | Platform | Package |
 | --- | --- |
-| Windows | `.msi` or `-setup.exe` |
+| Windows | `.msi` or `-setup.exe`, or `-portable.exe` (no install; runs from anywhere) |
 | macOS (Apple Silicon / Intel) | `.dmg` (untested) |
 | Linux | `.AppImage`, `.deb` or `.rpm` (untested) |
 
