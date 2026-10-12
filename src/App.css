@@ -90,7 +90,7 @@ h1, h2, h3 { margin: 0; font-weight: 600; text-wrap: balance; }
 .count {
   display: inline-grid; place-items: center; min-width: 1.6em; height: 1.45em; padding: 0 0.45em;
   font: 600 0.75rem/1 var(--sans); font-variant-numeric: tabular-nums; text-transform: none; letter-spacing: 0;
-  color: var(--muted); background: var(--pick); border-radius: 999px;
+  color: var(--accent-ink); background: var(--accent); border-radius: 999px;
 }
 /* macOS focus ring: soft accent halo hugging the control. */
 :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
@@ -407,7 +407,6 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .views button:hover { background: var(--pick); color: var(--fg); }
 .views button[aria-current="page"] { background: var(--active); box-shadow: var(--active-bar); color: var(--accent-fg); font-weight: 700; }
 .views button[aria-current="page"] .icon { color: var(--accent); }
-.views button[aria-current="page"] .count { color: var(--accent-ink); background: var(--accent); }
 /* Unresolved conflicts: File Status turns red, active or not. */
 .views button.conflict, .views button.conflict .icon { color: var(--danger); }
 .views button.conflict[aria-current="page"] { background: color-mix(in srgb, var(--danger) 13%, transparent); box-shadow: inset 3px 0 0 var(--danger); }
@@ -424,7 +423,6 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .sync button { border-radius: var(--r); box-shadow: var(--tool-edge), var(--tool-lit); }
 .sync button:hover:not(:disabled) { box-shadow: var(--tool-edge), var(--tool-lit), var(--veil); }
 .sync button[aria-busy="true"] .icon { animation: spin 900ms linear infinite; }
-.sync .count { color: var(--accent-ink); background: var(--accent); }
 /* Pull's menu half: a narrow chevron segment joined to Pull (no gap) by a faint seam. */
 .sync button:has(+ .split-menu) { border-radius: var(--r) 0 0 var(--r); }
 .sync button.split-menu { margin-left: -3px; width: 1.7rem; padding: 0; border-radius: 0 var(--r) var(--r) 0; border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent); }
@@ -560,6 +558,12 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .files { list-style: none; padding: 0; margin: 0; display: grid; gap: 1px; user-select: none; }
 .files li { position: relative; display: flex; align-items: center; gap: 2px; padding-right: 0.25rem; border-radius: 8px; transition: background-color 140ms; }
 .files li:hover { background: var(--raised); }
+/* Hairline in the 1px gap, inset to the file name; hidden beside hovered/selected rows. */
+.files li + li::before {
+  content: ""; position: absolute; top: -1px; left: 2.4rem; right: 0.5rem; height: 1px; pointer-events: none;
+  background: var(--line-strong); transition: opacity 140ms;
+}
+.files li:is(:hover, .sel)::before, .files li:is(:hover, .sel) + li::before { opacity: 0; }
 .files li.sel { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent); }
 .files li.sel .path small, .files li.sel .kind { color: inherit; }
 .files li.sel .path small { opacity: 0.75; }
@@ -785,7 +789,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .commit-search { display: flex; align-items: center; gap: 0.3rem; flex: 0 1 22rem; min-width: min(100%, 14rem); }
 .commit-search .search { flex: 1; min-width: 0; }
 .commit-search .search input { width: 100%; min-height: 1.95rem; }
-.commit-search .count { font-size: 0.78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.commit-search .count { color: var(--muted); background: var(--pick); font-size: 0.78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .commit-search .step { min-width: 1.95rem; padding: 0; font-size: 0.65rem; }
 @media (pointer: coarse) { .commit-search .search input, .commit-search .step { min-height: 2.5rem; min-width: 2.5rem; } }
 /* Segmented control: sunken track, the pressed option a raised pill. */

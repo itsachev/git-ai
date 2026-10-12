@@ -8,6 +8,10 @@ What's new in each git-ai release. Newest first.
 - **Portable Windows app.** Every release now includes `git-ai_<version>_x64-portable.exe`. It runs from any folder without installing.
 - **Select several files at once in File Status.** Use Ctrl+click, Shift+click, Ctrl+A, or drag over the rows. Stage, Unstage and Discard then act on all the selected files.
 
+### Changed
+- **Easier-to-scan file lists.** File Status lists now have a thin line between files.
+- **Counters stand out.** Every count badge (changed files, branches, remotes, tags, stashes, undo history) is now filled in the accent colour.
+
 ### Fixed
 - **Big repositories no longer freeze the app.** Opening a repo with a long history and thousands of tags or remote branches could hang the window for minutes. It now opens in about a second.
 - **Faster branch switching.** The window stays responsive during a switch, and the app refreshes once afterwards instead of several times.
