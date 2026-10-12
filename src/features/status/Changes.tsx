@@ -307,7 +307,28 @@ type ListProps = {
 };
 
 function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore, sel, onSelect }: ListProps) {
+  // Multi-selection: Ctrl/Shift+click, Ctrl+A, or drag over rows. Only shown while the diff's file is in this list.
+  const [marked, setMarked] = useState<Set<string>>(new Set());
+  const anchor = useRef(0);
+  const drag = useRef<number | null>(null);
   if (!files.length) return null;
+  const active = sel?.staged === staged && files.some((f) => f.path === sel.file);
+  const isMarked = (f: FileChange) => active && (marked.has(f.path) || f.path === sel?.file);
+  const picked = files.filter(isMarked);
+  const range = (a: number, b: number) => new Set(files.slice(Math.min(a, b), Math.max(a, b) + 1).map((f) => f.path));
+  function click(e: React.MouseEvent, i: number) {
+    const p = files[i].path;
+    const base = new Set(picked.map((f) => f.path));
+    if (e.shiftKey) setMarked(range(anchor.current, i));
+    else if (e.ctrlKey || e.metaKey) {
+      base.has(p) && base.size > 1 ? base.delete(p) : base.add(p);
+      setMarked(base);
+      anchor.current = i;
+      // Unpicking the diff's file moves the diff to another picked one.
+      if (!base.has(p)) return onSelect({ file: [...base][0], staged });
+    } else { setMarked(new Set([p])); anchor.current = i; }
+    onSelect({ file: p, staged });
+  }
   return (
     <section>
       <div className="list-head">
@@ -315,18 +336,31 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
         {onDiscard && <button className="small ghost" onClick={() => onDiscard(files)}>Discard all</button>}
         <button className="small ghost" onClick={() => onAction(files)}>{action} all</button>
       </div>
-      <ul className="files">
-        {files.map((f) => {
-          const selected = sel?.file === f.path && sel.staged === staged;
+      <ul className="files" aria-multiselectable
+        onKeyDown={(e) => {
+          if (e.key.toLowerCase() !== "a" || !(e.ctrlKey || e.metaKey) || (e.target as HTMLElement).closest("input, textarea")) return;
+          e.preventDefault();
+          setMarked(new Set(files.map((f) => f.path)));
+          if (!active) onSelect({ file: files[0].path, staged });
+        }}>
+        {files.map((f, i) => {
+          const selected = isMarked(f);
+          // Row buttons act on the whole selection when their row is part of it.
+          const targets = selected && picked.length > 1 ? picked : [f];
           return (
-            <li key={f.path} className={selected ? "sel" : undefined}>
-              <button className="row" aria-pressed={selected} onClick={() => onSelect({ file: f.path, staged })}
+            <li key={f.path} className={selected ? "sel" : undefined}
+              onMouseEnter={(e) => {
+                if (drag.current === null || !(e.buttons & 1)) return void (drag.current = null);
+                setMarked(range(drag.current, i));
+              }}>
+              <button className="row" aria-pressed={selected} onClick={(e) => click(e, i)}
+                onMouseDown={(e) => { if (e.button === 0 && !e.shiftKey && !e.ctrlKey && !e.metaKey) { drag.current = i; click(e, i); } }}
                 title={f.orig_path ? `${f.orig_path} → ${f.path}` : f.path}>
                 <FileLabel f={f} />
               </button>
               {onIgnore && f.kind === "?" && f.path !== ".gitignore" && <button className="small ghost" onClick={() => onIgnore(f.path)}>Ignore</button>}
-              {onDiscard && <button className="small ghost" onClick={() => onDiscard([f])}>Discard</button>}
-              <button className="small ghost" onClick={() => onAction([f])}>{action}</button>
+              {onDiscard && <button className="small ghost" onClick={() => onDiscard(targets)}>Discard{targets.length > 1 ? ` ${targets.length}` : ""}</button>}
+              <button className="small ghost" onClick={() => onAction(targets)}>{action}{targets.length > 1 ? ` ${targets.length}` : ""}</button>
             </li>
           );
         })}
