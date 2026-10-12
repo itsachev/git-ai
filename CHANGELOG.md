@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-12
+
 ### Added
 - **Portable Windows app.** Every release now includes `git-ai_<version>_x64-portable.exe`. It runs from any folder without installing.
 - **Select several files at once in File Status.** Use Ctrl+click, Shift+click, Ctrl+A, or drag over the rows. Stage, Unstage and Discard then act on all the selected files.
@@ -65,7 +67,8 @@ First release.
 - Keyboard shortcuts and a command palette.
 - Auto-update, and a System/Light/Dark theme switch.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/itsachev/git-ai/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/itsachev/git-ai/releases/tag/v0.1.0
