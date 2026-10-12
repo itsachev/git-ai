@@ -11,6 +11,7 @@ What's new in each git-ai release. Newest first.
 - **Select several files at once in File Status.** Use Ctrl+click, Shift+click, Ctrl+A, or drag over the rows. Stage, Unstage and Discard then act on all the selected files.
 
 ### Changed
+- **New look.** Warm stone and paper surfaces with a spruce-teal accent replace the grey-and-indigo theme, in both light and dark. Buttons are now light paper keys instead of dark slabs, and the commit graph's lane colours match the new palette.
 - **Easier-to-scan file lists.** File Status lists now have a thin line between files.
 - **Counters stand out.** Every count badge (changed files, branches, remotes, tags, stashes, undo history) is now filled in the accent colour.
 

@@ -1,37 +1,36 @@
-/* git-ai: macOS system look. Window / content / source-list surfaces, hairline separators,
-   system blue for selection and the default action. Geist / Geist Mono, bundled: works offline. */
+/* git-ai: "spruce on stone". Warm paper surfaces and ink text, one spruce-teal signal for HEAD, the selection
+   and the default action. Dark is warm graphite, not blue-black. Teal sits apart from the diff green/red, so the
+   signal never reads as "added" or "destructive". Geist / Geist Mono, bundled: works offline. */
 :root {
-  --bg: #f5f5f7;          /* window */
-  --panel: #ffffff;       /* content: tables, diffs, cards */
-  --raised: #f2f2f4;      /* hover */
-  --sunken: #e8e8ed;      /* fills, segmented tracks */
-  --rail: #e9e9ee;        /* sidebar (source list) */
-  --line: rgb(0 0 0 / 0.09);
-  --line-strong: rgb(0 0 0 / 0.16);
-  --fg: #16161a;
-  --muted: #55555c;       /* 7:1 on --panel: secondary text stays readable */
-  --faint: #86868d;
-  --accent: #4f46e5;      /* fills: the "signal" (indigo) */
+  --bg: #f4f2ee;          /* window: warm stone */
+  --panel: #fdfcfa;       /* content: tables, diffs, cards (paper) */
+  --raised: #efece6;      /* hover */
+  --sunken: #e7e3db;      /* fills, segmented tracks */
+  --rail: #ebe7e0;        /* sidebar */
+  --line: rgb(60 45 25 / 0.1);
+  --line-strong: rgb(60 45 25 / 0.18);
+  --fg: #1d1b18;          /* ink */
+  --muted: #5a554e;       /* 7:1 on --panel: secondary text stays readable */
+  --faint: #8a847a;
+  --accent: #0f766e;      /* fills: the "signal" (spruce teal); white text on it is 5.4:1 */
   --accent-ink: #ffffff;  /* text on fills */
-  --accent-fg: #4338ca;   /* accent as text / outline */
+  --accent-fg: #0b5e57;   /* accent as text / outline */
   /* Active things (current branch, view, HEAD): tinted fill + 3px bar + bold accent text. */
-  --active: color-mix(in srgb, var(--accent) 13%, transparent);
+  --active: color-mix(in srgb, var(--accent) 12%, transparent);
   --active-bar: inset 3px 0 0 var(--accent);
-  --pick: rgb(0 0 0 / 0.06); /* hover */
-  --danger: #d70015;
-  --add: #248a3d;
-  --mod: #c93400;
-  --info: #5856d6;
-  --shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.08), 0 16px 40px rgb(0 0 0 / 0.1);
-  --glass: rgb(246 246 248 / 0.78);
-  /* Push buttons, same in both themes: dark top-lit gradient, white text. */
-  --tool: linear-gradient(#3c3c3f, #2a2a2d);
-  --veil: inset 0 0 0 100vmax rgb(255 255 255 / 0.08); /* hover: a light wash over a gradient fill */
-  --tool-ink: #f5f5f7;
-  --tool-lit: inset 0 0.5px 0 rgb(255 255 255 / 0.16);
-  /* Light: the dark theme's black edge and drop shadow read as a heavy outline on a pale
-     window, so keep only a hairline. Same flat look as on dark. */
-  --tool-edge: 0 0 0 0.5px rgb(0 0 0 / 0.3);
+  --pick: rgb(60 45 25 / 0.06); /* hover */
+  --danger: #c2321f;      /* brick */
+  --add: #3b7d28;         /* leaf */
+  --mod: #b45309;         /* ochre */
+  --info: #4f63a8;        /* slate blue */
+  --shadow: 0 0 0 0.5px rgb(40 30 15 / 0.08), 0 4px 12px rgb(40 30 15 / 0.07), 0 16px 40px rgb(40 30 15 / 0.1);
+  --glass: rgb(250 248 244 / 0.8);
+  /* Push buttons: a paper key on the stone window, ink text, hairline edge, top light. */
+  --tool: linear-gradient(#fffefc, #f5f2ec);
+  --tool-ink: var(--fg);
+  --tool-lit: inset 0 1px 0 rgb(255 255 255 / 0.8);
+  --tool-edge: 0 0 0 1px var(--line-strong), 0 1px 2px rgb(40 30 15 / 0.08);
+  --veil: inset 0 0 0 100vmax rgb(40 30 15 / 0.04); /* hover: a wash over a gradient fill */
   /* Geist + Geist Mono: one superfamily, so prose, refs and hashes share metrics and rhythm.
      Bundled from @fontsource-variable (imported in main.tsx), so it works offline. */
   --sans: "Geist Variable", -apple-system, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -53,28 +52,31 @@
 /* index.html sets data-theme before first paint; src/lib/theme.tsx keeps it in sync. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1e1e1e;
-  --panel: #232323;
-  --raised: #2c2c2e;
-  --sunken: #161616;
-  --rail: #2a2a2c;
-  --line: rgb(255 255 255 / 0.09);
-  --line-strong: rgb(255 255 255 / 0.16);
-  --fg: #f5f5f7;
-  --muted: #b9b9c0;
-  --faint: #8a8a91;
-  --accent: #5e5ce6;
+  --bg: #1b1a18;
+  --panel: #222120;
+  --raised: #2c2a27;
+  --sunken: #151413;
+  --rail: #252321;
+  --line: rgb(255 245 230 / 0.08);
+  --line-strong: rgb(255 245 230 / 0.15);
+  --fg: #f2efe9;
+  --muted: #bcb6ac;
+  --faint: #8c867c;
+  --accent: #13817a;      /* white text on it is 4.7:1 */
   --accent-ink: #ffffff;
-  --accent-fg: #a5a3ff;
+  --accent-fg: #5fd9c8;
   --active: color-mix(in srgb, var(--accent) 26%, transparent);
-  --pick: rgb(255 255 255 / 0.08);
-  --danger: #ff6961;
-  --add: #30d158;
-  --mod: #ff9f0a;
-  --info: #8e8cff;
-  --shadow: 0 0 0 0.5px rgb(0 0 0 / 0.6), inset 0 0.5px 0 rgb(255 255 255 / 0.08), 0 16px 48px rgb(0 0 0 / 0.5);
-  --glass: rgb(40 40 42 / 0.78);
-  --tool-edge: 0 0 0 0.5px rgb(0 0 0 / 0.75), 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px rgb(0 0 0 / 0.12);
+  --pick: rgb(255 245 230 / 0.07);
+  --danger: #f2735f;
+  --add: #7fc96b;
+  --mod: #eba24c;
+  --info: #9aa9ee;
+  --shadow: 0 0 0 0.5px rgb(0 0 0 / 0.6), inset 0 0.5px 0 rgb(255 245 230 / 0.07), 0 16px 48px rgb(0 0 0 / 0.5);
+  --glass: rgb(38 36 34 / 0.8);
+  --tool: linear-gradient(#353330, #2b2927);
+  --tool-lit: inset 0 1px 0 rgb(255 245 230 / 0.07);
+  --tool-edge: 0 0 0 1px rgb(0 0 0 / 0.55), 0 1px 2px rgb(0 0 0 / 0.3);
+  --veil: inset 0 0 0 100vmax rgb(255 245 230 / 0.05);
 }
 @media (pointer: coarse) { :root { --ctl: 2.75rem; } }
 
@@ -114,17 +116,10 @@ button {
 /* Gradient fills can't transition, so hover washes a veil (inset shadow) over them instead of swapping the
    gradient. :where() keeps this weaker than any class that restyles a button. */
 button:where(:hover:not(:disabled)) { box-shadow: var(--tool-lit), var(--tool-edge), var(--veil); }
-button kbd { color: inherit; opacity: 0.7; background: rgb(255 255 255 / 0.12); }
+button kbd { color: inherit; opacity: 0.7; background: var(--pick); }
 button:active:not(:disabled) { filter: brightness(0.9); scale: 0.97; transition-duration: 60ms; }
 /* Filled actions lift on hover and settle back when pressed. */
 button:is(.primary, .danger, .tile):hover:not(:disabled):not(:active) { translate: 0 -1px; }
-/* Filled actions: a light sheen sweeps across on hover (jumps back unseen on leave). */
-button:is(.primary, .danger) { position: relative; overflow: hidden; }
-button:is(.primary, .danger)::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none; translate: -101% 0;
-  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
-}
-button:is(.primary, .danger):hover:not(:disabled)::after { translate: 101% 0; transition: translate 750ms var(--ease); }
 button:disabled { opacity: 0.45; }
 button.primary {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
@@ -166,13 +161,15 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 @media (min-width: 60rem) { .home { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-content: center; } }
 /* Backdrop (features/home/Backdrop.tsx): the artwork plus a canvas of light mapped onto it, in a layer that drifts (parallax). */
 .home { position: relative; isolation: isolate; overflow-x: clip; } /* reveals slide in from the edges: no page-wide scrollbar flash */
-.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #0e1014; animation: home-bg-in 1.4s var(--ease) both; }
+.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: var(--bg); animation: home-bg-in 1.4s var(--ease) both; }
 .home-art {
   position: absolute; inset: -24px; /* bleed, so the drift never shows an edge */
   background: url("./assets/app_bg.jpg") center / cover no-repeat;
-  filter: invert(1) hue-rotate(180deg); /* light: the dark artwork (and its light) flipped to a light one */
+  /* Light: the dark artwork (and its light) flipped to a light one, then warmed to stone. */
+  filter: invert(1) hue-rotate(180deg) sepia(0.35) saturate(0.8);
 }
-:root[data-theme="dark"] .home-art { filter: none; }
+/* Dark: the cool blue-grey artwork pulled to neutral graphite, to sit with the warm surfaces. */
+:root[data-theme="dark"] .home-art { filter: sepia(0.45) hue-rotate(125deg) saturate(0.9); }
 .home-art canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.55; } /* the moving light stays subtle */
 @keyframes home-bg-in { from { opacity: 0; } }
 .brand { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 clamp(0.75rem, 3vh, 1.5rem); font: 650 1.05rem var(--display); letter-spacing: -0.03em; }
@@ -206,13 +203,13 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
   max-width: 13ch; font: 650 clamp(2.4rem, 4.6vw, 4rem)/0.98 var(--display); letter-spacing: -0.04em; text-wrap: balance;
 }
 .home h1 .w-mask { padding-bottom: 0.12em; margin-bottom: -0.12em; } /* SplitText word masks (App.tsx intro): keep descenders */
-/* The app name (lib/modal.tsx Brand): a size up, heavier, in an indigo → fuchsia → amber gradient that slowly drifts.
+/* The app name (lib/modal.tsx Brand): a size up, heavier, in a spruce → sea-glass → honey gradient that slowly drifts.
    Mixing the stops with --fg deepens them on light themes and lifts them on dark, so the name keeps its contrast. */
 .brand-name {
   font: 800 1.18em/1 var(--display); letter-spacing: -0.035em; white-space: nowrap;
   background: linear-gradient(100deg,
-    var(--accent-fg) 0%, color-mix(in oklab, #a855f7 82%, var(--fg)) 30%, color-mix(in oklab, #ec4899 82%, var(--fg)) 55%,
-    color-mix(in oklab, #f59e0b 78%, var(--fg)) 75%, var(--accent-fg) 100%) 0 0 / 220% 100%;
+    var(--accent-fg) 0%, color-mix(in oklab, #14b8a6 80%, var(--fg)) 30%, color-mix(in oklab, #d4a017 80%, var(--fg)) 58%,
+    color-mix(in oklab, #e0703a 78%, var(--fg)) 78%, var(--accent-fg) 100%) 0 0 / 220% 100%;
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
   animation: brand-drift 9s ease-in-out infinite alternate;
 }
@@ -916,7 +913,7 @@ dialog[open] { opacity: 1; scale: 1; translate: 0 0; }
 @starting-style { dialog[open] { opacity: 0; scale: 0.95; translate: 0 10px; } }
 /* Fixed blur, faded with opacity: transitioning the blur radius re-renders the whole window every frame and flickers. */
 dialog::backdrop {
-  background: rgb(8 8 16 / 0.38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0;
+  background: rgb(24 18 10 / 0.36); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0;
   transition: opacity 220ms var(--ease), display 220ms allow-discrete, overlay 220ms allow-discrete;
 }
 dialog[open]::backdrop { opacity: 1; }
@@ -1125,7 +1122,7 @@ dialog.palette {
   width: min(40rem, calc(100vw - 2rem)); margin-top: 14vh; padding: 0; overflow: hidden; border-radius: 16px;
   background: var(--glass); -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8);
 }
-dialog.palette[open]::backdrop { background: rgb(8 8 16 / 0.12); -webkit-backdrop-filter: none; backdrop-filter: none; }
+dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .palette-field { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.9rem; border-bottom: 1px solid var(--line); color: var(--faint); }
 .palette-field .icon { width: 1.4rem; height: 1.4rem; color: var(--muted); }
 .palette input { background: none; min-height: 3.6rem; padding: 0; font-size: 1.55rem; font-weight: 300; box-shadow: none; }

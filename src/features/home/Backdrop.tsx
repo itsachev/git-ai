@@ -96,7 +96,7 @@ export function Backdrop() {
     const X = (x: number) => ox + x * s, Y = (y: number) => oy + y * s;
     function glow(x: number, y: number, r: number, a: number) {
       const g = ctx!.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, `rgb(255 255 255 / ${a})`); g.addColorStop(0.35, `rgb(200 215 255 / ${a * 0.35})`); g.addColorStop(1, "rgb(200 215 255 / 0)");
+      g.addColorStop(0, `rgb(255 255 255 / ${a})`); g.addColorStop(0.35, `rgb(225 225 225 / ${a * 0.35})`); g.addColorStop(1, "rgb(225 225 225 / 0)");
       ctx!.fillStyle = g;
       ctx!.fillRect(x - r, y - r, r * 2, r * 2);
     }
@@ -106,7 +106,7 @@ export function Backdrop() {
       ctx!.globalCompositeOperation = "lighter";
 
       for (const d of dust) {
-        ctx!.fillStyle = `rgb(220 230 255 / ${0.12 + 0.12 * Math.sin(time * 0.8 + d.ph)})`;
+        ctx!.fillStyle = `rgb(232 232 232 / ${0.12 + 0.12 * Math.sin(time * 0.8 + d.ph)})`;
         ctx!.beginPath(); ctx!.arc(X(d.x + Math.sin(time * 0.3 + d.ph) * 8), Y(d.y), d.r * s, 0, Math.PI * 2); ctx!.fill();
       }
       // Twinkle: mostly faint, now and then one node flares.
@@ -121,7 +121,7 @@ export function Backdrop() {
         if (k >= 1) { rings.splice(i, 1); continue; }
         const e = 1 - (1 - k) ** 3;
         glow(X(F.x), Y(F.y), (18 + 30 * e) * s, 0.35 * (1 - k));
-        ctx!.strokeStyle = `rgb(220 230 255 / ${0.45 * (1 - k)})`;
+        ctx!.strokeStyle = `rgb(232 232 232 / ${0.45 * (1 - k)})`;
         ctx!.lineWidth = 1;
         ctx!.beginPath(); ctx!.arc(X(F.x), Y(F.y), (4 + 40 * e) * s, 0, Math.PI * 2); ctx!.stroke();
       }
@@ -134,7 +134,7 @@ export function Backdrop() {
           const q = along(p.r, p.d - k * 7);
           const a = fade * (1 - k / 8) ** 2;
           if (k === 0) glow(X(q.x), Y(q.y), 12 * s, 0.6 * fade);
-          ctx!.fillStyle = `rgb(235 240 255 / ${a})`;
+          ctx!.fillStyle = `rgb(242 242 242 / ${a})`;
           ctx!.beginPath(); ctx!.arc(X(q.x), Y(q.y), (1.6 - k * 0.12) * s, 0, Math.PI * 2); ctx!.fill();
         }
       }
