@@ -368,12 +368,14 @@ pub struct CommitDetails {
 }
 
 /// `oid` is HEAD or one of its ancestors.
-fn in_head(repo: &git2::Repository, oid: git2::Oid) -> bool {
-    repo.head().ok().and_then(|h| h.target()).is_some_and(|h| h == oid || repo.graph_descendant_of(h, oid).unwrap_or(false))
+/// Runs `git merge-base --is-ancestor` (commit-graph aware): libgit2's `graph_descendant_of` walks all of
+/// HEAD's history for a commit outside it (0.8 s on 85k commits vs 35 ms).
+fn in_head(path: &Path, oid: git2::Oid) -> bool {
+    crate::git::cli::git(path, &["merge-base", "--is-ancestor", &oid.to_string(), "HEAD"]).is_ok()
 }
 
-pub fn commit_details(repo: &Path, oid: &str) -> Result<CommitDetails, AppError> {
-    let repo = git2::Repository::open(repo)?;
+pub fn commit_details(path: &Path, oid: &str) -> Result<CommitDetails, AppError> {
+    let repo = git2::Repository::open(path)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
     let diff = commit_diff_all(&repo, &c)?;
     let files = diff
@@ -400,7 +402,7 @@ pub fn commit_details(repo: &Path, oid: &str) -> Result<CommitDetails, AppError>
         committer: sig(c.committer()),
         message: String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(),
         files,
-        in_head: in_head(&repo, c.id()),
+        in_head: in_head(path, c.id()),
     })
 }
 
@@ -442,8 +444,6 @@ pub struct RefItem {
     /// Commits ahead of / behind the upstream.
     pub ahead: u32,
     pub behind: u32,
-    /// Already part of the current branch (merging or rebasing onto it would do nothing).
-    pub in_head: bool,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -462,13 +462,12 @@ pub struct Refs {
 pub fn refs(repo: &Path) -> Result<Refs, AppError> {
     let mut repo = git2::Repository::open(repo)?;
     let head = repo.head().ok().filter(|h| h.is_branch()).and_then(|h| h.shorthand().ok().map(String::from));
-    let item = |name: String, oid: git2::Oid| RefItem { name, oid: oid.to_string(), upstream: None, ahead: 0, behind: 0, in_head: false };
+    let item = |name: String, oid: git2::Oid| RefItem { name, oid: oid.to_string(), upstream: None, ahead: 0, behind: 0 };
     let (mut local, mut remote, mut tags) = (vec![], vec![], vec![]);
     for r in repo.references()?.flatten() {
         let (Ok(full), Ok(short)) = (r.name(), r.shorthand()) else { continue };
         let Ok(c) = r.peel_to_commit() else { continue };
         let mut it = item(short.to_string(), c.id());
-        it.in_head = in_head(&repo, c.id());
         if full.starts_with("refs/heads/") {
             let up = git2::Branch::wrap(r).upstream().ok();
             if let Some(up) = up.as_ref().and_then(|u| u.get().target()) {
@@ -492,6 +491,26 @@ pub fn refs(repo: &Path) -> Result<Refs, AppError> {
         true
     });
     Ok(Refs { head, local, remote, tags, stashes })
+}
+
+/// Short names of the branches, remote branches and tags already part of HEAD (merging or rebasing
+/// onto them would do nothing). Apart from `refs` because it can take a second on a long history.
+/// Runs `git for-each-ref --merged`, an exception to "reads use git2": it reads the commit-graph file and
+/// libgit2 doesn't (stale refs on 85k commits: 0.16 s vs ~1 s for a libgit2 walk).
+pub fn merged_refs(repo: &Path) -> Result<Vec<String>, AppError> {
+    if git2::Repository::open(repo)?.head().is_err() {
+        return Ok(vec![]); // unborn HEAD
+    }
+    // Full names, stripped here: `%(refname:short)` turns a branch that shares a tag's name into "heads/x".
+    let out = crate::git::cli::git(
+        repo,
+        &["for-each-ref", "--merged", "HEAD", "--format=%(refname)", "refs/heads/", "refs/remotes/", "refs/tags/"],
+    )?;
+    Ok(out
+        .lines()
+        .filter_map(|n| ["refs/heads/", "refs/remotes/", "refs/tags/"].iter().find_map(|p| n.strip_prefix(p)))
+        .map(String::from)
+        .collect())
 }
 
 #[cfg(test)]
@@ -525,9 +544,8 @@ mod tests {
         let side = repo.commit(None, &sig, &sig, "side", &first.tree().unwrap(), &[&second]).unwrap();
         repo.branch("side", &repo.find_commit(side).unwrap(), false).unwrap();
         assert!(d.in_head && !super::commit_details(&dir, &side.to_string()).unwrap().in_head);
-        let r = super::refs(&dir).unwrap();
-        let ins = |n: &str| r.local.iter().find(|b| b.name == n).unwrap().in_head;
-        assert!(ins("old") && !ins("side"));
+        let m = super::merged_refs(&dir).unwrap();
+        assert!(m.contains(&"old".into()) && !m.contains(&"side".into()));
         for b in ["old", "side"] {
             repo.find_branch(b, git2::BranchType::Local).unwrap().delete().unwrap();
         }
@@ -625,5 +643,53 @@ mod tests {
         // Clean or not, a known text file must give a text (possibly empty) diff, never "binary".
         assert!(super::file_diff(root, "progress.md", false).unwrap().is_some());
         assert!(super::file_diff(root, "progress.md", true).unwrap().is_some());
+    }
+
+    /// Times what opening a repo runs, on a real repo: `GITAI_REPO=<path> cargo test --release
+    /// --manifest-path src-tauri/Cargo.toml open_real_repo -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn open_real_repo() {
+        use std::time::Instant;
+        let dir = std::path::PathBuf::from(std::env::var("GITAI_REPO").expect("set GITAI_REPO"));
+        let t = Instant::now();
+        let r = super::refs(&dir).unwrap();
+        eprintln!("refs: {:?} ({} local, {} remote, {} tags)", t.elapsed(), r.local.len(), r.remote.len(), r.tags.len());
+        let t = Instant::now();
+        let m = super::merged_refs(&dir).unwrap();
+        eprintln!("merged_refs: {:?} ({} in HEAD)", t.elapsed(), m.len());
+        for it in r.local.iter().chain(&r.remote).chain(&r.tags).step_by(25) {
+            assert_eq!(m.contains(&it.name), super::in_head(&dir, it.oid.parse().unwrap()), "{}", it.name);
+        }
+        let t = Instant::now();
+        let s = crate::git::cli::status(&dir).unwrap();
+        eprintln!("status: {:?} ({} files)", t.elapsed(), s.unstaged.len());
+        let all = crate::git::graph::GraphOpts { all: true, remotes: true, by_date: true };
+        let t = Instant::now();
+        let page = crate::git::graph::rows(&Default::default(), &dir, all, 0, 500).unwrap();
+        let edges: usize = page.rows.iter().map(|r| r.edges.len()).sum();
+        eprintln!("graph: {:?} ({} rows, {} lanes, {edges} edges in page 0)", t.elapsed(), page.total, page.lanes);
+        let t = Instant::now();
+        super::commit_details(&dir, &page.rows[0].oid).unwrap();
+        eprintln!("commit_details: {:?}", t.elapsed());
+        // A branch switch and the refetch after it (GITAI_SWITCH = branch to switch to and back).
+        let Ok(to) = std::env::var("GITAI_SWITCH") else { return };
+        let from = r.head.clone().expect("on a branch");
+        let cache = Default::default();
+        crate::git::graph::rows(&cache, &dir, all, 0, 500).unwrap();
+        for b in [&to, &from] {
+            let t = Instant::now();
+            crate::git::cli::checkout(&dir, b, false, false).unwrap();
+            eprintln!("switch {b}: {:?}", t.elapsed());
+            let t = Instant::now();
+            super::refs(&dir).unwrap();
+            eprintln!("  refs: {:?}", t.elapsed());
+            let t = Instant::now();
+            crate::git::cli::status(&dir).unwrap();
+            eprintln!("  status: {:?}", t.elapsed());
+            let t = Instant::now();
+            crate::git::graph::rows(&cache, &dir, all, 0, 500).unwrap();
+            eprintln!("  graph: {:?}", t.elapsed());
+        }
     }
 }

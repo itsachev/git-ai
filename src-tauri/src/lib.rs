@@ -42,6 +42,7 @@ pub fn run() {
             commands::commit_details,
             commands::commit_file_diff,
             commands::refs,
+            commands::merged_refs,
             commands::checkout,
             commands::create_branch,
             commands::delete_branch,

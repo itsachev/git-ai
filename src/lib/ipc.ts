@@ -118,6 +118,8 @@ export const commitDetails = (path: string, oid: string) => invoke<CommitDetails
 export const commitFileDiff = (path: string, oid: string, file: string) =>
   invoke<string | null>("commit_file_diff", { path, oid, file });
 export const refs = (path: string) => invoke<Refs>("refs", { path });
+/** Names of the refs already part of HEAD. Slow on long histories, so apart from `refs`. */
+export const mergedRefs = (path: string) => invoke<string[]>("merged_refs", { path });
 /** `track`: create a local branch tracking remote branch `name` ("origin/feat") and switch to it.
  * Code "dirty" = local changes in the way; `carry` stashes them, switches and pops them back
  * (code "clash" = they clash with the branch; nothing switched, changes left where they were). */

@@ -1,7 +1,7 @@
 ﻿import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { checkout, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashSave, undo } from "../../lib/ipc";
+import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
@@ -38,6 +38,7 @@ export type Action = [string, () => void, string?];
 /** Menu actions for a branch, remote branch or tag by short name (shared by the sidebar and the graph's ref labels). */
 export function useRefActions(path: string) {
   const data = useQuery(refsQuery(path)).data;
+  const merged = useQuery({ queryKey: ["merged", path], queryFn: () => mergedRefs(path) }).data;
   const run = useRun();
   /** `ontoOnly`: just the merge/rebase actions (for branch drag and drop). */
   return (name: string, ontoOnly = false): Action[] => {
@@ -45,7 +46,7 @@ export function useRefActions(path: string) {
     const head = data.head;
     const branchOff: Action = ["New branch from here", () => openNewBranch(name)];
     // Merge/rebase need a current branch that isn't this one, and do nothing when it already has all of this one.
-    const done = [...data.local, ...data.remote, ...data.tags].find((r) => r.name === name)?.in_head ? `${head} already has everything in ${name}` : undefined;
+    const done = merged?.includes(name) ? `${head} already has everything in ${name}` : undefined;
     const onto: Action[] = head && head !== name ? [
       [`Merge ${name} into ${head}`, () => run(() => merge(path, name, false), `Merged ${name} into ${head}`), done],
       [`Rebase ${head} onto ${name}`, () => run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`), done],

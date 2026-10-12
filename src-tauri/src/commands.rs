@@ -5,14 +5,49 @@ use crate::oplog;
 use crate::watch;
 use serde_json::{json, Value};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_store::StoreExt;
 
 const STORE: &str = "settings.json";
 const MAX_RECENT: usize = 100;
 
-#[tauri::command]
+// Commands are `async` so a slow git call (switching branches on a big repo) never freezes the window.
+// They then run in parallel, so the ones that write (the repo, the recent list) take this lock in turn,
+// as they did on the main thread: two git writes at once would trip over `index.lock`.
+static OP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// When the last op ended (ms since the epoch).
+static OP_END: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
+}
+
+/// Holds the op lock; records the end time when dropped.
+pub struct Op(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+
+impl Drop for Op {
+    fn drop(&mut self) {
+        OP_END.store(now_ms(), Ordering::Relaxed);
+    }
+}
+
+fn serial() -> Op {
+    Op(OP.lock().unwrap_or_else(|e| e.into_inner()))
+}
+
+/// An op is running or just ended. The UI refetches everything when it ends, so the watcher stays quiet
+/// meanwhile (a branch switch on a big repo fired it 2 or 3 times, each a full refetch). The second after
+/// covers the debouncer flushing the op's own file events late, which restarted every query mid-fetch.
+// ponytail: an outside change within that second is missed until the next event; fine for a GUI.
+pub fn busy() -> bool {
+    matches!(OP.try_lock(), Err(std::sync::TryLockError::WouldBlock)) || now_ms().saturating_sub(OP_END.load(Ordering::Relaxed)) < 1000
+}
+
+#[tauri::command(async)]
 pub fn open_repo(app: AppHandle, path: String) -> Result<read::RepoInfo, AppError> {
+    let _op = serial();
     cli::ensure_version()?;
     let info = read::open(Path::new(&path))?;
     let mut recent = recent_repos(app.clone());
@@ -25,7 +60,7 @@ pub fn open_repo(app: AppHandle, path: String) -> Result<read::RepoInfo, AppErro
     Ok(info)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn recent_repos(app: AppHandle) -> Vec<String> {
     app.store(STORE)
         .ok()
@@ -35,14 +70,15 @@ pub fn recent_repos(app: AppHandle) -> Vec<String> {
 }
 
 /// Recent repos whose folder no longer exists (deleted or moved outside the app).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn missing_repos(app: AppHandle) -> Vec<String> {
     recent_repos(app).into_iter().filter(|p| !Path::new(p).exists()).collect()
 }
 
 /// Drops `path` from the recent list; the folder stays on disk.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn forget_repo(app: AppHandle, path: String) -> Result<(), AppError> {
+    let _op = serial();
     let mut recent = recent_repos(app.clone());
     recent.retain(|p| p != &path);
     let store = app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?;
@@ -52,7 +88,7 @@ pub fn forget_repo(app: AppHandle, path: String) -> Result<(), AppError> {
 
 /// Moves a recent repo's folder to the OS trash (recoverable from there), then forgets it.
 /// Only paths already in the recent list, so IPC can't trash arbitrary folders.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn trash_repo(app: AppHandle, path: String) -> Result<(), AppError> {
     if !recent_repos(app.clone()).contains(&path) {
         return Err(AppError::new("not_recent", "That folder isn't in your recent repositories."));
@@ -65,42 +101,47 @@ pub fn trash_repo(app: AppHandle, path: String) -> Result<(), AppError> {
     forget_repo(app, path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn repo_status(path: String) -> Result<cli::Status, AppError> {
     cli::status(Path::new(&path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stage(path: String, paths: Vec<String>) -> Result<(), AppError> {
+    let _op = serial();
     cli::stage(Path::new(&path), &paths)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn unstage(path: String, paths: Vec<String>) -> Result<(), AppError> {
+    let _op = serial();
     cli::unstage(Path::new(&path), &paths)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn discard(path: String, paths: Vec<String>) -> Result<(), AppError> {
+    let _op = serial();
     cli::discard(Path::new(&path), &paths)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn commit(path: String, message: String, amend: bool) -> Result<Option<String>, AppError> {
+    let _op = serial();
     cli::commit(Path::new(&path), &message, amend)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn head_message(path: String) -> Result<Option<String>, AppError> {
     read::head_message(Path::new(&path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn apply_lines(path: String, file: String, op: cli::LineOp, lines: Vec<usize>) -> Result<(), AppError> {
+    let _op = serial();
     cli::apply_lines(Path::new(&path), &file, op, &lines)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn op_log(path: String) -> Result<Vec<oplog::OpEntry>, AppError> {
     oplog::entries(Path::new(&path), 500)
 }
@@ -144,110 +185,132 @@ pub async fn commit_file_diff(path: String, oid: String, file: String) -> Result
     read::commit_file_diff(Path::new(&path), &oid, &file)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn refs(path: String) -> Result<read::Refs, AppError> {
     read::refs(Path::new(&path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
+pub fn merged_refs(path: String) -> Result<Vec<String>, AppError> {
+    read::merged_refs(Path::new(&path))
+}
+
+#[tauri::command(async)]
 pub fn checkout(path: String, name: String, track: bool, carry: bool) -> Result<(), AppError> {
+    let _op = serial();
     cli::checkout(Path::new(&path), &name, track, carry)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_branch(path: String, name: String, from: Option<String>, checkout: bool) -> Result<(), AppError> {
+    let _op = serial();
     cli::create_branch(Path::new(&path), &name, from.as_deref(), checkout)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_branch(path: String, name: String, force: bool) -> Result<(), AppError> {
+    let _op = serial();
     cli::delete_branch(Path::new(&path), &name, force)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_diff(path: String, file: String, staged: bool) -> Result<Option<String>, AppError> {
     read::file_diff(Path::new(&path), &file, staged)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn merge(path: String, rev: String, cherry_pick: bool) -> Result<(), AppError> {
+    let _op = serial();
     cli::merge(Path::new(&path), &rev, cherry_pick)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn reset_to(path: String, rev: String, mode: cli::ResetMode) -> Result<(), AppError> {
+    let _op = serial();
     cli::reset_to(Path::new(&path), &rev, mode)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn revert(path: String, rev: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::revert(Path::new(&path), &rev)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rename_branch(path: String, name: String, new_name: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::rename_branch(Path::new(&path), &name, &new_name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_upstream(path: String, branch: String, upstream: Option<String>) -> Result<(), AppError> {
+    let _op = serial();
     cli::set_upstream(Path::new(&path), &branch, upstream.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remotes(path: String) -> Result<Vec<cli::Remote>, AppError> {
     cli::remotes(Path::new(&path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remote_set(path: String, name: String, url: String, edit: bool) -> Result<(), AppError> {
+    let _op = serial();
     cli::remote_set(Path::new(&path), &name, &url, edit)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remote_remove(path: String, name: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::remote_remove(Path::new(&path), &name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ignore(path: String, pattern: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::ignore(Path::new(&path), &pattern)
 }
 
 /// Creates an empty repository in `dir`, then opens it like `open_repo`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn init_repo(app: AppHandle, dir: String) -> Result<read::RepoInfo, AppError> {
     cli::init(Path::new(&dir))?;
     open_repo(app, dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rebase_onto(path: String, onto: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::rebase_onto(Path::new(&path), &onto)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn abort(path: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::abort(Path::new(&path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_tag(path: String, name: String, target: String, message: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::create_tag(Path::new(&path), &name, &target, &message)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_tag(path: String, name: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::delete_tag(Path::new(&path), &name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stash_save(path: String, message: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::stash_save(Path::new(&path), &message)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stash(path: String, op: cli::StashOp, index: usize, oid: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::stash(Path::new(&path), op, index, &oid)
 }
 
@@ -287,30 +350,32 @@ pub async fn clone_repo(app: AppHandle, url: String, dest: String) -> Result<rea
     open_repo(app, dest)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resolve(path: String, paths: Vec<String>, side: cli::Side) -> Result<(), AppError> {
+    let _op = serial();
     cli::resolve(Path::new(&path), &paths, side)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_resolved(path: String, file: String, text: String) -> Result<(), AppError> {
+    let _op = serial();
     cli::write_resolved(Path::new(&path), &file, &text)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn work_file(path: String, file: String) -> Result<Option<String>, AppError> {
     read::work_file(Path::new(&path), &file)
 }
 
 /// Editors installed here plus the last one picked for `open_file`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn editors(app: AppHandle) -> crate::editors::Editors {
     crate::editors::list(app.store(STORE).ok().and_then(|s| s.get("editor")).and_then(|v| v.as_str().map(String::from)))
 }
 
 /// Opens a repo file (e.g. to resolve a conflict) in `editor` (a name from `editors`), or its default app when None.
 /// The choice is remembered for next time.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_file(app: AppHandle, path: String, file: String, editor: Option<String>) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;
     // Only paths inside the repo; `file` comes from the status list.
@@ -331,7 +396,7 @@ pub fn open_file(app: AppHandle, path: String, file: String, editor: Option<Stri
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn askpass_reply(id: u32, answer: Option<String>) {
     crate::askpass::reply(id, answer)
 }
@@ -376,7 +441,7 @@ pub async fn create_pr(path: String, head: String, base: String, title: String, 
 }
 
 /// "github", "gitlab" or None: where the repo's default remote lives, for the PR dialog's wording and sign-in.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pr_provider(path: String) -> Option<String> {
     let url = cli::default_remote_url(Path::new(&path)).ok()?;
     if crate::gitlab::remote_slug(&url).is_some() {
@@ -386,7 +451,7 @@ pub fn pr_provider(path: String) -> Option<String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn github_sign_out() -> Result<(), AppError> {
     crate::github::sign_out()
 }
@@ -418,13 +483,13 @@ pub async fn gitlab_sign_out() -> Result<(), AppError> {
 }
 
 // SSH key for network git (path only; the key file stays where it is).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ssh_key(app: AppHandle) -> Option<String> {
     app.store(STORE).ok()?.get("ssh_key")?.as_str().map(String::from)
 }
 
 /// Checks that `path` is a private key file, saves it and uses it from the next network op. None = ssh defaults.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ssh_key_set(app: AppHandle, path: Option<String>) -> Result<(), AppError> {
     let path = path.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
     if let Some(p) = &path {
@@ -449,30 +514,30 @@ pub fn ssh_key_set(app: AppHandle, path: Option<String>) -> Result<(), AppError>
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_setup() -> cli::GitSetup {
     cli::git_setup()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_setup_set(name: String, email: String, helper: bool) -> Result<(), AppError> {
     cli::set_global(&name, &email, helper)
 }
 
 /// Whether the first-run setup was finished or skipped.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn setup_done(app: AppHandle) -> bool {
     app.store(STORE).ok().and_then(|s| s.get("setup_done")).is_some_and(|v| v == json!(true))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn setup_finish(app: AppHandle) -> Result<(), AppError> {
     app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?.set("setup_done", json!(true));
     Ok(())
 }
 
 /// Private keys in ~/.ssh, the default names (id_ed25519, id_ecdsa, id_rsa) first.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ssh_detect(app: AppHandle) -> Vec<String> {
     use tauri::Manager;
     let Ok(dir) = app.path().home_dir().map(|h| h.join(".ssh")) else { return vec![] };
@@ -498,24 +563,24 @@ fn ai_cfg(app: &AppHandle) -> crate::ai::AiConfig {
     app.store(STORE).ok().and_then(|s| s.get("ai")).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_config(app: AppHandle) -> crate::ai::AiConfig {
     ai_cfg(&app)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_set_config(app: AppHandle, config: crate::ai::AiConfig) -> Result<(), AppError> {
     app.store(STORE).map_err(|e| AppError::new("store", e.to_string()))?.set("ai", json!(config));
     Ok(())
 }
 
 /// The chosen provider has a key, or needs none.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_has_key(app: AppHandle) -> bool {
     crate::ai::ready(&ai_cfg(&app))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_set_key(provider: String, key: Option<String>) -> Result<(), AppError> {
     crate::ai::set_key(&provider, key)
 }
@@ -551,7 +616,7 @@ pub async fn ai_resolve_conflict(app: AppHandle, path: String, file: String) -> 
 }
 
 /// Commits in `base..HEAD` (oldest first) for the interactive rebase dialog.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rebase_commits(path: String, base: String) -> Result<Vec<read::RebaseCommit>, AppError> {
     read::rebase_commits(Path::new(&path), &base)
 }
@@ -568,18 +633,20 @@ pub async fn blame(path: String, rev: String, file: String) -> Result<read::Blam
     read::blame(Path::new(&path), &rev, &file)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rebase(path: String, base: String, steps: Vec<cli::RebaseStep>) -> Result<(), AppError> {
+    let _op = serial();
     cli::rebase(Path::new(&path), &base, &steps)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn lfs(path: String) -> Result<cli::Lfs, AppError> {
     cli::lfs(Path::new(&path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn lfs_track(path: String, pattern: String, track: bool) -> Result<(), AppError> {
+    let _op = serial();
     cli::lfs_track(Path::new(&path), &pattern, track)
 }
 

@@ -17,7 +17,8 @@ Tauri scaffold in place (create-tauri-app react-ts template). The plan and the s
 - `npm run tauri dev`: run the app in a native window with hot reload (first Rust build takes ~2 min). Plain `npm run dev` (http://localhost:1420) has no Tauri backend, so IPC calls fail there.
 - `npm run tauri build`: release build. Output: `src-tauri/target/release/gitai.exe` plus MSI/NSIS installers under `src-tauri/target/release/bundle/`.
 - `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests; also regenerates `src/bindings/*.ts` (commit them).
-- `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`: times the graph on a generated 100k-commit repo (last run: 0.77 s first page, 6 ms cached page).
+- `GITAI_REPO=<path> cargo test --release --manifest-path src-tauri/Cargo.toml open_real_repo -- --ignored --nocapture`: times what opening a repo runs (refs, status, graph, details) on a real repo. Add `GITAI_SWITCH=<branch>` to also time a branch switch there and back, plus the refetch after it.
+- `cargo test --release --manifest-path src-tauri/Cargo.toml big_graph -- --ignored --nocapture`: times the graph on a generated 100k-commit repo (last run: 0.53 s first page, 6 ms cached page).
 - The exe name comes from `mainBinaryName` in `src-tauri/tauri.conf.json`. Keep it `gitai`.
 
 ## What this is
@@ -28,6 +29,7 @@ git-ai is a cross-platform desktop Git GUI (Sourcetree-like). It is local-first 
 
 - **Hybrid git access.**
   - Reads (log, diff, blame, refs, graph) use `git2` in `src-tauri/src/git/read.rs`.
+  - Exception for speed: history walks over the whole repo run the `git` binary, because it reads the commit-graph file and libgit2 doesn't. These are the graph walk (`rev-list`), `merged_refs` (`for-each-ref --merged`) and `in_head` (`merge-base --is-ancestor`).
   - Writes and network operations (commit, merge, rebase, push, fetch, clone, LFS) run the system `git` binary from `src-tauri/src/git/cli.rs`:
     - Use `Command::new("git").args([...])` and never a shell.
     - Put `--` before paths.

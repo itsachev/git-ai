@@ -15,7 +15,7 @@ pub fn watch(app: &AppHandle, path: &str) -> Result<(), AppError> {
     let err = |e: notify_debouncer_mini::notify::Error| AppError::new("watch", e.to_string());
     let (handle, repo) = (app.clone(), path.to_string());
     let mut debouncer = new_debouncer(Duration::from_millis(300), move |res: notify_debouncer_mini::DebounceEventResult| {
-        if res.is_ok() {
+        if res.is_ok() && !crate::commands::busy() {
             let _ = handle.emit("repo-changed", &repo);
         }
     })

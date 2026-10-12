@@ -126,7 +126,7 @@ fn fresh<'a>(
     let name = path.to_string_lossy().into_owned();
     let mut cache = cache.0.lock().unwrap_or_else(|e| e.into_inner());
     if !matches!(&*cache, Some(l) if l.repo == name && l.opts == opts && l.key == key) {
-        *cache = Some(compute(repo, name, opts, key)?);
+        *cache = Some(compute(path, name, opts, key)?);
     }
     Ok((cache, tips, head))
 }
@@ -142,19 +142,21 @@ fn tips(repo: &Repository, remotes: bool) -> Vec<(String, Oid)> {
         .collect()
 }
 
-fn compute(repo: &Repository, name: String, opts: GraphOpts, key: Vec<Oid>) -> Result<Layout, AppError> {
-    let mut walk = repo.revwalk()?;
-    walk.set_sorting(if opts.by_date { git2::Sort::TOPOLOGICAL | git2::Sort::TIME } else { git2::Sort::TOPOLOGICAL })?;
-    for oid in &key {
-        walk.push(*oid)?;
+/// The walk runs the `git` binary, an exception to "reads use git2": it reads the commit-graph file
+/// and libgit2 doesn't (85k commits: 0.25 s vs 1.45 s for walk + layout).
+fn compute(path: &Path, name: String, opts: GraphOpts, key: Vec<Oid>) -> Result<Layout, AppError> {
+    let mut commits: Vec<(Oid, Vec<Oid>)> = vec![];
+    if !key.is_empty() {
+        // Tips go in on stdin: thousands of tags would overflow the Windows command line (32k chars).
+        let order = if opts.by_date { "--date-order" } else { "--topo-order" };
+        let tips: String = key.iter().map(|o| format!("{o}\n")).collect();
+        let out = crate::git::cli::git_input(path, &["rev-list", "--parents", order, "--stdin"], &tips)?;
+        for line in out.lines() {
+            let mut ids = line.split(' ').map(Oid::from_str);
+            let Some(Ok(id)) = ids.next() else { continue };
+            commits.push((id, ids.collect::<Result<_, _>>()?));
+        }
     }
-    // ponytail: parses every commit (~1 s per 100k); read the commit-graph file if that gets slow.
-    let commits = walk
-        .map(|oid| {
-            let c = repo.find_commit(oid?)?;
-            Ok((c.id(), c.parent_ids().collect()))
-        })
-        .collect::<Result<Vec<_>, git2::Error>>()?;
     let (cols, lanes) = layout(&commits);
     let rows = commits.into_iter().zip(cols).map(|((oid, _), (col, edges))| (oid, col, edges)).collect();
     Ok(Layout { repo: name, opts, key, rows, lanes })
@@ -186,7 +188,8 @@ fn layout<T: Copy + PartialEq>(commits: &[(T, Vec<T>)]) -> (Vec<(u32, Vec<(u32, 
             let Some(l) = lane else { continue };
             let to = if l.want == *id { col } else { j } as u32;
             edges.extend(l.from.iter().map(|&f| (f, to)));
-            l.from = vec![j as u32];
+            l.from.clear(); // reuse the buffer: one allocation per lane per row was 2/3 of the layout time
+            l.from.push(j as u32);
         }
         for j in hits {
             lanes[j] = None;
