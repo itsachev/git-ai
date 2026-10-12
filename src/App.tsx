@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
 import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, stashSave, trashRepo, undo, unstage } from "./lib/ipc";
@@ -99,8 +99,30 @@ function RemoveRepoDialog({ path, missing, onClose, onDone }: { path: string | n
   );
 }
 
+/** One tab per open repo, plus "+" back to the repository list. Middle-click closes a tab. */
+function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]; active: string; onSelect: (path: string) => void; onClose: (path: string) => void; onNew: () => void }) {
+  // Many tabs scroll sideways: keep the active one in view.
+  useEffect(() => { document.querySelector(".tab[aria-current]")?.scrollIntoView({ block: "nearest", inline: "nearest" }); }, [active]);
+  return (
+    <nav className="tabs" aria-label="Open repositories">
+      {tabs.map((t) => (
+        <div key={t.path} className="tab" aria-current={t.path === active ? "page" : undefined}
+          onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }} onAuxClick={(e) => { if (e.button === 1) onClose(t.path); }}>
+          <button className="tab-name" onClick={() => onSelect(t.path)} title={t.path}><Icon name="folder" /><span>{t.name}</span></button>
+          <button className="icon-btn" onClick={() => onClose(t.path)} title="Close tab (Ctrl+W)" aria-label={`Close ${t.name}`}><Icon name="close" /></button>
+        </div>
+      ))}
+      <button className="icon-btn tab-new" onClick={onNew} title="Open another repository (Ctrl+T)" aria-label="Open another repository"><Icon name="add" /></button>
+    </nav>
+  );
+}
+
 function App() {
-  const [repo, setRepo] = useState<RepoInfo | null>(null);
+  // Open repos as tabs. Only the active one is mounted: the backend watches one repo at a time.
+  const [tabs, setTabs] = useState<RepoInfo[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const repo = tabs.find((t) => t.path === active) ?? null;
+  const qc = useQueryClient();
   const [recent, setRecent] = useState<string[]>([]);
   const [missing, setMissing] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -150,17 +172,60 @@ function App() {
     return () => window.removeEventListener("focus", refresh);
   }, []);
 
+  // Data cached for a repo went unwatched while it wasn't shown: mark it all stale, so the mounting view refetches.
+  function show(info: RepoInfo) {
+    setTabs((ts) => (ts.some((t) => t.path === info.path) ? ts : [...ts, info]));
+    setActive(info.path);
+    qc.invalidateQueries({ refetchType: "none" });
+    refresh();
+  }
+
   async function load(path: string) {
     if (missing.includes(path)) return setRemoving(path);
     try {
       setError(null);
-      setRepo(await openRepo(path));
-      refresh();
+      show(await openRepo(path));
     } catch (e) {
       setError((e as AppError).message ?? String(e));
+      drop(path);
       refresh();
     }
   }
+
+  // Switching tabs shows the repo at once; open_repo then points the watcher at it. If that fails (folder gone), back home.
+  function select(path: string) {
+    if (path === active) return;
+    setActive(path);
+    qc.invalidateQueries({ refetchType: "none" });
+    openRepo(path).then(refresh, (e) => {
+      setError((e as AppError).message ?? String(e));
+      drop(path);
+      setActive(null);
+      refresh();
+    });
+  }
+
+  const drop = (path: string) => setTabs((ts) => ts.filter((t) => t.path !== path));
+
+  // Closing the active tab shows its right neighbour, else its left one, else the repository list.
+  function close(path: string) {
+    const i = tabs.findIndex((t) => t.path === path);
+    const rest = tabs.filter((t) => t.path !== path);
+    setTabs(rest);
+    if (path !== active) return;
+    const next = rest[Math.min(i, rest.length - 1)];
+    if (next) select(next.path);
+    else setActive(null);
+  }
+
+  const cycle = (d: number) => select(tabs[(tabs.findIndex((t) => t.path === active) + d + tabs.length) % tabs.length].path);
+  const tabCommands: Command[] = [
+    { label: "Open another repository", keys: "Ctrl+T", run: () => setActive(null) },
+    { label: "Close tab", keys: "Ctrl+W", run: () => active && close(active) },
+  ];
+  if (tabs.length > 1)
+    tabCommands.push({ label: "Next tab", keys: "Ctrl+Tab", run: () => cycle(1) }, { label: "Previous tab", keys: "Ctrl+Shift+Tab", run: () => cycle(-1) },
+      ...tabs.filter((t) => t.path !== active).map((t) => ({ label: `Switch to ${t.name}`, run: () => select(t.path) })));
 
   async function pick() {
     const dir = await open({ directory: true });
@@ -172,8 +237,7 @@ function App() {
     if (!dir) return;
     try {
       setError(null);
-      setRepo(await initRepo(dir));
-      refresh();
+      show(await initRepo(dir));
     } catch (e) {
       setError((e as AppError).message ?? String(e));
     }
@@ -181,13 +245,17 @@ function App() {
 
   async function cloned(info: RepoInfo) {
     setCloning(false);
-    setRepo(info);
-    refresh();
+    show(info);
   }
 
   const f = filter.trim().toLowerCase();
   const shown = recent.filter((p) => p.toLowerCase().includes(f));
-  const body = repo ? <RepoView repo={repo} onClose={() => setRepo(null)} theme={theme} setTheme={setTheme} /> : (
+  const body = repo ? (
+    <div className="workspace">
+      <RepoTabs tabs={tabs} active={repo.path} onSelect={select} onClose={close} onNew={() => setActive(null)} />
+      <RepoView key={repo.path} repo={repo} onHome={() => setActive(null)} tabCommands={tabCommands} theme={theme} setTheme={setTheme} />
+    </div>
+  ) : (
     <main className="home" ref={home}>
       <Backdrop />
       <section className="home-intro">
@@ -234,14 +302,14 @@ function App() {
         {recent.length > 0 && !shown.length && <p className="empty">No repository matches “{filter}”.</p>}
         <ul className="recent">
           {shown.map((p) => {
-            const gone = missing.includes(p);
+            const gone = missing.includes(p), opened = tabs.some((t) => t.path === p);
             return (
-            <li key={p} className={gone ? "missing" : undefined} onContextMenu={(e) => { e.preventDefault(); setRemoving(p); }}>
+            <li key={p} className={gone ? "missing" : opened ? "opened" : undefined} onContextMenu={(e) => { e.preventDefault(); setRemoving(p); }}>
               <button onClick={() => load(p)} title={gone ? `Deleted from disk: ${p}` : p}>
                 <Icon name={gone ? "warn" : "folder"} />
                 <span>
                   <strong>{p.split(/[\\/]/).pop()}</strong>
-                  <small>{gone ? <><em>Deleted from disk</em> · {p}</> : p}</small>
+                  <small>{gone ? <><em>Deleted from disk</em> · {p}</> : opened ? <><em>Open</em> · {p}</> : p}</small>
                 </span>
               </button>
               <button className="icon-btn" onClick={() => setRemoving(p)} title="Remove…" aria-label={`Remove ${p}`}>
@@ -255,7 +323,7 @@ function App() {
       <div className="corner top-right"><SettingsButton labeled /></div>
       <div className="corner bottom-left"><ThemeButton theme={theme} onChange={setTheme} labeled /></div>
       <div className="corner bottom-right"><AboutButton /></div>
-      <RemoveRepoDialog path={removing} missing={!!removing && missing.includes(removing)} onClose={() => setRemoving(null)} onDone={(e) => { setError(e); refresh(); }} />
+      <RemoveRepoDialog path={removing} missing={!!removing && missing.includes(removing)} onClose={() => setRemoving(null)} onDone={(e) => { setError(e); if (!e && removing) drop(removing); refresh(); }} />
     </main>
   );
   // One askpass dialog for both screens: clone runs from the welcome screen.
@@ -274,9 +342,9 @@ function App() {
 const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+Shift+L", Push: "Ctrl+Shift+U" };
 const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pull: "git pull --no-rebase", Push: "git push" };
 
-type RepoProps = { repo: RepoInfo; onClose: () => void; theme: Theme; setTheme: (t: Theme) => void };
+type RepoProps = { repo: RepoInfo; onHome: () => void; tabCommands: Command[]; theme: Theme; setTheme: (t: Theme) => void };
 
-function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
+function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   const path = repo.path;
   // Branch comes from live status so checkouts made elsewhere show up.
   const status = useQuery(statusQuery(path)).data;
@@ -339,14 +407,14 @@ function RepoView({ repo, onClose, theme, setTheme }: RepoProps) {
   if (log?.[0]) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: () => run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
     if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, git: `git switch ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
-  commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, { label: "Close repository", run: onClose });
+  commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, ...tabCommands);
 
   return (
     <div ref={shell} className={`shell${side ? " show-side" : ""}`}>
       <aside className="rail" aria-label="Repository">
         <div className="rail-head">
           {/* Arrow and repo name are one target: either goes back to the repository list. */}
-          <button className="back" onClick={onClose} title={`Back to repositories\n${path}`} aria-label={`${repo.name}: back to repositories`}>
+          <button className="back" onClick={onHome} title={`Back to repositories\n${path}`} aria-label={`${repo.name}: back to repositories`}>
             <Icon name="back" /><strong>{repo.name}</strong>
           </button>
           <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>

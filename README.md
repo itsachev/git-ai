@@ -44,6 +44,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 ### 📁 Repositories
 - Open, create (`git init`) and clone, with live progress
 - Pick a repo to clone from your GitHub or GitLab account
+- **Several repos open at once, in tabs** (Ctrl+T, Ctrl+Tab, Ctrl+W)
 - Recent repos list with a filter; moved or deleted folders are flagged
 
 ### ✏️ File Status

@@ -7,6 +7,7 @@ What's new in each git-ai release. Newest first.
 ## [0.3.0] - 2026-10-12
 
 ### Added
+- **Several repositories open at once, in tabs.** Open another repository with the + at the end of the tab bar (or Ctrl+T) and switch between them with a click or Ctrl+Tab. Close a tab with its ×, a middle-click or Ctrl+W. In the Recent list, repositories already open in a tab are marked "Open".
 - **Portable Windows app.** Every release now includes `git-ai_<version>_x64-portable.exe`. It runs from any folder without installing.
 - **Select several files at once in File Status.** Use Ctrl+click, Shift+click, Ctrl+A, or drag over the rows. Stage, Unstage and Discard then act on all the selected files.
 
