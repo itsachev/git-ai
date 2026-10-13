@@ -16,12 +16,14 @@ jobs:
         include:
           - os: windows-latest
             args: ""
-          - os: ubuntu-22.04
-            args: ""
-          - os: macos-latest
-            args: --target aarch64-apple-darwin
-          - os: macos-latest
-            args: --target x86_64-apple-darwin
+          # Paused until macOS signing/notarization works (unsigned .app opens as "damaged") and Linux is tested.
+          # Uncomment to ship them again; the rest of this workflow still handles both.
+          # - os: ubuntu-22.04
+          #   args: ""
+          # - os: macos-latest
+          #   args: --target aarch64-apple-darwin
+          # - os: macos-latest
+          #   args: --target x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

@@ -96,16 +96,14 @@ Get the installer for your platform from the **[latest release](https://github.c
 | Platform | Package |
 | --- | --- |
 | Windows | `.msi` or `-setup.exe`, or `-portable.exe` (no install; runs from anywhere) |
-| macOS (Apple Silicon / Intel) | `.dmg` (untested) |
-| Linux | `.AppImage`, `.deb` or `.rpm` (untested) |
 
 **Requirement:** [git](https://git-scm.com/downloads) **2.38 or newer** on your `PATH`.
 
 > [!WARNING]
-> Only the Windows build is tested so far. The macOS and Linux builds come from the same code, but nobody has tried them yet. Please [open an issue](https://github.com/itsachev/git-ai/issues) if something breaks.
+> Releases are Windows-only for now. macOS builds are paused until they are code-signed (macOS reports an unsigned download as "damaged"), and Linux builds until they are tested. Both still build from source with `npm run tauri build`.
 
 > [!NOTE]
-> The installers are not code-signed yet. On Windows, SmartScreen warns "unknown publisher": click **More info → Run anyway**. On macOS, Gatekeeper blocks the first launch: right-click the app and choose **Open**.
+> The installers are not code-signed yet. On Windows, SmartScreen warns "unknown publisher": click **More info → Run anyway**.
 
 Once installed, git-ai updates itself: when a new release is out, a banner offers to install it and restart.
 
