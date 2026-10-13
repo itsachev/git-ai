@@ -6,6 +6,7 @@ What's new in each git-ai release. Newest first.
 
 ### Added
 - **See what a stash holds.** Click a stash in the sidebar (or right-click it → Show changes) to see its files, new untracked ones included, and the changes in each.
+- **Syntax colours in diffs.** File Status, History and stash diffs colour code like Sublime Text's Monokai theme: keywords, strings, numbers, functions and comments each get their own colour, in light and dark.
 - **Branch names on graph dots.** Hover a dot in the History graph to see which branch that commit sits on.
 - **Show only a branch's own commits.** In History, pick Own commits to list just the commits on your current branch that main (or master) doesn't have yet.
 

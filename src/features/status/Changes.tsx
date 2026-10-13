@@ -9,6 +9,7 @@ import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon, type IconName } from "../../lib/icons";
 import { Splitter } from "../../lib/splitter";
+import { DiffLine, langOf } from "../../lib/highlight";
 import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
@@ -578,6 +579,7 @@ function Diff({ path, sel, kind, run }: DiffProps) {
   if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
 
   const file = sel.file;
+  const lang = langOf(file);
   const isChange = (i: number) => all[i][0] === "+" || all[i][0] === "-";
   const ops: [LineOp, string][] = sel.staged ? [["Unstage", "Unstage"]] : [["Stage", "Stage"], ["Discard", "Discard"]];
   async function apply(op: LineOp, lines: number[], what: string) {
@@ -627,14 +629,14 @@ function Diff({ path, sel, kind, run }: DiffProps) {
                 <span>{l}</span>
               </div>
             );
-          if (!isChange(i)) return <div key={i}><Gutter o={o} n={n} />{l || " "}</div>;
+          if (!isChange(i)) return <div key={i}><Gutter o={o} n={n} /><DiffLine line={l} lang={lang} /></div>;
           const on = picked.has(i);
           return (
             <div key={i} role="checkbox" aria-checked={on}
               className={`${l[0] === "+" ? "add" : "del"} pick${on ? " on" : ""}`}
               onMouseDown={(e) => e.shiftKey && e.preventDefault()} // no text selection on Shift+click
               onClick={(e) => toggle(i, e.shiftKey)}>
-              <Gutter o={o} n={n} />{l}
+              <Gutter o={o} n={n} /><DiffLine line={l} lang={lang} />
             </div>
           );
         })}

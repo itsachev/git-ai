@@ -48,10 +48,16 @@
   font-kerning: normal;
   letter-spacing: -0.006em; /* Geist is set slightly loose for text sizes */
   color-scheme: light;
+  /* Diff syntax colours: Monokai hues, darkened to read on paper. */
+  --syn-key: #c2185b; --syn-str: #8a6d00; --syn-num: #7442d8; --syn-fn: #4f7f00;
+  --syn-type: #0a7fa3; --syn-param: #c25e00; --syn-com: #8a8574;
 }
 /* index.html sets data-theme before first paint; src/lib/theme.tsx keeps it in sync. */
 :root[data-theme="dark"] {
   color-scheme: dark;
+  /* Monokai (Sublime Text). */
+  --syn-key: #f92672; --syn-str: #e6db74; --syn-num: #ae81ff; --syn-fn: #a6e22e;
+  --syn-type: #66d9ef; --syn-param: #fd971f; --syn-com: #75715e;
   --bg: #1b1a18;
   --panel: #222120;
   --raised: #2c2a27;
@@ -730,6 +736,14 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff pre > div:not(.add):not(.del) .ln { background: var(--panel); }
 .diff .ln span { width: 4.5ch; padding-right: 0.6ch; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .diff .ln span:last-child { border-right: 1px solid var(--line); }
+/* highlight.js tokens (src/lib/highlight.tsx). */
+.diff :is(.hljs-keyword, .hljs-selector-tag, .hljs-tag, .hljs-name, .hljs-operator, .hljs-meta .hljs-keyword) { color: var(--syn-key); }
+.diff :is(.hljs-string, .hljs-regexp, .hljs-meta .hljs-string, .hljs-addition) { color: var(--syn-str); }
+.diff :is(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-variable.language_, .hljs-selector-pseudo) { color: var(--syn-num); }
+.diff :is(.hljs-title, .hljs-attr, .hljs-attribute, .hljs-selector-id, .hljs-selector-class, .hljs-section) { color: var(--syn-fn); }
+.diff :is(.hljs-built_in, .hljs-type, .hljs-title.class_, .hljs-meta, .hljs-bullet, .hljs-link) { color: var(--syn-type); }
+.diff :is(.hljs-params, .hljs-template-variable, .hljs-variable) { color: var(--syn-param); }
+.diff :is(.hljs-comment, .hljs-quote, .hljs-doctag) { color: var(--syn-com); font-style: italic; }
 .diff .add { background: color-mix(in srgb, var(--add) 12%, var(--panel)); }
 .diff .del { background: color-mix(in srgb, var(--danger) 11%, var(--panel)); }
 .diff .add .ln span { color: var(--add); }

@@ -4,6 +4,7 @@ import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, rever
 import type { AppError } from "../../bindings/AppError";
 import { DiffHead, FileLabel, Gutter, PaneNote, errorText, lineNumbers, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
+import { DiffLine, langOf } from "../../lib/highlight";
 import { ago } from "../refs/NewBranch";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm, refsQuery } from "../refs/Sidebar";
@@ -150,6 +151,7 @@ export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid
   const all = data.replace(/\n$/, "").split("\n");
   const start = all.findIndex((l) => l.startsWith("@@"));
   if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
+  const lang = langOf(file);
   // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
   return (
     <section className="diff">
@@ -158,7 +160,7 @@ export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid
         {lineNumbers(all, start).map(([o, n], k) => {
           const l = all[start + k];
           if (l.startsWith("@@")) return <div key={k} className="hunk"><span>{l}</span></div>;
-          return <div key={k} className={l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}><Gutter o={o} n={n} />{l || " "}</div>;
+          return <div key={k} className={l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}><Gutter o={o} n={n} /><DiffLine line={l} lang={lang} /></div>;
         })}
       </pre>
     </section>
