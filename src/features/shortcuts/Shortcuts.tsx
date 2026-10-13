@@ -105,14 +105,12 @@ export function Shortcuts({ commands }: { commands: Command[] }) {
   return (
     <div className="shortcuts" ref={root}>
       <header className="sc-hero">
-        <div>
-          <p className="sc-eyebrow"><Icon name="command" />{total} shortcuts</p>
-          <h2 className="sc-title">Every move, one keystroke away.</h2>
-          <p className="sc-lede">Hold <kbd className="sc-cap" data-k="ctrl">{GLYPH.Ctrl ?? "Ctrl"}</kbd>, <kbd className="sc-cap" data-k="shift">{GLYPH.Shift ?? "Shift"}</kbd> or <kbd className="sc-cap" data-k="alt">{GLYPH.Alt ?? "Alt"}</kbd> to light up the shortcuts that use it.</p>
-        </div>
+        <p className="sc-eyebrow"><Icon name="command" />{total} shortcuts</p>
+        <h2 className="sc-title">Every move, one keystroke away.</h2>
+        <p className="sc-lede">Hold <kbd className="sc-cap" data-k="ctrl">{GLYPH.Ctrl ?? "Ctrl"}</kbd>, <kbd className="sc-cap" data-k="shift">{GLYPH.Shift ?? "Shift"}</kbd> or <kbd className="sc-cap" data-k="alt">{GLYPH.Alt ?? "Alt"}</kbd> to light up the shortcuts that use it.</p>
         <div className="sc-hero-keys" aria-hidden="true">
           <kbd className="sc-cap" data-k="ctrl">{GLYPH.Ctrl ?? "Ctrl"}</kbd><span className="sc-plus">+</span><kbd className="sc-cap" data-k="k">K</kbd>
-          <small>opens everything</small>
+          <span className="sc-hero-say"><b>Command palette</b><small>opens everything</small></span>
         </div>
         <label className="search sc-tools">
           <Icon name="search" />

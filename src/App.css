@@ -1203,23 +1203,41 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
    data-ctrl / data-shift / data-alt on .shortcuts, which presses those caps and dims rows that don't use them. ---------- */
 .shortcuts { container: shortcuts / inline-size; --gap: clamp(1.25rem, 3vw, 2.5rem); max-width: 80rem; margin: 0 auto; padding: clamp(0.5rem, 2vw, 1.5rem) clamp(0rem, 1.5vw, 1rem) 3rem; }
 .sc-hero {
-  display: grid; gap: 1.25rem var(--gap); align-items: end; grid-template-columns: minmax(0, 1fr);
+  display: grid; gap: 1.25rem var(--gap); align-items: center; grid-template-columns: minmax(0, 1fr);
   padding-bottom: clamp(1.25rem, 3vw, 2rem); margin-bottom: clamp(0.5rem, 2vw, 1.25rem); border-bottom: 1px solid var(--line);
 }
 @container shortcuts (min-width: 40rem) { .sc-hero { grid-template-columns: minmax(0, 1fr) auto; } .sc-eyebrow, .sc-title, .sc-tools { grid-column: 1 / -1; } }
-.sc-eyebrow { grid-row: 1; display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.9rem; font: 700 0.75rem var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-fg); }
+.sc-eyebrow { grid-row: 1; display: flex; align-items: center; gap: 0.45rem; margin: 0; font: 700 0.75rem var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-fg); }
 .sc-eyebrow .icon { width: 1rem; height: 1rem; }
 /* Sized off the page width so the line fills it: ~15.5em of text at this weight and tracking. */
 .sc-title { margin: 0; font: 800 clamp(2rem, 6.3cqi, 8rem)/0.98 var(--display); letter-spacing: -0.05em; text-wrap: balance; }
-.sc-lede { max-width: 46ch; margin: 1rem 0 0; font-size: 1.02rem; line-height: 1.9; color: var(--muted); text-wrap: pretty; }
-.sc-hero-keys { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding-bottom: 0.4rem; }
-.sc-hero-keys .sc-cap {
-  min-width: clamp(3.4rem, 7vw, 5rem); height: clamp(3.4rem, 7vw, 5rem); padding: 0 1rem; border-radius: 14px;
-  font-size: clamp(1.05rem, 0.7rem + 1.2vw, 1.6rem); --depth: 5px;
+.sc-lede { max-width: 46ch; margin: 0; font-size: 1.02rem; line-height: 1.9; color: var(--muted); text-wrap: pretty; }
+/* The one shortcut to remember: a strip of caps, divider, then what it does. K glows and pings every few seconds. */
+.sc-hero-keys {
+  justify-self: start; display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+  padding: 0.7rem 1.25rem 0.85rem 0.8rem; border-radius: 18px; background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 14px 34px -20px color-mix(in srgb, var(--accent) 60%, transparent);
 }
-.sc-hero-keys .sc-cap[data-k="k"] { color: var(--accent-ink); background: linear-gradient(color-mix(in srgb, var(--accent) 88%, white), var(--accent)); --edge: color-mix(in srgb, var(--accent) 60%, black); }
-.sc-plus { font: 300 1.6rem var(--display); color: var(--faint); }
-.sc-hero-keys small { flex-basis: 100%; font: 600 0.78rem var(--mono); color: var(--faint); letter-spacing: 0.02em; }
+.sc-hero-keys .sc-cap {
+  min-width: clamp(2.9rem, 5cqi, 3.6rem); height: clamp(2.9rem, 5cqi, 3.6rem); padding: 0 0.85rem; border-radius: 12px;
+  font-size: clamp(1rem, 0.8rem + 0.6cqi, 1.3rem); --depth: 4px;
+}
+.sc-hero-keys .sc-cap[data-k="k"] {
+  position: relative; color: var(--accent-ink); background: linear-gradient(color-mix(in srgb, var(--accent) 85%, white), var(--accent));
+  --edge: color-mix(in srgb, var(--accent) 60%, black); --rim: rgb(255 255 255 / 0.35);
+  box-shadow: 0 0 0 1px var(--accent), 0 var(--depth) 0 var(--edge), inset 0 1px 0 var(--rim), 0 8px 24px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.sc-hero-keys .sc-cap[data-k="k"]::after {
+  content: ""; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--accent); opacity: 0; animation: sc-ping 3.2s var(--ease) 1s infinite;
+}
+@keyframes sc-ping { 0% { opacity: 0.7; transform: scale(1); } 45%, 100% { opacity: 0; transform: scale(1.4); } }
+@media (prefers-reduced-motion: reduce) { .sc-hero-keys .sc-cap[data-k="k"]::after { animation: none; } }
+.sc-plus { font: 500 1.5rem/1 var(--display); color: var(--accent-fg); }
+.sc-hero-say { display: grid; gap: 0.15rem; margin-left: 0.35rem; padding-left: 1rem; border-left: 1px solid var(--line); }
+.sc-hero-say b { font: 700 1.05rem/1.2 var(--sans); color: var(--fg); letter-spacing: -0.01em; white-space: nowrap; }
+.sc-hero-say small { font: 600 0.82rem/1.2 var(--sans); color: var(--muted); }
+@container shortcuts (max-width: 24rem) { .sc-hero-say { flex-basis: 100%; margin: 0; padding: 0.6rem 0 0; border-left: 0; border-top: 1px solid var(--line); } }
 .sc-tools input { min-height: calc(var(--ctl) + 0.75rem); padding-left: 2.2rem; font-size: 1rem; border-radius: 12px; }
 .sc-tools .icon { left: 0.75rem; }
 
