@@ -16,6 +16,9 @@ What's new in each git-ai release. Newest first.
 - **File-type icons.** Changed files in File Status, History and stashes show a colour-coded icon for their type (code, styles, data, config, images, archives and more), so you can tell them apart at a glance.
 - **Keyboard shortcuts page.** Pick "Keyboard shortcuts" in the command palette (Ctrl+K), or press Ctrl+/, to see every shortcut the app has, grouped by where it works. Settings links to it too.
 
+### Changed
+- **Fold away a commit explanation.** Click the Explanation heading in History to collapse a long AI explanation, and click again to open it.
+
 ## [0.3.0] - 2026-10-12
 
 ### Added

@@ -99,10 +99,10 @@ export function History({ path }: { path: string }) {
                 </button>
               </div>
               {explained[d.oid] && (
-                <section className="explain" aria-label="AI explanation">
-                  <h3><Icon name="sparkle" />Explanation</h3>
+                <details className="explain" open>
+                  <summary><h3><Icon name="sparkle" />Explanation<Icon name="chevron" /></h3></summary>
                   <p>{explained[d.oid]}</p>
-                </section>
+                </details>
               )}
               {tagging && <NameForm label="Tag name" check="Annotated (message = name)" button="Create tag" onCancel={() => setTagging(false)}
                 onSubmit={async (name, annotated) => { if (await run(() => createTag(path, name, d.oid, annotated ? name : ""))) setTagging(false); }} />}
