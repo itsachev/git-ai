@@ -56,6 +56,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ### 🕸️ History
 - Commit graph with all-branches or current-branch view and date or topological sort
+- Hover a graph dot to see its branch
 - **Search commits** by message, author or id (Ctrl+F)
 - Commit details and diffs, **AI explanations**, file history and blame
 - Right-click any commit to branch, merge, rebase, revert or reset (soft, mixed, keep or hard, all undoable)

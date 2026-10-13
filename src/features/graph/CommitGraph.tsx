@@ -128,6 +128,7 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
   const qc = useQueryClient();
   const menuPop = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<Action[]>([]);
+  const [tip, setTip] = useState<{ i: number; col: number; names: string[] } | null>(null);
 
   /** Reset the current branch to commit `r` (row menu and its ref labels' menus). */
   function resetAction(r: GraphRow): Action {
@@ -246,6 +247,30 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
     else if ((selI + 1) * ROW > el.scrollTop + el.clientHeight) el.scrollTop = (selI + 1) * ROW - el.clientHeight;
   }, [selI]);
 
+  /** Branches a dot sits on: every branch label up its lane, following the straight line; local branches first. */
+  function branchesOf(i: number, c: number): string[] {
+    const tags = new Set(refsData?.tags.map((t) => t.name));
+    const local = new Set(refsData?.local.map((b) => b.name));
+    const out: string[] = [];
+    // Stops at an unloaded page or where the lane starts or bends in (merge, fork, reused lane).
+    for (let k = i; ; k--) {
+      const row = rowAt(k);
+      if (!row) break;
+      if (row.col === c) out.push(...row.refs.filter((n) => !tags.has(n)));
+      if (!row.edges.some(([a, b]) => a === c && b === c)) break;
+    }
+    return out.sort((a, b) => +local.has(b) - +local.has(a));
+  }
+
+  /** Hovering a dot shows its branch; only re-renders when the hovered dot changes. The row starts where the canvas does. */
+  function hoverDot(e: React.MouseEvent<HTMLDivElement>, i: number, r: GraphRow) {
+    const near = Math.abs(e.clientX - e.currentTarget.getBoundingClientRect().left - x(r.col)) <= 7 && r.col < MAX_LANES;
+    if (!near) { if (tip) setTip(null); return; }
+    if (tip?.i === i) return;
+    const names = branchesOf(i, r.col);
+    setTip(names.length ? { i, col: r.col, names } : null);
+  }
+
   const cols = { gridTemplateColumns: `${gw}px var(--graph-cols)` };
   const err = pages.find((p) => p.error)?.error;
   return (
@@ -269,7 +294,8 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
           {visible.map(([i, r]) => (
             <div key={i} id={`c-${r.oid}`} role="option" aria-selected={sel?.oid === r.oid}
               className={`grow${sel?.oid === r.oid ? " sel" : ""}${r.head ? " head" : ""}${hits?.has(r.oid) ? " hit" : ""}`}
-              style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}>
+              style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}
+              onMouseMove={(e) => hoverDot(e, i, r)} onMouseLeave={() => tip && setTip(null)}>
               <span />
               <span className="desc">
                 {r.refs.map((n) => <RefChip key={n} name={n} path={path} extra={[resetAction(r)]} />)}
@@ -280,6 +306,11 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
               <span className="c-oid">{r.oid.slice(0, 7)}</span>
             </div>
           ))}
+          {tip && tip.i >= first && tip.i <= last && (
+            <div className="dot-tip" role="tooltip" style={{ top: tip.i * ROW + ROW / 2, left: x(tip.col) + 10, borderColor: color(tip.col) }}>
+              {tip.names.join(", ")}
+            </div>
+          )}
         </div>
       </div>
       <RefMenu pop={menuPop} label="Commit actions" actions={menu} />

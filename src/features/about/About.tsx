@@ -31,6 +31,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ]],
   ["history", "History", [
     ["Commit graph", "History tab · Ctrl+2", "Every commit, with lanes that show where branches split and merge, and branch and tag labels. Arrow keys and Page Up / Down move the selection. Fast on 100k+ commits."],
+    ["Branch on a graph dot", "Hover a dot in the graph", "Shows which branches that commit sits on, local ones first."],
     ["History options", "Options above the graph", "Show all branches or just the current one, hide or show remote branches, and sort by date or ancestor order."],
     ["Search commits", "Search box above the graph · Ctrl+F", "Finds commits by message, author, email or commit id and highlights every match. Enter and Shift+Enter (or ▲ ▼) step through them, Esc clears."],
     ["Commit details", "Click a commit", "Its message, author, date, parent commits, the files it changed and each file's diff. Click the short id to copy the full one."],

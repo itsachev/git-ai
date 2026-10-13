@@ -842,6 +842,15 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .graph-body { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .graph-body:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: -2px; }
 .grow { position: absolute; left: 0; right: 0; font-size: 0.88rem; }
+/* Branch name beside a hovered graph dot. */
+.dot-tip {
+  position: absolute; z-index: 2; transform: translateY(-50%); pointer-events: none; white-space: nowrap;
+  font: 600 0.75rem/1.6 var(--mono); padding: 0.1rem 0.5rem; border-radius: 6px;
+  color: var(--fg); background: var(--raised); border: 1px solid; box-shadow: var(--shadow);
+  animation: dot-tip 120ms var(--ease);
+}
+@keyframes dot-tip { from { opacity: 0; transform: translate(-4px, -50%); } }
+@media (prefers-reduced-motion: reduce) { .dot-tip { animation: none; } }
 .grow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Row separator; a pseudo-element so it survives the hover/head/sel backgrounds and box-shadows. The lane canvas draws over it. */
 .grow::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: color-mix(in srgb, var(--line) 60%, transparent); pointer-events: none; }
