@@ -280,8 +280,11 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
   const head = useQuery({ queryKey: ["head", path], queryFn: () => headMessage(path) }).data;
   // Amend may just reword, so it doesn't need staged changes.
   // A merge commit may have nothing staged (all conflicts resolved to "ours").
-  const ready = amend ? msg.trim() !== "" : finishing ? !conflicts : canCommit && msg.trim() !== "";
-  const ok = ready && !busy;
+  // Amending with the same message and nothing staged would change nothing.
+  const why = amend ? (!msg.trim() ? "Write a commit message" : msg === head && !canCommit ? "Change the message or stage files to amend" : "")
+    : finishing ? (conflicts ? "Resolve the conflicts first" : "")
+    : !canCommit ? "Stage files to commit" : !msg.trim() ? "Write a commit message" : "";
+  const ok = !why && !busy;
   const subject = msg.split("\n")[0].trim().length;
   function toggleAmend(on: boolean) {
     setAmend(on);
@@ -323,7 +326,7 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
           <input type="checkbox" checked={amend} disabled={!head || !!finishing} onChange={(e) => toggleAmend(e.target.checked)} />
           Amend last commit
         </label>
-        <button className="primary" disabled={!ok} title={finishing && conflicts ? "Resolve the conflicts first" : undefined}>
+        <button className="primary" disabled={!ok} title={why || undefined}>
           {busy ? (amend ? "Amending…" : "Committing…") : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
             : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}
         </button>

@@ -262,7 +262,7 @@ function App() {
       <Backdrop />
       <section className="home-intro">
         <p className="brand"><Mark /> <Brand /></p>
-        <h1>Git, in plain sight.</h1>
+        <h1>Git that explains itself.</h1>
         <p className="lede">Local-first. Discards, branch deletes and merges are recorded, so each one can be undone.</p>
         <div className="tiles" onPointerMove={(e) => {
           const t = (e.target as HTMLElement).closest<HTMLElement>(".tile"), r = t?.getBoundingClientRect();

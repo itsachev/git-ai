@@ -31,7 +31,7 @@ export async function switchTo(path: string, name: string, track: boolean) {
 }
 
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
-const remotesQuery = (path: string) => ({ queryKey: ["remotes", path], queryFn: () => remotes(path) });
+export const remotesQuery = (path: string) => ({ queryKey: ["remotes", path], queryFn: () => remotes(path) });
 
 /** [label, handler, why it is disabled (absent = enabled)] */
 export type Action = [string, () => void, string?];
