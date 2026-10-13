@@ -4,95 +4,29 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
-### Added
-- **Livelier toolbar buttons.** Hovering Fetch, Pull, Push, Stash, Branch and Terminal lights the button where your pointer is and lifts it slightly, and each icon hints at its action (Fetch spins, Pull drops, Push rises). The settings gear and theme icon react too. Icons stay still if your system asks for reduced motion.
-- **Pull remembers how you pull.** Pick merge or rebase from the Pull button's menu (picking doesn't pull) and the button keeps using it, showing "Pull (rebase)" when rebase is on. The choice survives restarts.
-- **Pick the app color.** Settings → App color changes the color of buttons, the selection and the current branch. Seven colors, each tuned to stay readable in light and dark themes.
-- **Git and Node versions in the status bar.** The bottom-left corner of a repo window shows which Git and Node.js versions are installed (Node is left out when it isn't installed).
-- **See what a stash holds.** Click a stash in the sidebar (or right-click it → Show changes) to see its files, new untracked ones included, and the changes in each.
-- **Syntax colours in diffs.** File Status, History and stash diffs colour code like Sublime Text's Monokai theme: keywords, strings, numbers, functions and comments each get their own colour, in light and dark.
-- **Branch names on graph dots.** Hover a dot in the History graph to see which branch that commit sits on.
-- **Show only a branch's own commits.** In History, pick Own commits to list just the commits on your current branch that main (or master) doesn't have yet.
-- **Compare a file between branches.** Right-click a file in File Status and choose Compare with branch… to see how it differs between any two branches, tags or your working copy. Commits' file lists reach the same view through History → Compare.
-- **Open in terminal.** The terminal button in the toolbar (or "Open in terminal" in the command palette) opens your system terminal in the repository folder.
-- **File-type icons.** Changed files in File Status, History and stashes show a colour-coded icon for their type (code, styles, data, config, images, archives and more), so you can tell them apart at a glance.
-- **Keyboard shortcuts page.** Pick "Keyboard shortcuts" in the command palette (Ctrl+K), or press Ctrl+/, to see every shortcut the app has, grouped by where it works. Settings links to it too.
+## [0.1.1] - 2026-10-13
 
-### Changed
-- **Windows-only downloads for now.** macOS and Linux installers are no longer published. The macOS app opened as "damaged" because it isn't code-signed yet, and the Linux build is untested. They will return once both work.
-- The app starts faster: diff colours now load the first time you open a diff. Very large diffs open faster and are shown without colours.
-- **Current branch on top.** The checked-out branch now sits first in the sidebar's Branches list, and the remote branch it tracks sits first under its remote, so you never have to scroll to find them. The rest stay alphabetical.
-- **See Fetch, Pull, Push and Commit at work.** While one runs, a card at the bottom says what is happening ("Pushing main to origin/main…"), with a spinner and a seconds counter for slow networks. When it finishes, the card turns into a green check that says what was done, for example which commit was made. The rest of the window stays locked until the commit, fetch, pull or push finishes, so nothing else can start halfway through.
-- **Fold away a commit explanation.** Click the Explanation heading in History to collapse a long AI explanation, and click again to open it.
-- **Merge and Revert ask first.** Clicking Merge or Revert on a commit in History now asks for confirmation before changing the current branch.
-
-## [0.3.0] - 2026-10-12
+First release. Windows only for now: macOS and Linux installers will follow once the macOS app is code-signed and the Linux build is tested.
 
 ### Added
-- **Several repositories open at once, in tabs.** Open another repository with the + at the end of the tab bar (or Ctrl+T) and switch between them with a click or Ctrl+Tab. Close a tab with its ×, a middle-click or Ctrl+W. In the Recent list, repositories already open in a tab are marked "Open".
-- **Portable Windows app.** Every release now includes `git-ai_<version>_x64-portable.exe`. It runs from any folder without installing.
-- **Select several files at once in File Status.** Use Ctrl+click, Shift+click, Ctrl+A, or drag over the rows. Stage, Unstage and Discard then act on all the selected files.
-
-### Changed
-- **New look.** Warm stone and paper surfaces with a spruce-teal accent replace the grey-and-indigo theme, in both light and dark. Buttons are now light paper keys instead of dark slabs, and the commit graph's lane colours match the new palette.
-- **Easier-to-scan file lists.** File Status lists now have a thin line between files.
-- **Counters stand out.** Every count badge (changed files, branches, remotes, tags, stashes, undo history) is now filled in the accent colour.
-
-### Fixed
-- **Big repositories no longer freeze the app.** Opening a repo with a long history and thousands of tags or remote branches could hang the window for minutes. It now opens in about a second.
-- **Faster branch switching.** The window stays responsive during a switch, and the app refreshes once afterwards instead of several times.
-- **Faster History.** On a repo with 85,000 commits, the commit graph loads about 3× faster (1.7 s → 0.5 s). Clicking a commit that isn't on your current branch now opens instantly (it took almost a second before).
-
-## [0.2.0] - 2026-10-10
-
-### Added
-- **AI built in.** Write a commit message from your changes, explain a commit, a branch or a stash, draft a pull request description, write a changelog since a tag, and get help resolving merge conflicts. Choose your AI provider in Settings.
-- **Pull requests.** Create GitHub pull requests and GitLab merge requests from the branch menu, with an AI-written description.
-- **GitLab sign-in**, alongside GitHub. When you clone, pick from a list of your GitHub and GitLab repos.
-- **Interactive rebase** from any commit in History. Reorder commits by dragging them or with ▲/▼, and reword, squash, fixup or drop them.
-- **File history and blame** from any file in a commit.
-- **Search commits** in History (Ctrl+F): by message, author, email or commit id.
-- **History options:** show all branches or just the current one, show or hide remote branches, and sort by date or by ancestry.
-- **Drag and drop a branch** onto another to merge or rebase.
-- **Reset from a commit's menu:** soft, mixed, keep or hard.
-- **Switch branches with uncommitted changes:** bring them along, or stash them and switch.
-- **Stash button** in the toolbar.
+- **File Status:** stage and unstage files, hunks or single lines, and discard changes (with a backup). Commit and amend. Select several files at once with Ctrl+click, Shift+click, Ctrl+A or by dragging.
+- **History:** a commit graph that stays fast on repositories with 100,000+ commits. Search commits (Ctrl+F), show all branches or just the current one, show only a branch's own commits, and hover a graph dot to see its branch.
+- **Several repositories at once, in tabs** (Ctrl+T, Ctrl+Tab, Ctrl+W).
+- **Branches, tags and stashes** in the sidebar, with the current branch pinned on top. Merge, rebase (also by dragging one branch onto another), cherry-pick, revert and reset. Merge and Revert ask first. Switch branches with uncommitted changes by bringing them along or stashing them.
+- **Interactive rebase:** reorder commits, and reword, squash, fixup or drop them.
+- **Undo** for destructive operations.
+- **Fetch, Pull and Push** with a live progress card. Pull remembers merge or rebase. A rejected push offers a safe force push (with lease).
+- **Clone** with progress, picking from your GitHub and GitLab repositories after you sign in. Sign-in tokens are kept in your OS keychain.
+- **AI built in (bring your own key):** write commit messages, explain a commit, branch or stash, draft pull request descriptions, write a changelog since a tag, and get help resolving merge conflicts.
+- **Pull requests:** create GitHub pull requests and GitLab merge requests from the branch menu.
+- **Conflict tools:** keep mine, keep theirs or keep both sides. Open the file in your editor, and finish the merge from the conflict bar.
+- **Diffs** with syntax colours, file-type icons, file history and blame, and comparing a file between any two branches or tags.
+- **Stashes:** a toolbar button, and see what a stash holds.
 - **Git LFS** dialog for tracking large files.
-- **Conflict tools:** keep mine, keep theirs, or keep both sides. Open the file in your editor, and finish the merge from the conflict bar.
-- **Command palette shows the git command** behind each action, so you can learn the terminal equivalent.
-- **First-run setup**, an **About** guide to every feature, a choice of **SSH key** in Settings, and a right-click menu for recent repos (remove from the list, or move to the trash).
+- **Command palette** (Ctrl+K) that shows the git command behind each action, a keyboard shortcuts page (Ctrl+/), and Open in terminal.
+- **Your look:** System, Light or Dark theme and seven app colors.
+- **Auto-update**, first-run setup, an About guide to every feature, SSH key choice, and Git and Node versions in the status bar.
+- **Portable Windows app:** `git-ai_<version>_x64-portable.exe` runs from any folder without installing.
 
-### Changed
-- New look: dark theme by default, the Geist typeface, an animated home screen, and redesigned File Status, commit details and Settings.
-- Pull is now a split button, so you can see the Pull with rebase option.
-- Clearer error messages that suggest the likely fix (for example when a push is rejected). A rejected push offers a safe force push (with lease).
-
-### Fixed
-- A "bring changes" branch switch that clashes now cancels cleanly and leaves your changes where they were. Before, it left conflict markers in your files.
-- Line-ending (CRLF) conflicts, and a clash when creating a new branch.
-- Gemini API keys were wrongly blamed for every request error.
-
-## [0.1.1] - 2026-10-05
-
-### Changed
-- Maintenance release that tests the in-app auto-update.
-
-## [0.1.0] - 2026-10-05
-
-First release.
-
-### Added
-- File Status: stage and unstage files, hunks or single lines, discard changes (with backup), commit and amend.
-- Commit graph and History view.
-- Branches, tags and stashes in the sidebar. Merge and cherry-pick.
-- Undo for destructive operations.
-- Fetch, pull and push, clone with progress, and a conflict view.
-- GitHub sign-in. The token is kept in your OS keychain.
-- Keyboard shortcuts and a command palette.
-- Auto-update, and a System/Light/Dark theme switch.
-
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/itsachev/git-ai/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/itsachev/git-ai/releases/tag/v0.1.0
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/itsachev/git-ai/releases/tag/v0.1.1
