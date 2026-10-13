@@ -21,8 +21,9 @@ export const statusQuery = (path: string) => ({ queryKey: ["status", path], quer
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
 
 type Selection = { file: string; staged: boolean };
-/** `done`: the success notice, or a function called after success (undefined = no notice). */
-export type Run = (op: () => Promise<unknown>, done?: string | (() => string | undefined)) => Promise<boolean>;
+/** `done`: the success notice, or a function called after success (undefined = no notice).
+ *  `doing`: shown in the notice while the op runs ("Pushing main…"). */
+export type Run = (op: () => Promise<unknown>, done?: string | (() => string | undefined), doing?: string) => Promise<boolean>;
 
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
@@ -37,31 +38,36 @@ let opError: { title: string; text: string; warn?: boolean; code?: string; retry
 const opSubs = new Set<() => void>();
 const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
 
-// `run(op, done)`: on success `done` ("Pushed main") shows in `Notice` until the next op or for a few seconds.
-let notice: { text: string; gen: number } | null = null;
+// `run(op, done, doing)`: `doing` shows in `Notice` while the op runs, then `done` ("Pushed main") for a few seconds.
+// `pending`: when the op started. `waited`: this success follows a pending notice.
+let notice: { text: string; gen: number; pending?: number; waited?: boolean } | null = null;
+
+/** True while an op started with a `doing` label runs (Commit, Fetch, Pull, Push): the repo window locks. */
+export const useOpBusy = () => useSyncExternalStore(subscribeOps, () => !!notice?.pending);
 
 export function useRun() {
   const qc = useQueryClient();
-  async function run(op: () => Promise<unknown>, done?: string | (() => string | undefined)) {
+  async function run(op: () => Promise<unknown>, done?: string | (() => string | undefined), doing?: string) {
     const mine = ++opGen;
-    notice = null;
+    notice = doing ? { text: doing, gen: mine, pending: Date.now() } : null;
     opSubs.forEach((f) => f());
     try {
       await op();
       const text = typeof done === "function" ? done() : done;
-      if (text && mine === opGen) {
-        notice = { text, gen: mine };
+      if (mine === opGen) {
+        notice = text ? { text, gen: mine, waited: !!doing } : null;
         opSubs.forEach((f) => f());
       }
       return true;
     } catch (e) {
+      if (mine === opGen) notice = null;
       // "conflicts" = the op paused halfway (still in progress), not a failure.
       const code = (e as AppError).code;
       opError = code === "conflicts"
         ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
         : { title: code === "clash" ? "Nothing was switched" : (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code,
             // `extra` is appended to the success notice ("… Your changes are in the stash.").
-            retry: (extra?: string) => { run(op, extra ? () => `${(typeof done === "function" ? done() : done) ?? "Done"}. ${extra}` : done); } };
+            retry: (extra?: string) => { run(op, extra ? () => `${(typeof done === "function" ? done() : done) ?? "Done"}. ${extra}` : done, doing); } };
       opSubs.forEach((f) => f());
       return false;
     } finally {
@@ -113,23 +119,49 @@ export function OpErrorDialog({ path }: { path: string }) {
   );
 }
 
-/** Short success line for the last op (`run`'s `done`); fades out after 4 s. */
+/** The running op ("Pushing main…", with elapsed seconds), then its short success line, which fades out after 4 s.
+ *  A running op shows only after 250 ms, so quick ones (stage, commit) don't flash it. */
 export function Notice() {
   // The snapshot must be `notice` itself: a success changes it but not `opGen`.
   const shown = useSyncExternalStore(subscribeOps, () => notice);
   const [hidden, setHidden] = useState<number | null>(null);
-  const cur = shown && hidden !== shown.gen ? shown : null;
-  const ref = useRef<HTMLParagraphElement>(null);
+  const [now, setNow] = useState(Date.now);
+  // Ticks while an op runs: reveals it at 250 ms, then counts seconds.
   useEffect(() => {
-    if (!cur) return;
+    if (!shown?.pending) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [shown]);
+  const cur = shown && hidden !== shown.gen && (!shown.pending || now - shown.pending >= 250) ? shown : null;
+  const ref = useRef<HTMLParagraphElement>(null);
+  const visible = !!cur;
+  useEffect(() => {
+    if (!visible) return;
     // A popover shown after an open <dialog> stacks above it (and its backdrop blur) in the top layer.
     const p = ref.current;
     p?.hidePopover();
     p?.showPopover();
+    return () => p?.hidePopover();
+  }, [visible, cur?.gen]);
+  useEffect(() => {
+    if (!cur || cur.pending) return;
     const t = setTimeout(() => setHidden(cur.gen), 4000);
-    return () => { clearTimeout(t); p?.hidePopover(); };
+    return () => clearTimeout(t);
   }, [cur]);
-  return <p ref={ref} popover="manual" className="notice" role="status">{cur && <span key={cur.gen} className="toast tone-ok"><span className="modal-badge tone-ok"><Icon name="check" /></span>{cur.text}</span>}</p>;
+  const secs = cur?.pending ? Math.floor((now - cur.pending) / 1000) : 0;
+  return (
+    <p ref={ref} popover="manual" className="notice" role="status">
+      {cur && (cur.pending
+        ? <span key={cur.gen} className="toast tone-accent pending">
+            <span className="modal-badge tone-accent"><span className="ring" aria-hidden="true" /></span>
+            {cur.text}{secs >= 2 && <span className="elapsed" aria-hidden="true">{secs}s</span>}
+          </span>
+        : <span key={`${cur.gen}-done`} className={`toast tone-ok${cur.waited ? " settled" : ""}`}>
+            <span className="modal-badge tone-ok"><Icon name="check" /></span>{cur.text}
+          </span>)}
+    </p>
+  );
 }
 
 export function Changes({ path }: { path: string }) {
@@ -199,10 +231,13 @@ export function Changes({ path }: { path: string }) {
             const op = amend ? null : data.operation;
             let finished = false;
             let note: string | null = null;
+            const subject = msg.split("\n")[0].trim();
             return run(async () => {
               note = await commit(path, msg, amend);
               finished = !!op && !(await repoStatus(path)).operation;
-            }, () => [note, finished && `${cap(op!)} finished`].filter(Boolean).join(" ") || undefined);
+            }, () => [note ?? (amend ? "Amended the last commit" : subject ? `Committed “${subject.length > 48 ? subject.slice(0, 47) + "…" : subject}”` : "Committed"),
+              finished && `${cap(op!)} finished`].filter(Boolean).join(". "),
+            amend ? "Amending…" : op ? `Finishing the ${op}…` : "Committing…");
           }} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />
@@ -289,7 +324,7 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
           Amend last commit
         </label>
         <button className="primary" disabled={!ok} title={finishing && conflicts ? "Resolve the conflicts first" : undefined}>
-          {busy ? "Working…" : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
+          {busy ? (amend ? "Amending…" : "Committing…") : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
             : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}
         </button>
       </div>

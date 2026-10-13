@@ -9,7 +9,7 @@ import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
-import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useRun } from "./features/status/Changes";
+import { Changes, Notice, OpErrorDialog, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useOpBusy, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
 import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs/NewBranch";
@@ -366,6 +366,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   const [side, setSide] = useState(false);
   const run = useRun();
   const sync = useSync(path, run);
+  // Also true between the two steps of a rejected push (sync.busy covers the choice dialog in between).
+  const busy = useOpBusy() || !!sync.busy;
   const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
   const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
   const shell = useRef<HTMLDivElement>(null);
@@ -424,7 +426,10 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
 
   return (
     <div ref={shell} className={`shell${side ? " show-side" : ""}`}>
+      {/* While Commit/Fetch/Pull/Push runs, every control in the rail and the stage is disabled (`.lock`). Askpass and the
+          push-rejected choice mount outside RepoView, so they stay usable. */}
       <aside className="rail" aria-label="Repository">
+        <fieldset className="lock" disabled={busy}>
         <div className="rail-head">
           {/* Arrow and repo name are one target: either goes back to the repository list. */}
           <button className="back" onClick={onHome} title={`Back to repositories\n${path}`} aria-label={`${repo.name}: back to repositories`}>
@@ -443,10 +448,12 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           ))}
         </nav>
         <Sidebar path={path} />
+        </fieldset>
       </aside>
       <Splitter name="rail-w" axis="x" label="Resize sidebar" />
       <div className="scrim" aria-hidden="true" onClick={() => setSide(false)} />
       <main className="stage">
+        <fieldset className="lock" disabled={busy}>
         <header className="toolbar">
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
@@ -471,7 +478,9 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <StashDialog path={path} />
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
-        <footer className="statusbar"><Versions /><Palette commands={commands} /></footer>
+        {/* No shortcuts or palette commands while busy. */}
+        <footer className="statusbar"><Versions /><Palette commands={busy ? [] : commands} /></footer>
+        </fieldset>
       </main>
     </div>
   );

@@ -1324,8 +1324,42 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 .toast-text small { font-size: 0.82rem; }
 .toast-actions { display: flex; gap: 0.4rem; margin-left: 0.25rem; }
 .update { position: fixed; right: 1rem; bottom: 1rem; z-index: 30; max-width: calc(100vw - 2rem); flex-wrap: wrap; }
-.notice { position: fixed; inset: auto auto 1rem 50%; translate: -50% 0; z-index: 29; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; max-width: calc(100vw - 2rem); pointer-events: none; }
-.notice .toast { font-size: 1.05rem; animation: toast-in 460ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
+.notice { position: fixed; inset: auto auto clamp(1rem, 3vh, 2rem) 50%; translate: -50% 0; z-index: 29; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; max-width: min(40rem, calc(100vw - 2rem)); pointer-events: none; }
+/* Op notice: larger than the update toast, scales with the window. Phones: full width inside a 1rem gutter. */
+.notice .toast {
+  min-width: min(24rem, calc(100vw - 2rem)); gap: clamp(0.75rem, 0.6rem + 0.5vw, 1rem);
+  padding: clamp(0.65rem, 0.55rem + 0.4vw, 0.9rem) clamp(1.1rem, 0.9rem + 0.8vw, 1.6rem) clamp(0.65rem, 0.55rem + 0.4vw, 0.9rem) clamp(0.65rem, 0.55rem + 0.4vw, 0.9rem);
+  border-radius: 20px; font: 600 clamp(1.05rem, 0.95rem + 0.4vw, 1.3rem)/1.3 var(--sans);
+}
+.notice .toast .modal-badge { flex: none; width: clamp(2.5rem, 2.2rem + 1vw, 3.1rem); height: clamp(2.5rem, 2.2rem + 1vw, 3.1rem); border-radius: 12px; }
+.notice .toast .modal-badge .icon { width: 1.45rem; height: 1.45rem; }
+@media (max-width: 30rem) {
+  .notice { inset: auto 1rem 1rem; translate: none; max-width: none; }
+  .notice .toast { min-width: 0; }
+}
+.notice .toast { animation: toast-in 460ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
+/* Running op: a spinning ring in the badge and a sweeping bar along the bottom edge. Then it settles into the success card. */
+.notice .toast.pending { position: relative; overflow: hidden; animation: toast-in 460ms var(--spring); }
+.notice .toast.pending::after {
+  content: ""; position: absolute; left: 0; bottom: 0; width: 40%; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--tone), transparent); animation: sweep 1.3s var(--ease) infinite;
+}
+.toast .ring { width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 2.5px solid color-mix(in srgb, var(--tone) 25%, transparent); border-top-color: var(--tone); animation: spin 800ms linear infinite; }
+.toast .elapsed { margin-left: auto; padding-left: 0.5rem; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); animation: fade 300ms var(--ease); }
+.notice .toast.settled { animation: settle 420ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
+/* Repo window lock during Commit/Fetch/Pull/Push: a layout-free <fieldset disabled>. */
+.lock { display: contents; }
+.lock:disabled, .lock:disabled button:disabled { cursor: progress; }
+/* Dims only after 250 ms (unlocking is instant), so a quick commit doesn't flash the whole window. */
+.lock:disabled button:disabled { transition: opacity 160ms var(--ease) 250ms; }
+/* The running op stays at full strength so its spinner reads among the dimmed buttons. */
+.sync button[aria-busy="true"]:disabled { opacity: 1; }
+/* Busy toolbar button: the same sweep under its label. */
+.sync button[aria-busy="true"] { position: relative; overflow: hidden; }
+.sync button[aria-busy="true"]::after {
+  content: ""; position: absolute; left: 0; bottom: 0; width: 45%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: sweep 1.3s var(--ease) infinite;
+}
 
 /* ---------- Motion ---------- */
 @keyframes fade { from { opacity: 0; } }
@@ -1335,6 +1369,8 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 @keyframes ping { 70%, 100% { scale: 2.6; opacity: 0; } from { opacity: 0.55; } }
 @keyframes nudge { 25% { rotate: -10deg; } 50% { rotate: 8deg; } 75% { rotate: -4deg; } }
 @keyframes spin { to { rotate: 360deg; } }
+@keyframes sweep { from { translate: -100% 0; } to { translate: 250% 0; } }
+@keyframes settle { from { scale: 0.96; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, dialog[open] { animation: none !important; transition: none !important; }
 }

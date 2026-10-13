@@ -20,12 +20,13 @@ export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const [busy, setBusy] = useState<string | null>(null);
-  const op = (label: string, doing: string, done: string | (() => string | undefined), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
+  // `doing` fits the button; `notice` is the longer line for the toast ("Pushing main to origin/main…").
+  const op = (label: string, doing: string, notice: string, done: string | (() => string | undefined), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
     label, doing, badge, hint,
     go: async () => {
       if (busy) return;
       setBusy(doing);
-      await run(fn, done);
+      await run(fn, done, notice);
       setBusy(null);
     },
   });
@@ -33,11 +34,11 @@ export function useSync(path: string, run: Run) {
   const target = `${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`;
   return {
     busy,
-    pullRebase: op("Pull with rebase", "Pulling…", `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true)).go,
+    pullRebase: op("Pull with rebase", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} with rebase…`, `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true)).go,
     ops: [
-      op("Fetch", "Fetching…", "Fetched all remotes", () => fetchAll(path)),
-      op("Pull", "Pulling…", `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
-      op("Push", "Pushing…", () => pushed, async () => {
+      op("Fetch", "Fetching…", "Fetching from all remotes…", "Fetched all remotes", () => fetchAll(path)),
+      op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} into ${refs?.head ?? "your branch"}…`, `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
+      op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
         pushed = undefined;
         try {
           await push(path);
