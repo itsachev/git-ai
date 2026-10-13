@@ -463,7 +463,8 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .sync button:has(+ .split-menu) { border-radius: var(--r) 0 0 var(--r); }
 .sync button.split-menu { margin-left: -3px; width: 1.7rem; padding: 0; border-radius: 0 var(--r) var(--r) 0; border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent); }
 /* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
-.statusbar { display: flex; justify-content: flex-end; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
+.statusbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
+.versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--muted); }
 .palette-trigger { min-height: 1.75rem; padding: 0 0.5rem; font-size: 0.8rem; color: var(--muted); background: none; box-shadow: none; }
 .palette-trigger:hover { color: var(--fg); background: var(--pick); }
 .palette-trigger kbd { margin-left: 0.25rem; }

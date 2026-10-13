@@ -92,6 +92,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Plain-language errors", "Automatic", "When git fails, you get what went wrong and what to do next, not just git's raw message. Common fixes are one button: stash and retry, try again, fetch now, push this branch."],
     ["Updates", "Notice in the bottom-right corner", "When a new version is out, install it and restart with one click, or later."],
     ["Resizable panes", "Drag the dividers", "Resize the commit list, details and diff. Sizes are remembered."],
+    ["Tool versions", "Bottom-left of a repo window", "Shows which Git and Node.js versions are installed. Hover for the full version text."],
   ]],
 ];
 

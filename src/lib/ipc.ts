@@ -235,6 +235,8 @@ export const gitSetup = () => invoke<GitSetup>("git_setup");
 export const gitSetupSet = (name: string, email: string, helper: boolean) => invoke<void>("git_setup_set", { name, email, helper });
 export const setupDone = () => invoke<boolean>("setup_done");
 export const setupFinish = () => invoke<void>("setup_finish");
+/** [git, node] `--version` first lines; null when not installed. */
+export const toolVersions = () => invoke<[string | null, string | null]>("tool_versions");
 // AI, bring your own key: Gemini, Claude or an OpenAI-compatible server. Keys stay in the OS keychain (or <PROVIDER>_API_KEY in dev).
 export const aiConfig = () => invoke<AiConfig>("ai_config");
 export const aiSetConfig = (config: AiConfig) => invoke<void>("ai_set_config", { config });

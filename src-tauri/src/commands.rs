@@ -45,6 +45,25 @@ pub fn busy() -> bool {
     matches!(OP.try_lock(), Err(std::sync::TryLockError::WouldBlock)) || now_ms().saturating_sub(OP_END.load(Ordering::Relaxed)) < 1000
 }
 
+/// `<tool> --version` output, first line ("git version 2.45.1.windows.1", "v22.3.0"). None if not installed.
+fn version(tool: &str) -> Option<String> {
+    let mut cmd = std::process::Command::new(tool);
+    cmd.arg("--version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let out = cmd.output().ok().filter(|o| o.status.success())?;
+    Some(String::from_utf8_lossy(&out.stdout).lines().next()?.trim().to_string())
+}
+
+/// [git, node] versions for the status bar.
+#[tauri::command(async)]
+pub fn tool_versions() -> (Option<String>, Option<String>) {
+    (version("git"), version("node"))
+}
+
 #[tauri::command(async)]
 pub fn open_repo(app: AppHandle, path: String) -> Result<read::RepoInfo, AppError> {
     let _op = serial();
