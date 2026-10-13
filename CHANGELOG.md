@@ -19,6 +19,7 @@ What's new in each git-ai release. Newest first.
 - **Keyboard shortcuts page.** Pick "Keyboard shortcuts" in the command palette (Ctrl+K), or press Ctrl+/, to see every shortcut the app has, grouped by where it works. Settings links to it too.
 
 ### Changed
+- The app starts faster: diff colours now load the first time you open a diff. Very large diffs open faster and are shown without colours.
 - **Current branch on top.** The checked-out branch now sits first in the sidebar's Branches list, and the remote branch it tracks sits first under its remote, so you never have to scroll to find them. The rest stay alphabetical.
 - **See Fetch, Pull, Push and Commit at work.** While one runs, a card at the bottom says what is happening ("Pushing main to origin/main…"), with a spinner and a seconds counter for slow networks. When it finishes, the card turns into a green check that says what was done, for example which commit was made. The rest of the window stays locked until the commit, fetch, pull or push finishes, so nothing else can start halfway through.
 - **Fold away a commit explanation.** Click the Explanation heading in History to collapse a long AI explanation, and click again to open it.

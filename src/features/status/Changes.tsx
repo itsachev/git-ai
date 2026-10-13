@@ -10,7 +10,7 @@ import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon, type IconName } from "../../lib/icons";
 import { FileIcon } from "../../lib/fileIcon";
 import { Splitter } from "../../lib/splitter";
-import { DiffLine, langOf } from "../../lib/highlight";
+import { DiffLine, useLang } from "../../lib/highlight";
 import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
@@ -598,6 +598,7 @@ function Diff({ path, sel, kind, run }: DiffProps) {
   // Picked +/- lines, as indices into the diff text's lines (what `applyLines` expects).
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [anchor, setAnchor] = useState<number | null>(null);
+  const lang = useLang(sel?.file ?? "", data);
   useEffect(() => {
     setPicked(new Set());
     setAnchor(null);
@@ -625,7 +626,6 @@ function Diff({ path, sel, kind, run }: DiffProps) {
   if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
 
   const file = sel.file;
-  const lang = langOf(file);
   const isChange = (i: number) => all[i][0] === "+" || all[i][0] === "-";
   const ops: [LineOp, string][] = sel.staged ? [["Unstage", "Unstage"]] : [["Stage", "Stage"], ["Discard", "Discard"]];
   async function apply(op: LineOp, lines: number[], what: string) {

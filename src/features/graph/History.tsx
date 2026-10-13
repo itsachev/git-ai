@@ -4,7 +4,7 @@ import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, rever
 import type { AppError } from "../../bindings/AppError";
 import { DiffHead, FileLabel, Gutter, PaneNote, errorText, lineNumbers, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
-import { DiffLine, langOf } from "../../lib/highlight";
+import { DiffLine, useLang } from "../../lib/highlight";
 import { ago } from "../refs/NewBranch";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm, refsQuery } from "../refs/Sidebar";
@@ -150,6 +150,7 @@ export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid
 
 /** Read-only diff of one file. `data`: undefined = loading, null = binary or over 1 MB, "" = no difference. */
 export function ReadDiff({ file, kind, data, error }: { file: string; kind?: string; data: string | null | undefined; error: unknown }) {
+  const lang = useLang(file, data);
   const head = <DiffHead file={file} kind={kind} />;
   if (error) return <section className="diff">{head}<p className="pane-note error" role="alert">{errorText(error)}</p></section>;
   if (data === undefined) return <section className="diff">{head}</section>;
@@ -158,7 +159,6 @@ export function ReadDiff({ file, kind, data, error }: { file: string; kind?: str
   const all = data.replace(/\n$/, "").split("\n");
   const start = all.findIndex((l) => l.startsWith("@@"));
   if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
-  const lang = langOf(file);
   // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
   return (
     <section className="diff">
