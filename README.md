@@ -70,7 +70,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - Tags and stashes (one-click Stash in the toolbar), with AI explanations for branches and stashes
 
 ### ☁️ Remotes & hosting
-- Fetch, pull (merge or rebase) and push, with ahead/behind counts
+- Fetch, pull (merge or rebase) and push, with ahead/behind counts. Push and Commit grey out when they can't run, and say why on hover
 - Rejected-push dialog that offers pull-then-push or force push with lease
 - GitHub and GitLab sign-in; open **PRs / MRs with AI-written descriptions**
 - AI changelogs
