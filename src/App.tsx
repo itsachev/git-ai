@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, initRepo, missingRepos, openRepo, recentRepos, stage, stashSave, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, stashSave, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -396,6 +396,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
     { label: "Git LFS…", git: "git lfs track", run: () => openLfs() },
+    { label: "Open in terminal", run: () => run(() => openTerminal(path)) },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
     ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
@@ -443,6 +444,9 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
               <Icon name="stash" /><span className="btn-label">Stash</span>
             </button>
             <NewBranchButton />
+            <button onClick={() => run(() => openTerminal(path))} title="Open this repository in a terminal">
+              <Icon name="terminal" /><span className="btn-label">Terminal</span>
+            </button>
           </SyncButtons>
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />

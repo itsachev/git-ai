@@ -411,6 +411,12 @@ pub fn open_file(app: AppHandle, path: String, file: String, editor: Option<Stri
     }
 }
 
+/// Opens the system terminal in the repo folder.
+#[tauri::command(async)]
+pub fn open_terminal(path: String) -> Result<(), AppError> {
+    crate::editors::terminal(Path::new(&path))
+}
+
 #[tauri::command(async)]
 pub fn askpass_reply(id: u32, answer: Option<String>) {
     crate::askpass::reply(id, answer)

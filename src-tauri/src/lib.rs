@@ -78,6 +78,7 @@ pub fn run() {
             commands::work_file,
             commands::open_file,
             commands::editors,
+            commands::open_terminal,
             commands::github_start,
             commands::github_finish,
             commands::github_user,

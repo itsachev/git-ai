@@ -10,6 +10,7 @@ What's new in each git-ai release. Newest first.
 - **Branch names on graph dots.** Hover a dot in the History graph to see which branch that commit sits on.
 - **Show only a branch's own commits.** In History, pick Own commits to list just the commits on your current branch that main (or master) doesn't have yet.
 - **Compare a file between branches.** Right-click a file in File Status and choose Compare with branch… to see how it differs between any two branches, tags or your working copy. Commits' file lists reach the same view through History → Compare.
+- **Open in terminal.** The terminal button in the toolbar (or "Open in terminal" in the command palette) opens your system terminal in the repository folder.
 
 ## [0.3.0] - 2026-10-12
 

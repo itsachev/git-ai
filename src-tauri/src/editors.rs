@@ -104,6 +104,40 @@ pub fn open(name: &str, file: &Path) -> Result<(), AppError> {
     cmd.arg(file).spawn().map(drop).map_err(fail)
 }
 
+/// Opens the OS terminal in `dir`: Windows Terminal (else a cmd console), macOS Terminal, or the first Linux terminal found.
+pub fn terminal(dir: &Path) -> Result<(), AppError> {
+    if !dir.is_dir() {
+        return Err(AppError::new("open", format!("'{}' is not a folder.", dir.display())));
+    }
+    let fail = |e: std::io::Error| AppError::new("open", format!("Couldn't open a terminal: {e}"));
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NEW_CONSOLE: u32 = 0x10;
+        if Command::new("wt.exe").arg("-d").arg(dir).spawn().is_ok() {
+            return Ok(());
+        }
+        // A new console goes to whatever the user set as their default terminal app.
+        Command::new("cmd.exe").current_dir(dir).creation_flags(CREATE_NEW_CONSOLE).spawn().map(drop).map_err(fail)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").args(["-a", "Terminal"]).arg(dir).spawn().map(drop).map_err(fail)
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // x-terminal-emulator is Debian/Ubuntu's "default terminal" alternative; the rest are common fallbacks.
+        let mut last = None;
+        for bin in ["x-terminal-emulator", "gnome-terminal", "konsole", "xfce4-terminal", "kitty", "alacritty", "wezterm", "xterm"] {
+            match Command::new(bin).current_dir(dir).spawn() {
+                Ok(_) => return Ok(()),
+                Err(e) => last = Some(e),
+            }
+        }
+        Err(fail(last.unwrap()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
