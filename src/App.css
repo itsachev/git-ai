@@ -1140,6 +1140,10 @@ dialog.modal.settings { width: min(60rem, 100vw - 2rem); }
 .settings-dot { flex: none; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--faint); }
 .state-ok .settings-dot { background: var(--add); box-shadow: 0 0 0 3px color-mix(in srgb, var(--add) 20%, transparent); }
 .state-todo .settings-dot { background: var(--mod); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mod) 22%, transparent); }
+/* A way out of Settings, not a section: no fill, dashed edge, set apart from the sections above it. */
+.settings-nav button.settings-go { background: none; box-shadow: none; border: 1px dashed var(--line-strong); }
+.settings-nav button.settings-go:hover { border-color: transparent; }
+.settings-go .settings-nav-text small { white-space: normal; }
 dialog.modal[open] .settings-nav button { animation: rise 420ms var(--ease) backwards; animation-delay: calc(120ms + var(--i) * 60ms); }
 .settings-cards { display: grid; gap: 0.9rem; min-width: 0; }
 .settings-card { border-radius: 14px; }
@@ -1156,6 +1160,7 @@ dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards;
   .settings-layout { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; }
   /* Header = pad + 2.6rem badge + 1rem; sticky offsets start at the content edge. */
   .settings-nav { position: sticky; top: 4.1rem; align-self: start; grid-template-columns: none; }
+  .settings-nav button.settings-go { margin-top: 0.6rem; }
 }
 /* Section titles inside any modal: larger and heavier than body text so sections scan at a glance. */
 dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg); }
@@ -1192,6 +1197,77 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 .palette li[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 .palette li[aria-selected="true"] kbd { color: inherit; background: rgb(255 255 255 / 0.2); }
 .palette li.muted { cursor: default; }
+
+/* ---------- Keyboard shortcuts (features/shortcuts): keycaps you can almost press. A hero with the one shortcut
+   to remember, then one band per area: sticky label left, rows in columns right. Holding Ctrl / Shift / Alt sets
+   data-ctrl / data-shift / data-alt on .shortcuts, which presses those caps and dims rows that don't use them. ---------- */
+.shortcuts { container: shortcuts / inline-size; --gap: clamp(1.25rem, 3vw, 2.5rem); max-width: 80rem; margin: 0 auto; padding: clamp(0.5rem, 2vw, 1.5rem) clamp(0rem, 1.5vw, 1rem) 3rem; }
+.sc-hero {
+  display: grid; gap: 1.25rem var(--gap); align-items: end; grid-template-columns: minmax(0, 1fr);
+  padding-bottom: clamp(1.25rem, 3vw, 2rem); margin-bottom: clamp(0.5rem, 2vw, 1.25rem); border-bottom: 1px solid var(--line);
+}
+@container shortcuts (min-width: 40rem) { .sc-hero { grid-template-columns: minmax(0, 1fr) auto; } .sc-eyebrow, .sc-title, .sc-tools { grid-column: 1 / -1; } }
+.sc-eyebrow { grid-row: 1; display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.9rem; font: 700 0.75rem var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-fg); }
+.sc-eyebrow .icon { width: 1rem; height: 1rem; }
+/* Sized off the page width so the line fills it: ~15.5em of text at this weight and tracking. */
+.sc-title { margin: 0; font: 800 clamp(2rem, 6.3cqi, 8rem)/0.98 var(--display); letter-spacing: -0.05em; text-wrap: balance; }
+.sc-lede { max-width: 46ch; margin: 1rem 0 0; font-size: 1.02rem; line-height: 1.9; color: var(--muted); text-wrap: pretty; }
+.sc-hero-keys { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding-bottom: 0.4rem; }
+.sc-hero-keys .sc-cap {
+  min-width: clamp(3.4rem, 7vw, 5rem); height: clamp(3.4rem, 7vw, 5rem); padding: 0 1rem; border-radius: 14px;
+  font-size: clamp(1.05rem, 0.7rem + 1.2vw, 1.6rem); --depth: 5px;
+}
+.sc-hero-keys .sc-cap[data-k="k"] { color: var(--accent-ink); background: linear-gradient(color-mix(in srgb, var(--accent) 88%, white), var(--accent)); --edge: color-mix(in srgb, var(--accent) 60%, black); }
+.sc-plus { font: 300 1.6rem var(--display); color: var(--faint); }
+.sc-hero-keys small { flex-basis: 100%; font: 600 0.78rem var(--mono); color: var(--faint); letter-spacing: 0.02em; }
+.sc-tools input { min-height: calc(var(--ctl) + 0.75rem); padding-left: 2.2rem; font-size: 1rem; border-radius: 12px; }
+.sc-tools .icon { left: 0.75rem; }
+
+/* Keycap: light top face, a darker edge below it (--depth), lit inner rim. Pressed: sinks into its edge. */
+.shortcuts kbd.sc-cap {
+  --depth: 2px; --edge: var(--line-strong);
+  display: inline-grid; place-items: center; min-width: 1.7rem; height: 1.7rem; padding: 0 0.45rem; border-radius: 6px;
+  font: 650 0.74rem/1 var(--mono); color: var(--fg); white-space: nowrap; vertical-align: middle;
+  background: linear-gradient(var(--panel), color-mix(in srgb, var(--sunken) 45%, var(--panel)));
+  box-shadow: 0 0 0 1px var(--line-strong), 0 var(--depth) 0 var(--edge), inset 0 1px 0 var(--rim, rgb(255 255 255 / 0.55));
+  translate: 0 calc(var(--depth) * -0.5);
+  transition: translate 90ms var(--ease), box-shadow 90ms var(--ease), background-color 90ms, color 90ms;
+}
+:root[data-theme="dark"] .shortcuts { --rim: rgb(255 245 230 / 0.07); }
+.sc-lede kbd.sc-cap { margin: 0 0.1rem; }
+.shortcuts kbd.sc-cap.mouse { font-family: var(--sans); font-style: italic; font-weight: 600; background: none; box-shadow: inset 0 0 0 1px var(--line-strong); translate: none; }
+.shortcuts[data-ctrl] kbd.sc-cap[data-k="ctrl"], .shortcuts[data-shift] kbd.sc-cap[data-k="shift"], .shortcuts[data-alt] kbd.sc-cap[data-k="alt"] {
+  translate: 0 calc(var(--depth) * 0.5); color: var(--accent-ink); background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 var(--edge), 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.sc-area {
+  --hc: color-mix(in oklab, oklch(0.62 0.17 var(--h)) 82%, var(--fg));
+  display: grid; gap: 0.75rem var(--gap); padding: clamp(1.1rem, 2.5vw, 1.75rem) 0; border-bottom: 1px solid var(--line);
+}
+.sc-area:last-of-type { border-bottom: 0; }
+@media (min-width: 52rem) { .sc-area { grid-template-columns: 13rem minmax(0, 1fr); } .sc-label { position: sticky; top: 0; align-self: start; } }
+.sc-label { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.7rem; align-items: center; }
+.sc-label h3 { margin: 0; font: 750 1.05rem var(--display); letter-spacing: -0.02em; }
+.sc-label h3 small { margin-left: 0.3rem; font: 600 0.75rem var(--sans); color: var(--hc); font-variant-numeric: tabular-nums; }
+.sc-label p { grid-column: 2; margin: 0; font-size: 0.84rem; color: var(--faint); }
+.sc-label .about-icon { grid-row: span 2; }
+
+.sc-rows { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); column-gap: 1.75rem; }
+.sc-rows li {
+  display: flex; align-items: center; gap: 1rem; min-height: 2.75rem; margin: 0 -0.6rem; padding: 0.35rem 0.6rem; border-radius: 10px;
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--line) 70%, transparent); transition: opacity 140ms var(--ease), background-color 160ms;
+}
+.sc-rows li:hover { background: color-mix(in srgb, var(--hc) 9%, transparent); }
+.sc-rows li > span:first-child { flex: 1; min-width: 0; font-size: 0.95rem; }
+.sc-caps { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem 0.5rem; }
+.sc-alt { display: inline-flex; align-items: center; gap: 0.25rem; }
+.sc-or { margin-right: 0.25rem; font-size: 0.72rem; font-style: italic; color: var(--faint); }
+.shortcuts[data-ctrl] .sc-rows li:not([data-mods~="ctrl"]),
+.shortcuts[data-shift] .sc-rows li:not([data-mods~="shift"]),
+.shortcuts[data-alt] .sc-rows li:not([data-mods~="alt"]) { opacity: 0.28; }
+.sc-empty { padding: 3rem 0; text-align: center; color: var(--muted); }
+@media (pointer: coarse) { .sc-rows li { min-height: 3rem; } }
 
 /* ---------- Toasts: op notice (bottom center), update (bottom right). Same card as the modals. ---------- */
 .toast {

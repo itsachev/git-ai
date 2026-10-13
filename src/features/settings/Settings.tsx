@@ -8,6 +8,7 @@ import { Icon } from "../../lib/icons";
 import { ModalHead } from "../../lib/modal";
 import { errorText } from "../status/Changes";
 import { openSetup } from "../setup/Setup";
+import { canOpenShortcuts, openShortcuts } from "../shortcuts/Shortcuts";
 
 export const aiKeyQuery = { queryKey: ["ai-key"], queryFn: aiHasKey, staleTime: Infinity };
 export const aiConfigQuery = { queryKey: ["ai-config"], queryFn: aiConfig, staleTime: Infinity };
@@ -96,6 +97,12 @@ function SettingsNav() {
           </button>
         );
       })}
+      {canOpenShortcuts() && (
+        <button type="button" className="settings-go" style={{ "--h": 175, "--i": SECTIONS.length } as React.CSSProperties} onClick={() => { set(false); openShortcuts(); }}>
+          <span className="about-icon"><Icon name="command" /></span>
+          <span className="settings-nav-text"><strong>Keyboard shortcuts</strong><small>Every shortcut on one page</small></span>
+        </button>
+      )}
     </nav>
   );
 }

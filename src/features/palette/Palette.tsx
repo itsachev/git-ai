@@ -4,7 +4,7 @@ import { Icon } from "../../lib/icons";
 /** `keys` like "Ctrl+Shift+F": also a global shortcut. Ctrl means Cmd on macOS too. `git`: the terminal equivalent, shown as a hint. */
 export type Command = { label: string; keys?: string; git?: string; run: () => void };
 
-const OPEN = ["Ctrl+K", "Ctrl+Shift+P"];
+export const OPEN = ["Ctrl+K", "Ctrl+Shift+P"];
 const mac = navigator.userAgent.includes("Mac");
 const show = (keys: string) => (mac ? keys.replace("Ctrl+", "⌘").replace("Shift+", "⇧") : keys);
 

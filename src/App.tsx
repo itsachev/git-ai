@@ -22,6 +22,7 @@ import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
 import { Palette, type Command } from "./features/palette/Palette";
+import { Shortcuts, onOpenShortcuts } from "./features/shortcuts/Shortcuts";
 import { LfsDialog, openLfs } from "./features/lfs/Lfs";
 import { SettingsButton, SettingsDialog, openSettings } from "./features/settings/Settings";
 import { SetupWizard, openSetup } from "./features/setup/Setup";
@@ -352,7 +353,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   const refs = useQuery(refsQuery(path)).data;
   const log = useQuery(opLogQuery(path)).data;
   const branch = status ? status.branch : repo.branch;
-  const [tab, setTab] = useState<"status" | "history">("history");
+  const [tab, setTab] = useState<"status" | "history" | "shortcuts">("history");
   // Narrow windows show the rail as a drawer over the body; wide ones show both.
   const [side, setSide] = useState(false);
   const run = useRun();
@@ -372,6 +373,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   }, { scope: shell, dependencies: [path], revertOnUpdate: true });
 
   const show = (t: typeof tab) => { setTab(t); setSide(false); };
+  useEffect(() => onOpenShortcuts(() => show("shortcuts")), []);
   // Escape closes the drawer, unless a dialog or menu on top takes it first.
   useEffect(() => {
     if (!side) return;
@@ -390,6 +392,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
     { label: "Go to File Status", keys: "Ctrl+1", git: "git status", run: () => show("status") },
     { label: "Go to History", keys: "Ctrl+2", git: "git log --graph --oneline --all", run: () => show("history") },
     { label: "Search commits", keys: "Ctrl+F", git: "git log --all -i --grep=<text>", run: () => { show("history"); setTimeout(() => document.getElementById("commit-search")?.focus()); } },
+    { label: "Keyboard shortcuts", keys: "Ctrl+/", run: () => show("shortcuts") },
     { label: "Toggle branches", keys: "Ctrl+B", git: "git branch -a", run: () => setSide((v) => !v) },
     { label: "New branch", keys: "Ctrl+Shift+B", git: "git switch -c <name>", run: () => openNewBranch() },
     { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },
@@ -438,7 +441,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
       <main className="stage">
         <header className="toolbar">
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
-          <h1>{tab === "status" ? "File Status" : "History"}</h1>
+          <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
           <SyncButtons sync={sync}>
             <button disabled={!changed} onClick={() => run(() => stashSave(path, ""))} title="Stash all changes, untracked files included">
               <Icon name="stash" /><span className="btn-label">Stash</span>
@@ -459,7 +462,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <FileHistoryDialog path={path} />
         <StashDialog path={path} />
         <LfsDialog path={path} />
-        <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
+        <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
         <footer className="statusbar"><Palette commands={commands} /></footer>
       </main>
     </div>

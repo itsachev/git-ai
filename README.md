@@ -80,7 +80,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - **AI resolve**: review the proposed file before applying it
 
 ### ⌨️ Everywhere
-- Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>) and keyboard shortcuts
+- Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>) and keyboard shortcuts, all listed on one page (<kbd>Ctrl</kbd>+<kbd>/</kbd>)
 - Light, dark or system theme; first-run setup; auto-update
 
 </td></tr>

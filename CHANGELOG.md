@@ -11,6 +11,7 @@ What's new in each git-ai release. Newest first.
 - **Show only a branch's own commits.** In History, pick Own commits to list just the commits on your current branch that main (or master) doesn't have yet.
 - **Compare a file between branches.** Right-click a file in File Status and choose Compare with branch… to see how it differs between any two branches, tags or your working copy. Commits' file lists reach the same view through History → Compare.
 - **Open in terminal.** The terminal button in the toolbar (or "Open in terminal" in the command palette) opens your system terminal in the repository folder.
+- **Keyboard shortcuts page.** Pick "Keyboard shortcuts" in the command palette (Ctrl+K), or press Ctrl+/, to see every shortcut the app has, grouped by where it works. Settings links to it too.
 
 ## [0.3.0] - 2026-10-12
 
