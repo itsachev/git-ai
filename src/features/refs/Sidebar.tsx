@@ -8,6 +8,7 @@ import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
+import { openStash } from "./Stash";
 import { choose, confirm, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
@@ -278,7 +279,8 @@ export function Sidebar({ path }: { path: string }) {
           onSubmit={async (msg) => { if (await run(() => stashSave(path, msg))) setCreating(null); }} />}
         <ul className="refs">
           {data.stashes.map((s, i) => s.name.toLowerCase().includes(f) && (
-            <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} actions={[
+            <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} onPick={() => openStash(s.oid, `stash@{${i}}: ${s.name}`)} actions={[
+              ["Show changes", () => openStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
               ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
               ["Explain (AI)", () => openExplainStash(s.oid, `stash@{${i}}: ${s.name}`)],
@@ -322,11 +324,11 @@ function RemoteSummary({ name, actions }: { name: string; actions: Action[] }) {
   );
 }
 
-/** `onOpen` runs on double-click; `actions` are [label, handler] items of a popover menu (right-click or the ⋯ button). */
+/** `onPick` runs on click, `onOpen` on double-click; `actions` are [label, handler] items of a popover menu (right-click or the ⋯ button). */
 type DragProps = { onDragStart: () => void; onDragEnd: () => void; canDrop: boolean; onDrop: (e: React.DragEvent<HTMLElement>) => void };
-type RowProps = { item: RefItem; label?: string; cur?: boolean; onOpen?: () => void; actions?: Action[]; dnd?: DragProps };
+type RowProps = { item: RefItem; label?: string; cur?: boolean; onPick?: () => void; onOpen?: () => void; actions?: Action[]; dnd?: DragProps };
 
-function Row({ item, label = item.name, cur, onOpen, actions = [], dnd }: RowProps) {
+function Row({ item, label = item.name, cur, onPick, onOpen, actions = [], dnd }: RowProps) {
   const title = item.upstream ? `${item.name} (tracks ${item.upstream})` : item.name;
   const pop = useRef<HTMLDivElement>(null);
   const menu = (e: React.MouseEvent<HTMLElement>) => showMenu(pop.current, e);
@@ -339,7 +341,7 @@ function Row({ item, label = item.name, cur, onOpen, actions = [], dnd }: RowPro
       onDragOver={dnd?.canDrop ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "link"; setOver(true); } : undefined}
       onDragLeave={() => setOver(false)}
       onDrop={dnd?.canDrop ? (e) => { setOver(false); dnd.onDrop(e); } : undefined}>
-      <span className="name" title={title} onDoubleClick={onOpen}>
+      <span className={onPick ? "name pick" : "name"} title={title} onClick={onPick} onDoubleClick={onOpen}>
         {cur && <span className="dot" aria-label="current branch" />}
         <span>{label}</span>
         {item.ahead > 0 && <small className="ab" title={`${item.ahead} to push`}>↑{item.ahead}</small>}

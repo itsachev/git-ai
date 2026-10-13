@@ -4,6 +4,9 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+- **See what a stash holds.** Click a stash in the sidebar (or right-click it → Show changes) to see its files, new untracked ones included, and the changes in each.
+
 ## [0.3.0] - 2026-10-12
 
 ### Added

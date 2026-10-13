@@ -124,17 +124,40 @@ pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError
     Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
 }
 
-/// A stash's message and patch: tracked changes (vs. the commit it was made on) plus untracked files
-/// (`stash -u` keeps them in a third parent).
+/// A stash's message and patch (see `stash_diff`).
 pub fn stash_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError> {
-    let (message, mut patch) = commit_patch(repo, oid)?;
-    let git = git2::Repository::open(repo)?;
-    if let Ok(untracked) = git.find_commit(git2::Oid::from_str(oid)?)?.parent(2) {
+    let repo = git2::Repository::open(repo)?;
+    let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
+    let patch = patch_text(&stash_diff(&repo, &c)?)?;
+    Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
+}
+
+/// Files a stash holds (see `stash_diff`).
+pub fn stash_files(repo: &Path, oid: &str) -> Result<Vec<FileChange>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
+    let files = diff_files(&stash_diff(&repo, &c)?);
+    Ok(files)
+}
+
+/// Unified diff of one file of a stash. None when binary or over 1 MB.
+pub fn stash_file_diff(repo: &Path, oid: &str, file: &str) -> Result<Option<String>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
+    let text = file_patch(&stash_diff(&repo, &c)?, file)?;
+    Ok(text)
+}
+
+/// A stash's changes: tracked ones (vs. the commit it was made on) plus untracked files
+/// (`stash -u` keeps them in a third parent), as one diff.
+fn stash_diff<'r>(repo: &'r git2::Repository, c: &git2::Commit) -> Result<git2::Diff<'r>, AppError> {
+    let mut diff = commit_diff_all(repo, c)?;
+    if let Ok(untracked) = c.parent(2) {
         let mut opts = git2::DiffOptions::new();
         opts.max_size(1 << 20);
-        patch += &patch_text(&git.diff_tree_to_tree(None, Some(&untracked.tree()?), Some(&mut opts))?)?;
+        diff.merge(&repo.diff_tree_to_tree(None, Some(&untracked.tree()?), Some(&mut opts))?)?;
     }
-    Ok((message, patch))
+    Ok(diff)
 }
 
 /// What `head` adds on top of `base` (refs or oids), like a PR: the messages of the non-merge commits
@@ -377,21 +400,7 @@ fn in_head(path: &Path, oid: git2::Oid) -> bool {
 pub fn commit_details(path: &Path, oid: &str) -> Result<CommitDetails, AppError> {
     let repo = git2::Repository::open(path)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let diff = commit_diff_all(&repo, &c)?;
-    let files = diff
-        .deltas()
-        .map(|d| {
-            use git2::Delta::*;
-            let path = |f: git2::DiffFile| f.path().map(|p| p.to_string_lossy().replace('\\', "/"));
-            let kind = match d.status() { Added => "A", Deleted => "D", Renamed => "R", Copied => "C", Typechange => "T", _ => "M" };
-            let renamed = matches!(d.status(), Renamed | Copied);
-            FileChange {
-                path: path(d.new_file()).or_else(|| path(d.old_file())).unwrap_or_default(),
-                orig_path: if renamed { path(d.old_file()) } else { None },
-                kind: kind.into(),
-            }
-        })
-        .collect();
+    let files = diff_files(&commit_diff_all(&repo, &c)?);
     let sig = |s: git2::Signature| format!("{} <{}>", String::from_utf8_lossy(s.name_bytes()), String::from_utf8_lossy(s.email_bytes()));
     let author = c.author();
     Ok(CommitDetails {
@@ -410,13 +419,34 @@ pub fn commit_details(path: &Path, oid: &str) -> Result<CommitDetails, AppError>
 pub fn commit_file_diff(repo: &Path, oid: &str, file: &str) -> Result<Option<String>, AppError> {
     let repo = git2::Repository::open(repo)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let diff = commit_diff_all(&repo, &c)?;
+    let text = file_patch(&commit_diff_all(&repo, &c)?, file)?;
+    Ok(text)
+}
+
+fn diff_files(diff: &git2::Diff) -> Vec<FileChange> {
+    diff.deltas()
+        .map(|d| {
+            use git2::Delta::*;
+            let path = |f: git2::DiffFile| f.path().map(|p| p.to_string_lossy().replace('\\', "/"));
+            let kind = match d.status() { Added => "A", Deleted => "D", Renamed => "R", Copied => "C", Typechange => "T", _ => "M" };
+            let renamed = matches!(d.status(), Renamed | Copied);
+            FileChange {
+                path: path(d.new_file()).or_else(|| path(d.old_file())).unwrap_or_default(),
+                orig_path: if renamed { path(d.old_file()) } else { None },
+                kind: kind.into(),
+            }
+        })
+        .collect()
+}
+
+/// Patch of `file` (old or new path) in `diff`; empty when absent, None when binary or over 1 MB.
+fn file_patch(diff: &git2::Diff, file: &str) -> Result<Option<String>, AppError> {
     let Some(idx) = diff.deltas().position(|d| {
         [d.new_file(), d.old_file()].iter().any(|f| f.path().is_some_and(|p| p.to_string_lossy().replace('\\', "/") == file))
     }) else {
         return Ok(Some(String::new()));
     };
-    let text = match git2::Patch::from_diff(&diff, idx)? {
+    let text = match git2::Patch::from_diff(diff, idx)? {
         Some(mut patch) if !patch.delta().flags().is_binary() => Some(String::from_utf8_lossy(&patch.to_buf()?).into_owned()),
         _ => None,
     };
@@ -634,6 +664,9 @@ mod tests {
         let oid = git(&["rev-parse", "refs/stash"]);
         let (msg, patch) = super::stash_patch(&dir, oid.trim()).unwrap();
         assert!(msg.ends_with("wip") && patch.contains("+ONE") && patch.contains("+fresh"), "{patch}");
+        let files: Vec<_> = super::stash_files(&dir, oid.trim()).unwrap().into_iter().map(|f| (f.path, f.kind)).collect();
+        assert_eq!(files, [("a.txt".into(), "M".into()), ("new.txt".into(), "A".into())]);
+        assert!(super::stash_file_diff(&dir, oid.trim(), "new.txt").unwrap().unwrap().contains("+fresh"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

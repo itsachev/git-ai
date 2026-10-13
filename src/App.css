@@ -1286,6 +1286,9 @@ dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, 
 @media (min-width: 48rem) { .fh-split { grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); } }
 .fh .diff:not(.muted):not(.error) { min-height: 0; display: flex; flex-direction: column; }
 .fh .diff pre { flex: 1; min-height: 0; max-height: none; }
+.fh.stash { grid-template-rows: auto minmax(0, 1fr) auto; }
+.fh-split > .files { min-height: 0; overflow-y: auto; align-content: start; }
+.refs .name.pick { cursor: pointer; }
 .fh-list { margin: 0; padding: 0; list-style: none; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 0.15rem; }
 .fh-list .row { all: unset; box-sizing: border-box; width: 100%; min-height: var(--ctl); display: grid; align-content: center; gap: 0.1rem; padding: 0.35rem 0.6rem; border-radius: 8px; cursor: pointer; }
 .fh-list .row { transition: background-color 160ms; }

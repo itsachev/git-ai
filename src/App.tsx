@@ -16,6 +16,7 @@ import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs
 import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { RebaseDialog } from "./features/graph/Rebase";
 import { FileHistoryDialog } from "./features/graph/FileHistory";
+import { StashDialog } from "./features/refs/Stash";
 import { AskpassDialog, CloneDialog, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
@@ -452,6 +453,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <WriteUpDialog path={path} />
         <RebaseDialog path={path} />
         <FileHistoryDialog path={path} />
+        <StashDialog path={path} />
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : <History path={path} />}</div>
         <footer className="statusbar"><Palette commands={commands} /></footer>

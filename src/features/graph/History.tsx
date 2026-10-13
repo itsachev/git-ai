@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, revert } from "../../lib/ipc";
+import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, revert, stashFileDiff } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import { DiffHead, FileLabel, Gutter, PaneNote, errorText, lineNumbers, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
@@ -139,9 +139,10 @@ export function History({ path }: { path: string }) {
   );
 }
 
-export function CommitDiff({ path, oid, file, kind }: { path: string; oid: string; file: string; kind?: string }) {
+/** `stash`: `oid` is a stash, whose untracked files count too. */
+export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid: string; file: string; kind?: string; stash?: boolean }) {
   // A commit never changes, so its diffs never need a refetch.
-  const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file], queryFn: () => commitFileDiff(path, oid, file) });
+  const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file, !!stash], queryFn: () => (stash ? stashFileDiff : commitFileDiff)(path, oid, file) });
   const head = <DiffHead file={file} kind={kind} />;
   if (error) return <section className="diff">{head}<p className="pane-note error" role="alert">{errorText(error)}</p></section>;
   if (data === undefined) return <section className="diff">{head}</section>;

@@ -185,6 +185,16 @@ pub async fn commit_file_diff(path: String, oid: String, file: String) -> Result
     read::commit_file_diff(Path::new(&path), &oid, &file)
 }
 
+#[tauri::command]
+pub async fn stash_files(path: String, oid: String) -> Result<Vec<cli::FileChange>, AppError> {
+    read::stash_files(Path::new(&path), &oid)
+}
+
+#[tauri::command]
+pub async fn stash_file_diff(path: String, oid: String, file: String) -> Result<Option<String>, AppError> {
+    read::stash_file_diff(Path::new(&path), &oid, &file)
+}
+
 #[tauri::command(async)]
 pub fn refs(path: String) -> Result<read::Refs, AppError> {
     read::refs(Path::new(&path))

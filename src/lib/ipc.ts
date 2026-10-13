@@ -9,6 +9,7 @@ import type { GraphOpts } from "../bindings/GraphOpts";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
+import type { FileChange } from "../bindings/FileChange";
 import type { Side } from "../bindings/Side";
 import type { Editors } from "../bindings/Editors";
 import type { DeviceCode } from "../bindings/DeviceCode";
@@ -168,6 +169,10 @@ export const deleteTag = (path: string, name: string) => invoke<void>("delete_ta
 export const stashSave = (path: string, message: string) => invoke<void>("stash_save", { path, message });
 /** `oid` must still be stash@{index}, else code "stale". */
 export const stash = (path: string, op: StashOp, index: number, oid: string) => invoke<void>("stash", { path, op, index, oid });
+/** A stash's files: tracked changes plus untracked files. */
+export const stashFiles = (path: string, oid: string) => invoke<FileChange[]>("stash_files", { path, oid });
+/** null = binary or over 1 MB. */
+export const stashFileDiff = (path: string, oid: string, file: string) => invoke<string | null>("stash_file_diff", { path, oid, file });
 // Network ops. git may ask for credentials meanwhile through the "askpass" event (see AskpassDialog).
 export const fetchAll = (path: string) => invoke<void>("fetch", { path });
 /** Merges the upstream, or with `rebase` replays local commits on it; code "conflicts" = stopped halfway. Undoable. */
