@@ -14,12 +14,19 @@ import { Brand, ModalHead, choose, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
 
 export type Sync = ReturnType<typeof useSync>;
+const PULL_KEY = "pull-mode";
 
 /** Fetch / Pull / Push for the current branch with its behind/ahead counts; one at a time. */
 export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const [busy, setBusy] = useState<string | null>(null);
+  // The Pull button's mode, last picked in its menu; kept in localStorage like the other per-window UI choices.
+  const [rebase, setRebase] = useState(() => { try { return localStorage.getItem(PULL_KEY) === "rebase"; } catch { return false; } });
+  const pickPull = (r: boolean) => {
+    setRebase(r);
+    try { localStorage.setItem(PULL_KEY, r ? "rebase" : "merge"); } catch { /* storage blocked */ }
+  };
   // `doing` fits the button; `notice` is the longer line for the toast ("Pushing main to origin/main…").
   const op = (label: string, doing: string, notice: string, done: string | (() => string | undefined), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
     label, doing, badge, hint,
@@ -32,12 +39,15 @@ export function useSync(path: string, run: Run) {
   });
   let pushed: string | undefined;
   const target = `${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`;
+  const pullMerge = op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} into ${refs?.head ?? "your branch"}…`, `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0);
+  const pullRebase = op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} with rebase…`, `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true), cur?.behind ?? 0);
   return {
-    busy,
-    pullRebase: op("Pull with rebase", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} with rebase…`, `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true)).go,
+    busy, rebase, pickPull,
+    pullMerge: pullMerge.go,
+    pullRebase: pullRebase.go,
     ops: [
       op("Fetch", "Fetching…", "Fetching from all remotes…", "Fetched all remotes", () => fetchAll(path)),
-      op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} into ${refs?.head ?? "your branch"}…`, `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0),
+      rebase ? pullRebase : pullMerge,
       op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
         pushed = undefined;
         try {
@@ -73,14 +83,21 @@ export function useSync(path: string, run: Run) {
 export function SyncButtons({ sync, children }: { sync: Sync; children?: React.ReactNode }) {
   const pullPop = useRef<HTMLDivElement>(null);
   return (
-    <span className="sync">
+    // The hover light follows the pointer inside whichever button it's over (see `.sync button::before`).
+    <span className="sync" onPointerMove={(e) => {
+      const b = (e.target as Element).closest("button");
+      if (!b) return;
+      const r = b.getBoundingClientRect();
+      b.style.setProperty("--mx", `${e.clientX - r.left}px`);
+      b.style.setProperty("--my", `${e.clientY - r.top}px`);
+    }}>
       {sync.ops.map((o) => (
         <Fragment key={o.label}>
           <button disabled={!!sync.busy} onClick={o.go} aria-busy={sync.busy === o.doing}
-            title={o.label === "Pull" ? "Pull (right-click: pull with rebase)" : o.label}
+            title={o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"} (right-click to change)` : o.label}
             onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
             <Icon name={o.label.toLowerCase() as IconName} />
-            <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label}</span>
+            <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label === "Pull" && sync.rebase ? "Pull (rebase)" : o.label}</span>
             {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
           </button>
           {o.label === "Pull" && (
@@ -91,7 +108,11 @@ export function SyncButtons({ sync, children }: { sync: Sync; children?: React.R
           )}
         </Fragment>
       ))}
-      <RefMenu pop={pullPop} label="Pull" actions={[["Pull (merge)", sync.ops[1].go], ["Pull with rebase", sync.pullRebase]]} />
+      {/* Picking a mode only sets the button's default; the button itself pulls. */}
+      <RefMenu pop={pullPop} label="Pull" actions={[
+        [`${sync.rebase ? "" : "✓ "}Pull (merge)`, () => sync.pickPull(false)],
+        [`${sync.rebase ? "✓ " : ""}Pull with rebase`, () => sync.pickPull(true)],
+      ]} />
       {children}
     </span>
   );

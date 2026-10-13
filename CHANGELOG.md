@@ -5,6 +5,8 @@ What's new in each git-ai release. Newest first.
 ## [Unreleased]
 
 ### Added
+- **Livelier toolbar buttons.** Hovering Fetch, Pull, Push, Stash, Branch and Terminal lights the button where your pointer is and lifts it slightly, and each icon hints at its action (Fetch spins, Pull drops, Push rises). The settings gear and theme icon react too. Icons stay still if your system asks for reduced motion.
+- **Pull remembers how you pull.** Pick merge or rebase from the Pull button's menu (picking doesn't pull) and the button keeps using it, showing "Pull (rebase)" when rebase is on. The choice survives restarts.
 - **Pick the app color.** Settings → App color changes the color of buttons, the selection and the current branch. Seven colors, each tuned to stay readable in light and dark themes.
 - **Git and Node versions in the status bar.** The bottom-left corner of a repo window shows which Git and Node.js versions are installed (Node is left out when it isn't installed).
 - **See what a stash holds.** Click a stash in the sidebar (or right-click it → Show changes) to see its files, new untracked ones included, and the changes in each.

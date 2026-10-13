@@ -466,6 +466,38 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 /* Pull's menu half: a narrow chevron segment joined to Pull (no gap) by a faint seam. */
 .sync button:has(+ .split-menu) { border-radius: var(--r) 0 0 var(--r); }
 .sync button.split-menu { margin-left: -3px; width: 1.7rem; padding: 0; border-radius: 0 var(--r) var(--r) 0; border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent); }
+/* Toolbar hover: an accent light that follows the pointer (--mx/--my, set in SyncButtons), a 1px lift with an
+   accent edge, and an icon move that previews the action. Pointer devices only, so touch never sticks in hover. */
+.sync button { position: relative; isolation: isolate; overflow: hidden; }
+.sync button::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(4.5rem circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 24%, transparent), transparent 75%);
+  opacity: 0; transition: opacity 280ms var(--ease);
+}
+.sync button:focus-visible::before { opacity: 1; }
+.sync .icon, .toolbar > .icon-btn .icon { transition: rotate 560ms var(--spring), translate 380ms var(--spring), scale 380ms var(--spring); }
+@media (hover: hover) {
+  .sync button:hover:not(:disabled)::before { opacity: 1; }
+  /* Pull and its chevron rise together so the split button stays one piece. */
+  .sync button:is(:hover, :has(+ .split-menu:hover), :hover + .split-menu):not(:disabled):not(:active) {
+    translate: 0 -1px;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, var(--line-strong)), 0 6px 14px -6px color-mix(in srgb, var(--accent) 55%, transparent), var(--tool-lit);
+  }
+  .toolbar > .icon-btn:hover { color: var(--fg); }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .sync button:hover:not(:disabled) .icon[data-icon="fetch"] { rotate: 180deg; }
+  .sync button:hover:not(:disabled) .icon[data-icon="pull"] { translate: 0 2px; }
+  .sync button:hover:not(:disabled) .icon[data-icon="push"] { translate: 0 -2px; }
+  .sync button:hover:not(:disabled) .icon[data-icon="stash"] { translate: 0 1.5px; scale: 0.9; }
+  .sync button:hover:not(:disabled) .icon[data-icon="branch"] { rotate: -14deg; }
+  .sync button:hover:not(:disabled) .icon[data-icon="terminal"] { translate: 2px 0; }
+  .sync button:hover:not(:disabled) .icon[data-icon="chevron"] { translate: 0 2px; }
+  .toolbar > .icon-btn:hover .icon[data-icon="settings"] { rotate: 90deg; }
+  .toolbar > .icon-btn:hover .icon[data-icon="moon"] { rotate: -24deg; }
+  .toolbar > .icon-btn:hover .icon[data-icon="sun"] { rotate: 90deg; }
+  .toolbar > .icon-btn:hover .icon[data-icon="monitor"] { scale: 1.12; }
+}
 /* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
 .statusbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
 .versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--muted); }

@@ -45,5 +45,5 @@ export type IconName = keyof typeof BODIES;
 
 /** Decorative 24x24 icon at 1em; label the control that holds it, not the icon. */
 export function Icon({ name }: { name: IconName }) {
-  return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: BODIES[name] }} />;
+  return <svg className="icon" data-icon={name} viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: BODIES[name] }} />;
 }

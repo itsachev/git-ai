@@ -343,6 +343,7 @@ function App() {
 
 const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+Shift+L", Push: "Ctrl+Shift+U" };
 const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pull: "git pull --no-rebase", Push: "git push" };
+const PULL_REBASE_GIT = "git pull --rebase --autostash";
 
 /** Installed git and Node versions, read once per app run. */
 function Versions() {
@@ -412,8 +413,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
     { label: "Open in terminal", run: () => run(() => openTerminal(path)) },
     // The textarea mounts after the tab switch renders.
     { label: "Write commit message", keys: "Ctrl+Shift+M", git: 'git commit -m "<message>"', run: () => { show("status"); setTimeout(() => document.getElementById("commit-msg")?.focus()); } },
-    ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: SYNC_GIT[o.label], run: o.go })),
-    { label: "Pull with rebase", git: "git pull --rebase --autostash", run: sync.pullRebase },
+    ...sync.ops.map((o) => ({ label: o.label, keys: SYNC_KEYS[o.label], git: o.label === "Pull" && sync.rebase ? PULL_REBASE_GIT : SYNC_GIT[o.label], run: o.go })),
+    sync.rebase ? { label: "Pull (merge)", git: SYNC_GIT.Pull, run: sync.pullMerge } : { label: "Pull with rebase", git: PULL_REBASE_GIT, run: sync.pullRebase },
   ];
   if (status?.unstaged.length)
     commands.push({ label: "Stage all changes", keys: "Ctrl+Shift+S", git: "git add -A", run: () => run(() => stage(path, pathsOf(status.unstaged))) });
