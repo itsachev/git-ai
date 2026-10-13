@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon } from "./icons";
 
@@ -45,7 +45,46 @@ export function useTheme() {
   return [theme, setTheme] as const;
 }
 
-export const themeCommands = (theme: Theme, set: (t: Theme) => void) =>
+/** Accent hues (oklch). null = the built-in spruce teal. App.css turns the hue into fills and text colours. */
+export const ACCENTS: [string, number | null][] = [
+  ["Spruce", null], ["Blue", 255], ["Indigo", 280], ["Violet", 305], ["Rose", 0], ["Amber", 60], ["Green", 145],
+];
+const ACCENT_KEY = "accent";
+const accentSubs = new Set<() => void>();
+let accent = savedAccent();
+
+/** The current accent hue; re-renders when Settings changes it. */
+export const useAccent = () =>
+  useSyncExternalStore((f) => { accentSubs.add(f); return () => { accentSubs.delete(f); }; }, () => accent);
+
+function savedAccent(): number | null {
+  try {
+    const h = localStorage.getItem(ACCENT_KEY);
+    return h ? Number(h) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Applies and remembers the accent hue. index.html applies the saved one before first paint. */
+export function setAccent(hue: number | null) {
+  accent = hue;
+  accentSubs.forEach((f) => f());
+  const root = document.documentElement;
+  if (hue === null) {
+    delete root.dataset.accent;
+    root.style.removeProperty("--ah");
+  } else {
+    root.dataset.accent = "";
+    root.style.setProperty("--ah", String(hue));
+  }
+  try {
+    if (hue === null) localStorage.removeItem(ACCENT_KEY);
+    else localStorage.setItem(ACCENT_KEY, String(hue));
+  } catch { /* private storage: choice lasts this session */ }
+}
+
+export const themeCommands =(theme: Theme, set: (t: Theme) => void) =>
   THEMES.filter((t) => t !== theme).map((t) => ({ label: `Theme: ${NAME[t]}`, run: () => set(t) }));
 
 /** Cycles System → Light → Dark. `labeled`: show the theme name next to the icon. */

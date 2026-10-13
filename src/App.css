@@ -84,6 +84,10 @@
   --tool-edge: 0 0 0 1px rgb(0 0 0 / 0.55), 0 1px 2px rgb(0 0 0 / 0.3);
   --veil: inset 0 0 0 100vmax rgb(255 245 230 / 0.05);
 }
+/* Accent picked in Settings: one oklch hue (--ah, set by index.html / src/lib/theme.tsx). Lightness matches the
+   spruce defaults, so white text on fills keeps ~5:1 for every hue. */
+:root[data-accent] { --accent: oklch(0.5 0.12 var(--ah)); --accent-fg: oklch(0.43 0.11 var(--ah)); }
+:root[data-accent][data-theme="dark"] { --accent: oklch(0.55 0.12 var(--ah)); --accent-fg: oklch(0.84 0.1 var(--ah)); }
 @media (pointer: coarse) { :root { --ctl: 2.75rem; } }
 
 * { box-sizing: border-box; }
@@ -1159,6 +1163,17 @@ dialog.settings .settings-card .setting:focus-within { box-shadow: inset 0 0 0 1
 dialog.settings .setting h3 { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
 dialog.settings .setting > p.muted { max-width: 68ch; line-height: 1.5; text-wrap: pretty; }
 .settings-card.lit { animation: lit 1.6s var(--ease); }
+/* App color: one chip per accent hue; the picked one gets a ring in its own colour. */
+.swatches { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.swatches button {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.25rem; padding: 0.3rem 0.75rem 0.3rem 0.4rem;
+  border-radius: 999px; cursor: pointer; font-size: 0.85rem; box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow 160ms var(--ease), background-color 160ms;
+}
+.swatches button:hover { background: color-mix(in srgb, var(--sw) 10%, transparent); }
+.swatches button:focus-visible { outline: 2px solid var(--sw); outline-offset: 2px; }
+.swatches button[aria-checked="true"] { font-weight: 700; box-shadow: inset 0 0 0 2px var(--sw); background: color-mix(in srgb, var(--sw) 12%, transparent); }
+.swatch { width: 1.35rem; height: 1.35rem; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15); }
+@media (pointer: coarse) { .swatches button { min-height: 44px; } }
 dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards; animation-delay: calc(200ms + var(--i) * 60ms); }
 @media (min-width: 52rem) {
   .settings-layout { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; }

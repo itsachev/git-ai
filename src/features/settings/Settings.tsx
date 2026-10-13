@@ -9,6 +9,7 @@ import { ModalHead } from "../../lib/modal";
 import { errorText } from "../status/Changes";
 import { openSetup } from "../setup/Setup";
 import { canOpenShortcuts, openShortcuts } from "../shortcuts/Shortcuts";
+import { ACCENTS, setAccent, useAccent } from "../../lib/theme";
 
 export const aiKeyQuery = { queryKey: ["ai-key"], queryFn: aiHasKey, staleTime: Infinity };
 export const aiConfigQuery = { queryKey: ["ai-config"], queryFn: aiConfig, staleTime: Infinity };
@@ -61,6 +62,7 @@ const SECTIONS = [
   { id: "settings-identity", title: "Git identity", icon: "user", hue: 265, Body: () => <GitIdentity /> },
   { id: "settings-ssh", title: "SSH key", icon: "key", hue: 165, Body: () => <SshKey /> },
   { id: "settings-ai", title: "AI features", icon: "sparkle", hue: 320, Body: () => <AiKey /> },
+  { id: "settings-color", title: "App color", icon: "monitor", hue: 60, Body: () => <AppColor /> },
 ] as const;
 
 /** Setup at a glance: each section's current value and whether it's ready. Clicking jumps to the card. */
@@ -71,11 +73,13 @@ function SettingsNav() {
   const has = useQuery(aiKeyQuery).data;
   const ai = PROVIDERS[cfg && cfg.provider in PROVIDERS ? cfg.provider : "gemini"];
   const local = cfg?.provider === "openai" && !!cfg.base_url.trim();
+  const accent = useAccent();
   // [value, state]: ok = set up, idle = fine as is, todo = needs doing.
   const status: Record<string, [string, "ok" | "idle" | "todo"]> = {
     "settings-identity": setup?.name && setup.email ? [`${setup.name} · ${setup.email}`, "ok"] : ["Not set", "todo"],
     "settings-ssh": ssh ? [ssh.split(/[\\/]/).pop()!, "ok"] : ["ssh defaults", "idle"],
     "settings-ai": [`${ai.name} · ${local ? "local server" : has ? "key set" : "no key"}`, local || has ? "ok" : "todo"],
+    "settings-color": [ACCENTS.find(([, h]) => h === accent)?.[0] ?? "Spruce", "idle"],
   };
   function go(id: string) {
     const card = document.getElementById(id);
@@ -248,6 +252,25 @@ export function AiKey() {
         </div>
       </form>
       {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+/** The accent colour for buttons, selection and the current branch. Saved per computer, like the theme. */
+function AppColor() {
+  const accent = useAccent();
+  return (
+    <section className="setting">
+      <h3><span className="about-icon"><Icon name="monitor" /></span>App color</h3>
+      <p className="muted">The color of primary buttons, the selection and the current branch. Works with light and dark themes.</p>
+      <div className="swatches" role="radiogroup" aria-label="App color">
+        {ACCENTS.map(([name, hue]) => (
+          <button key={name} type="button" role="radio" aria-checked={accent === hue} title={name}
+            style={{ "--sw": hue === null ? "#0f766e" : `oklch(0.5 0.12 ${hue})` } as React.CSSProperties} onClick={() => setAccent(hue)}>
+            <span className="swatch" />{name}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

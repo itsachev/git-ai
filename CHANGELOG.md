@@ -5,6 +5,7 @@ What's new in each git-ai release. Newest first.
 ## [Unreleased]
 
 ### Added
+- **Pick the app color.** Settings → App color changes the color of buttons, the selection and the current branch. Seven colors, each tuned to stay readable in light and dark themes.
 - **Git and Node versions in the status bar.** The bottom-left corner of a repo window shows which Git and Node.js versions are installed (Node is left out when it isn't installed).
 - **See what a stash holds.** Click a stash in the sidebar (or right-click it → Show changes) to see its files, new untracked ones included, and the changes in each.
 - **Syntax colours in diffs.** File Status, History and stash diffs colour code like Sublime Text's Monokai theme: keywords, strings, numbers, functions and comments each get their own colour, in light and dark.

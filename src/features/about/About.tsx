@@ -87,6 +87,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Command palette", "Ctrl+K or Ctrl+Shift+P", "Type to find any action by name and see its shortcut and the git command it runs: switch views, check out a branch, change theme and more."],
     ["Keyboard shortcuts", "Ctrl+K → Keyboard shortcuts · Ctrl+/ · Settings", "One page with every shortcut, grouped by where it works, with a filter. Hold Ctrl, Shift or Alt to light up the shortcuts that use it."],
     ["Theme", "Theme button, or Ctrl+K", "System, light or dark."],
+    ["App color", "Settings → App color", "Pick the color of buttons, the selection and the current branch from seven presets."],
     ["Settings", "Gear button", "A status overview shows what is set up and what still needs doing; click one to jump to it. Your git name and email, saving HTTPS sign-ins, your SSH key and your AI provider (Gemini, Claude, OpenAI or a local model) with its key. Stored on this computer only."],
     ["First-run setup", "On first launch, or Settings → Run setup again", "A short walkthrough of the settings above."],
     ["Plain-language errors", "Automatic", "When git fails, you get what went wrong and what to do next, not just git's raw message. Common fixes are one button: stash and retry, try again, fetch now, push this branch."],

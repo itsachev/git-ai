@@ -9,6 +9,8 @@
     <script>
       try { var t = localStorage.getItem("theme"); } catch (e) {}
       document.documentElement.dataset.theme = t === "light" ? t : t === "system" && !matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+      try { var h = localStorage.getItem("accent"); } catch (e) {}
+      if (h) { document.documentElement.dataset.accent = ""; document.documentElement.style.setProperty("--ah", h); }
     </script>
   </head>
 
