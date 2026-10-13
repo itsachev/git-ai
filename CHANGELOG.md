@@ -19,6 +19,7 @@ What's new in each git-ai release. Newest first.
 ### Changed
 - **See Fetch, Pull, Push and Commit at work.** While one runs, a card at the bottom says what is happening ("Pushing main to origin/main…"), with a spinner and a seconds counter for slow networks. When it finishes, the card turns into a green check that says what was done, for example which commit was made. The rest of the window stays locked until the commit, fetch, pull or push finishes, so nothing else can start halfway through.
 - **Fold away a commit explanation.** Click the Explanation heading in History to collapse a long AI explanation, and click again to open it.
+- **Merge and Revert ask first.** Clicking Merge or Revert on a commit in History now asks for confirmation before changing the current branch.
 
 ## [0.3.0] - 2026-10-12
 
