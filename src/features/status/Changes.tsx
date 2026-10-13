@@ -8,6 +8,7 @@ import type { AppError } from "../../bindings/AppError";
 import type { LineOp } from "../../bindings/LineOp";
 import type { OpEntry } from "../../bindings/OpEntry";
 import { Icon, type IconName } from "../../lib/icons";
+import { FileIcon } from "../../lib/fileIcon";
 import { Splitter } from "../../lib/splitter";
 import { DiffLine, langOf } from "../../lib/highlight";
 import { ModalHead, choose, confirm } from "../../lib/modal";
@@ -506,12 +507,13 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
 
 type DiffProps = { path: string; sel: Selection | null; kind?: string; run: Run };
 
-/** Folder (dimmed) + file name; the name never truncates first. */
+/** Kind badge, file-type icon, folder (dimmed) + file name; the name never truncates first. */
 export function FileLabel({ f }: { f: FileChange }) {
   const slash = f.path.lastIndexOf("/");
   return (
     <>
       <span className={`kind ${kindClass(f.kind)}`}>{f.kind}</span>
+      <FileIcon file={f.path} />
       <span className="path">
         <strong>{f.path.slice(slash + 1)}</strong>
         {slash > 0 && <small>{f.path.slice(0, slash)}</small>}

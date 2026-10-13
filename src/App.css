@@ -624,6 +624,9 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
   font: 700 0.68rem var(--mono); border-radius: 5px; color: var(--muted);
   background: color-mix(in srgb, currentColor 13%, transparent);
 }
+.ficon { flex-shrink: 0; width: 1.15rem; height: 1.15rem; margin-right: -0.2rem; color: var(--fc); }
+.ficon-page { fill: color-mix(in srgb, currentColor 14%, transparent); }
+.files li.sel .ficon { color: inherit; }
 .k-M { color: var(--mod); }
 .k-A { color: var(--add); }
 .k-D, .k-X { color: var(--danger); }
