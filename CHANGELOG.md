@@ -7,6 +7,7 @@ What's new in each git-ai release. Newest first.
 ### Added
 - **See what a stash holds.** Click a stash in the sidebar (or right-click it → Show changes) to see its files, new untracked ones included, and the changes in each.
 - **Branch names on graph dots.** Hover a dot in the History graph to see which branch that commit sits on.
+- **Show only a branch's own commits.** In History, pick Own commits to list just the commits on your current branch that main (or master) doesn't have yet.
 
 ## [0.3.0] - 2026-10-12
 

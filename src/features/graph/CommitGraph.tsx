@@ -36,7 +36,7 @@ type Props = { path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: 
 const OPTS_KEY = "graph-opts";
 /** Last-used history options, kept in localStorage (a per-window convenience). */
 export function savedOpts(): GraphOpts {
-  const def = { all: true, remotes: true, by_date: true };
+  const def = { all: true, own: false, remotes: true, by_date: true };
   try { return { ...def, ...JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}") }; } catch { return def; }
 }
 
@@ -48,16 +48,20 @@ export function GraphOptions({ opts, onChange }: { opts: GraphOpts; onChange: (o
     onChange(next);
   };
   // Segmented pickers: one pressed button per group.
-  const seg = (label: string, items: [string, boolean, Partial<GraphOpts>][]) => (
+  const seg = (label: string, items: [string, boolean, Partial<GraphOpts>, string?][]) => (
     <div className="seg" role="group" aria-label={label}>
-      {items.map(([text, on, o]) => (
-        <button key={text} type="button" aria-pressed={on} onClick={() => set(o)}>{text}</button>
+      {items.map(([text, on, o, title]) => (
+        <button key={text} type="button" aria-pressed={on} title={title} onClick={() => set(o)}>{text}</button>
       ))}
     </div>
   );
   return (
     <div className="graph-opts">
-      {seg("Branches", [["All branches", opts.all, { all: true }], ["Current", !opts.all, { all: false }]])}
+      {seg("Branches", [
+        ["All branches", opts.all, { all: true }],
+        ["Current", !opts.all && !opts.own, { all: false, own: false }, "Everything the current branch contains, including the history it started from"],
+        ["Own commits", !opts.all && opts.own, { all: false, own: true }, "Only the commits on the current branch that main/master doesn't have yet"],
+      ])}
       {seg("Remote branches", [["Remotes", opts.remotes, { remotes: !opts.remotes }]])}
       {seg("Sort", [["By date", opts.by_date, { by_date: true }], ["Ancestor order", !opts.by_date, { by_date: false }]])}
     </div>

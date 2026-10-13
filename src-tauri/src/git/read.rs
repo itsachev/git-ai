@@ -603,7 +603,7 @@ mod tests {
         assert!(patch.contains("+four\n") && patch.contains("Binary files"), "{patch}");
 
         use crate::git::graph::{rows, GraphOpts};
-        let all = GraphOpts { all: true, remotes: true, by_date: true };
+        let all = GraphOpts { all: true, own: false, remotes: true, by_date: true };
         let page = rows(&Default::default(), &dir, all, 0, 500).unwrap();
         assert_eq!((page.total, page.lanes), (2, 1));
         assert!(page.rows[0].head && page.rows[0].oid == second.id().to_string());
@@ -697,7 +697,7 @@ mod tests {
         let t = Instant::now();
         let s = crate::git::cli::status(&dir).unwrap();
         eprintln!("status: {:?} ({} files)", t.elapsed(), s.unstaged.len());
-        let all = crate::git::graph::GraphOpts { all: true, remotes: true, by_date: true };
+        let all = crate::git::graph::GraphOpts { all: true, own: false, remotes: true, by_date: true };
         let t = Instant::now();
         let page = crate::git::graph::rows(&Default::default(), &dir, all, 0, 500).unwrap();
         let edges: usize = page.rows.iter().map(|r| r.edges.len()).sum();

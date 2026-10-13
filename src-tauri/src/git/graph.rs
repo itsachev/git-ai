@@ -41,6 +41,8 @@ pub struct GraphPage {
 pub struct GraphOpts {
     /// Every branch and tag; false = only what HEAD reaches.
     pub all: bool,
+    /// With `all` off: only the commits not on the default branch (main/master); on the default branch itself, everything HEAD reaches.
+    pub own: bool,
     /// Remote branches (as walk starts and as labels).
     pub remotes: bool,
     /// Commit date order; false = ancestor order (keeps each branch's commits together).
@@ -52,6 +54,8 @@ struct Layout {
     opts: GraphOpts,
     /// Sorted tip oids; the layout is stale once they change.
     key: Vec<Oid>,
+    /// Excluded tips (`own`).
+    not: Vec<Oid>,
     rows: Vec<(Oid, u32, Vec<(u32, u32)>)>,
     lanes: u32,
 }
@@ -123,10 +127,11 @@ fn fresh<'a>(
     let mut key: Vec<Oid> = starts.iter().map(|t| t.1).chain(head).collect();
     key.sort();
     key.dedup();
+    let not = if !opts.all && opts.own { default_tips(repo) } else { vec![] };
     let name = path.to_string_lossy().into_owned();
     let mut cache = cache.0.lock().unwrap_or_else(|e| e.into_inner());
-    if !matches!(&*cache, Some(l) if l.repo == name && l.opts == opts && l.key == key) {
-        *cache = Some(compute(path, name, opts, key)?);
+    if !matches!(&*cache, Some(l) if l.repo == name && l.opts == opts && l.key == key && l.not == not) {
+        *cache = Some(compute(path, name, opts, key, not)?);
     }
     Ok((cache, tips, head))
 }
@@ -142,14 +147,30 @@ fn tips(repo: &Repository, remotes: bool) -> Vec<(String, Oid)> {
         .collect()
 }
 
+/// Tips of the default branch (origin/HEAD's name, else main, else master), local and on origin.
+/// Empty when HEAD is on it, so "own commits" there shows the whole branch.
+fn default_tips(repo: &Repository) -> Vec<Oid> {
+    let remote = repo.find_reference("refs/remotes/origin/HEAD").ok();
+    let target = remote.as_ref().and_then(|r| r.symbolic_target().ok().flatten()).and_then(|t| t.strip_prefix("refs/remotes/origin/"));
+    let has = |n: &str| ["refs/heads/", "refs/remotes/origin/"].iter().any(|p| repo.find_reference(&format!("{p}{n}")).is_ok());
+    let Some(name) = target.map(str::to_string).or_else(|| ["main", "master"].into_iter().find(|n| has(n)).map(String::from)) else { return vec![] };
+    if repo.head().ok().and_then(|h| h.shorthand().ok().map(String::from)).as_deref() == Some(name.as_str()) {
+        return vec![];
+    }
+    ["refs/heads/", "refs/remotes/origin/"]
+        .iter()
+        .filter_map(|p| repo.find_reference(&format!("{p}{name}")).ok()?.peel_to_commit().ok().map(|c| c.id()))
+        .collect()
+}
+
 /// The walk runs the `git` binary, an exception to "reads use git2": it reads the commit-graph file
 /// and libgit2 doesn't (85k commits: 0.25 s vs 1.45 s for walk + layout).
-fn compute(path: &Path, name: String, opts: GraphOpts, key: Vec<Oid>) -> Result<Layout, AppError> {
+fn compute(path: &Path, name: String, opts: GraphOpts, key: Vec<Oid>, not: Vec<Oid>) -> Result<Layout, AppError> {
     let mut commits: Vec<(Oid, Vec<Oid>)> = vec![];
     if !key.is_empty() {
         // Tips go in on stdin: thousands of tags would overflow the Windows command line (32k chars).
         let order = if opts.by_date { "--date-order" } else { "--topo-order" };
-        let tips: String = key.iter().map(|o| format!("{o}\n")).collect();
+        let tips: String = key.iter().map(|o| format!("{o}\n")).chain(not.iter().map(|o| format!("^{o}\n"))).collect();
         let out = crate::git::cli::git_input(path, &["rev-list", "--parents", order, "--stdin"], &tips)?;
         for line in out.lines() {
             let mut ids = line.split(' ').map(Oid::from_str);
@@ -159,7 +180,7 @@ fn compute(path: &Path, name: String, opts: GraphOpts, key: Vec<Oid>) -> Result<
     }
     let (cols, lanes) = layout(&commits);
     let rows = commits.into_iter().zip(cols).map(|((oid, _), (col, edges))| (oid, col, edges)).collect();
-    Ok(Layout { repo: name, opts, key, rows, lanes })
+    Ok(Layout { repo: name, opts, key, not, rows, lanes })
 }
 
 /// Assigns each commit (children before parents) a lane, plus the edges coming into its row.
@@ -254,7 +275,7 @@ mod tests {
         at("refs/heads/b", "b2", 500, &[b1]);
         let x = at("refs/remotes/origin/x", "x", 600, &[a2]);
         repo.set_head("refs/heads/a").unwrap();
-        let on = GraphOpts { all: true, remotes: true, by_date: true };
+        let on = GraphOpts { all: true, remotes: true, own: false, by_date: true };
         let order = |o| rows(&GraphCache::default(), &dir, o, 0, 100).unwrap().rows.into_iter().map(|r| r.summary).collect::<Vec<_>>();
         assert_eq!(order(on), ["x", "b2", "a2", "b1", "a1", "base"]);
         let page = rows(&GraphCache::default(), &dir, on, 0, 100).unwrap();
@@ -272,6 +293,13 @@ mod tests {
         assert_eq!(rows(&cache, &dir, on, 0, 100).unwrap().total, 6);
         assert_eq!(rows(&cache, &dir, off, 0, 100).unwrap().total, 5);
         assert_eq!(rows(&cache, &dir, GraphOpts { all: false, ..off }, 0, 100).unwrap().total, 3);
+        // Own commits: a minus main (at base); on main itself, everything HEAD reaches.
+        repo.reference("refs/heads/main", base, false, "").unwrap();
+        let own = GraphOpts { all: false, own: true, ..off };
+        assert_eq!(order(own), ["a2", "a1"]);
+        repo.set_head("refs/heads/main").unwrap();
+        assert_eq!(order(own), ["base"]);
+        repo.set_head("refs/heads/a").unwrap();
         // Search: message, author, id prefix; rows match the page order.
         let find = |q: &str| super::search(&cache, &dir, on, q).unwrap().into_iter().map(|h| h.0).collect::<Vec<_>>();
         assert_eq!(find("A2"), [2]);
@@ -320,7 +348,7 @@ mod tests {
         assert!(imp.wait().unwrap().success());
 
         let cache = super::GraphCache::default();
-        let all = super::GraphOpts { all: true, remotes: true, by_date: true };
+        let all = super::GraphOpts { all: true, remotes: true, own: false, by_date: true };
         let t = Instant::now();
         let page = super::rows(&cache, &dir, all, 0, 500).unwrap();
         eprintln!("first page (layout + 500 rows): {:?}, total {}, lanes {}", t.elapsed(), page.total, page.lanes);

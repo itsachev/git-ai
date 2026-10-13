@@ -9,6 +9,10 @@ export type GraphOpts = {
  */
 all: boolean, 
 /**
+ * With `all` off: only the commits not on the default branch (main/master); on the default branch itself, everything HEAD reaches.
+ */
+own: boolean, 
+/**
  * Remote branches (as walk starts and as labels).
  */
 remotes: boolean, 
