@@ -198,7 +198,13 @@ export function Sidebar({ path }: { path: string }) {
   if (!data) return <div className="sidebar" />;
   const f = filter.trim().toLowerCase();
   const match = (items: RefItem[]) => items.filter((r) => r.name.toLowerCase().includes(f));
-  const local = match(data.local);
+  // The current branch (and its upstream under its remote) goes first so it never scrolls out of sight; the rest stay alphabetical.
+  const pin = (items: RefItem[], name: string | null | undefined) => {
+    const i = name ? items.findIndex((r) => r.name === name) : -1;
+    return i > 0 ? [items[i], ...items.slice(0, i), ...items.slice(i + 1)] : items;
+  };
+  const local = pin(match(data.local), data.head);
+  const upstream = data.local.find((b) => b.name === data.head)?.upstream;
   // ponytail: remote name = text before the first "/"; a remote named "a/b" would be split wrong.
   // Every configured remote gets a group, even before it has branches (just added, not fetched).
   const groups = new Map<string, RefItem[]>((remoteList ?? []).map((r) => [r.name, []]));
@@ -255,7 +261,7 @@ export function Sidebar({ path }: { path: string }) {
           <details key={remote} open className="nested">
             <RemoteSummary name={remote} actions={remoteActions(remote)} />
             <ul className="refs">
-              {items.map((r) => (
+              {pin(items, upstream).map((r) => (
                 <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={actions(r.name)[0][1]} actions={actions(r.name)} dnd={dnd(r.name)} />
               ))}
             </ul>
