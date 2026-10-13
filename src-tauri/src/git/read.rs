@@ -423,6 +423,22 @@ pub fn commit_file_diff(repo: &Path, oid: &str, file: &str) -> Result<Option<Str
     Ok(text)
 }
 
+/// Unified diff of `file` from one revision to another (branch, tag, oid); `None` = the working tree.
+/// Empty when both sides match, None when binary or over 1 MB.
+pub fn compare_file(repo: &Path, from: Option<&str>, to: Option<&str>, file: &str) -> Result<Option<String>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let tree = |rev: &str| repo.revparse_single(rev).and_then(|o| o.peel_to_tree());
+    let mut opts = git2::DiffOptions::new();
+    opts.pathspec(file).disable_pathspec_match(true).max_size(1 << 20).include_untracked(true).show_untracked_content(true);
+    let diff = match (from, to) {
+        (Some(a), Some(b)) => repo.diff_tree_to_tree(Some(&tree(a)?), Some(&tree(b)?), Some(&mut opts))?,
+        (Some(a), None) => repo.diff_tree_to_workdir(Some(&tree(a)?), Some(&mut opts))?,
+        (None, Some(b)) => repo.diff_tree_to_workdir(Some(&tree(b)?), Some(opts.reverse(true)))?,
+        (None, None) => return Ok(Some(String::new())),
+    };
+    file_patch(&diff, file)
+}
+
 fn diff_files(diff: &git2::Diff) -> Vec<FileChange> {
     diff.deltas()
         .map(|d| {
@@ -601,6 +617,12 @@ mod tests {
         index.write().unwrap();
         let patch = super::staged_patch(&dir).unwrap();
         assert!(patch.contains("+four\n") && patch.contains("Binary files"), "{patch}");
+        // Compare one file across revisions and against the working tree, either way round.
+        let first_oid = first.id().to_string();
+        assert!(super::compare_file(&dir, Some(&first_oid), Some("HEAD"), "a.txt").unwrap().unwrap().contains("-one\n"));
+        assert_eq!(super::compare_file(&dir, Some("HEAD"), Some("HEAD"), "b.txt").unwrap().unwrap(), "");
+        assert!(super::compare_file(&dir, Some("HEAD"), None, "b.txt").unwrap().unwrap().ends_with("+four\n"));
+        assert!(super::compare_file(&dir, None, Some("HEAD"), "b.txt").unwrap().unwrap().ends_with("-four\n"));
 
         use crate::git::graph::{rows, GraphOpts};
         let all = GraphOpts { all: true, own: false, remotes: true, by_date: true };

@@ -144,10 +144,16 @@ export function History({ path }: { path: string }) {
 export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid: string; file: string; kind?: string; stash?: boolean }) {
   // A commit never changes, so its diffs never need a refetch.
   const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file, !!stash], queryFn: () => (stash ? stashFileDiff : commitFileDiff)(path, oid, file) });
+  return <ReadDiff file={file} kind={kind} data={data} error={error} />;
+}
+
+/** Read-only diff of one file. `data`: undefined = loading, null = binary or over 1 MB, "" = no difference. */
+export function ReadDiff({ file, kind, data, error }: { file: string; kind?: string; data: string | null | undefined; error: unknown }) {
   const head = <DiffHead file={file} kind={kind} />;
   if (error) return <section className="diff">{head}<p className="pane-note error" role="alert">{errorText(error)}</p></section>;
   if (data === undefined) return <section className="diff">{head}</section>;
   if (data === null) return <section className="diff">{head}<PaneNote icon="info" title="No inline diff"><p>Binary file or larger than 1 MB.</p></PaneNote></section>;
+  if (data === "") return <section className="diff">{head}<PaneNote icon="check" title="No differences"><p>The file is the same on both sides.</p></PaneNote></section>;
   const all = data.replace(/\n$/, "").split("\n");
   const start = all.findIndex((l) => l.startsWith("@@"));
   if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;

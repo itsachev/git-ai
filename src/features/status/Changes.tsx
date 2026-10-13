@@ -13,6 +13,8 @@ import { DiffLine, langOf } from "../../lib/highlight";
 import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
+import { RefMenu, showMenu } from "../refs/Sidebar";
+import { openFileHistory } from "../graph/FileHistory";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
@@ -312,6 +314,8 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
   const [marked, setMarked] = useState<Set<string>>(new Set());
   const anchor = useRef(0);
   const drag = useRef<number | null>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [ctx, setCtx] = useState<FileChange | null>(null);
   if (!files.length) return null;
   const active = sel?.staged === staged && files.some((f) => f.path === sel.file);
   const isMarked = (f: FileChange) => active && (marked.has(f.path) || f.path === sel?.file);
@@ -350,6 +354,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
           const targets = selected && picked.length > 1 ? picked : [f];
           return (
             <li key={f.path} className={selected ? "sel" : undefined}
+              onContextMenu={(e) => { setCtx(f); showMenu(menu.current, e); }}
               onMouseEnter={(e) => {
                 if (drag.current === null || !(e.buttons & 1)) return void (drag.current = null);
                 setMarked(range(drag.current, i));
@@ -366,6 +371,10 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
           );
         })}
       </ul>
+      <RefMenu pop={menu} label={`Actions for ${ctx?.path ?? "file"}`} actions={ctx ? [
+        ["Compare with branch…", () => openFileHistory("HEAD", ctx.path, "compare")],
+        ["History and blame", () => openFileHistory("HEAD", ctx.path), ctx.kind === "?" || ctx.kind === "A" ? "New file: no history yet" : undefined],
+      ] : []} />
     </section>
   );
 }

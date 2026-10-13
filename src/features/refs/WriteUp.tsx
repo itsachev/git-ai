@@ -47,7 +47,7 @@ export function WriteUpDialog({ path }: { path: string }) {
   );
 }
 
-function RefOptions({ refs }: { refs: Refs | undefined }) {
+export function RefOptions({ refs }: { refs: Refs | undefined }) {
   return (
     <>
       {!!refs?.local.length && <optgroup label="Branches">{refs.local.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}</optgroup>}

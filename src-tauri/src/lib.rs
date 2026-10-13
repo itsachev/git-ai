@@ -41,6 +41,7 @@ pub fn run() {
             commands::graph_search,
             commands::commit_details,
             commands::commit_file_diff,
+            commands::compare_file,
             commands::stash_files,
             commands::stash_file_diff,
             commands::refs,

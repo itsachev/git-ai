@@ -118,6 +118,9 @@ export const commitDetails = (path: string, oid: string) => invoke<CommitDetails
 /** null = binary or over 1 MB. */
 export const commitFileDiff = (path: string, oid: string, file: string) =>
   invoke<string | null>("commit_file_diff", { path, oid, file });
+/** `file` from revision `from` to `to`; null side = working tree. "" = same on both, null = binary or over 1 MB. */
+export const compareFile = (path: string, from: string | null, to: string | null, file: string) =>
+  invoke<string | null>("compare_file", { path, from, to, file });
 export const refs = (path: string) => invoke<Refs>("refs", { path });
 /** Names of the refs already part of HEAD. Slow on long histories, so apart from `refs`. */
 export const mergedRefs = (path: string) => invoke<string[]>("merged_refs", { path });

@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { blame, fileLog } from "../../lib/ipc";
+import { blame, compareFile, fileLog } from "../../lib/ipc";
 import { ModalHead } from "../../lib/modal";
 import { errorText } from "../status/Changes";
 import { ago } from "../refs/NewBranch";
-import { CommitDiff } from "./History";
+import { CommitDiff, ReadDiff } from "./History";
+import { refsQuery } from "../refs/Sidebar";
+import { RefOptions } from "../refs/WriteUp";
+import { Icon } from "../../lib/icons";
 
-// History and blame of one file as of commit `rev`. Opened from a file in a commit's file list.
-let state: { rev: string; file: string } | null = null;
+// History, blame and branch compare of one file as of `rev` (an oid, or "HEAD" from File Status).
+// Opened from a file in a commit's file list, or by right-clicking a file in File Status.
+type Tab = "history" | "blame" | "compare";
+let state: { rev: string; file: string; tab: Tab } | null = null;
 const subs = new Set<() => void>();
-export const openFileHistory = (rev: string, file: string) => { state = { rev, file }; subs.forEach((f) => f()); };
+export const openFileHistory = (rev: string, file: string, tab: Tab = "history") => { state = { rev, file, tab }; subs.forEach((f) => f()); };
 const close = () => { state = null; subs.forEach((f) => f()); };
 
 export function FileHistoryDialog({ path }: { path: string }) {
@@ -23,15 +28,15 @@ export function FileHistoryDialog({ path }: { path: string }) {
   useEffect(() => close, []);
   return (
     <dialog ref={dialog} className="modal file-history" aria-labelledby="fh-title" onCancel={(e) => { e.preventDefault(); close(); }}>
-      {cur && <Body key={cur.rev + cur.file} path={path} rev={cur.rev} file={cur.file} />}
+      {cur && <Body key={cur.rev + cur.file + cur.tab} path={path} rev={cur.rev} file={cur.file} initial={cur.tab} />}
     </dialog>
   );
 }
 
-function Body({ path, rev, file }: { path: string; rev: string; file: string }) {
-  const [tab, setTab] = useState<"history" | "blame">("history");
+function Body({ path, rev, file, initial }: { path: string; rev: string; file: string; initial: Tab }) {
+  const [tab, setTab] = useState(initial);
   const [picked, setPicked] = useState<string | null>(null);
-  // `rev` is an oid, so neither answer can change while open.
+  // An oid never changes; "HEAD" is refetched on repo-changed like every query.
   const log = useQuery({ queryKey: ["file-log", path, rev, file], queryFn: () => fileLog(path, rev, file), staleTime: Infinity });
   const shown = log.data?.find((c) => c.oid === picked) ?? log.data?.[0];
   const name = file.slice(file.lastIndexOf("/") + 1);
@@ -39,12 +44,13 @@ function Body({ path, rev, file }: { path: string; rev: string; file: string }) 
 
   return (
     <div className="fh">
-      <ModalHead id="fh-title" icon="history" title={name} sub={<><span className="mono">{file}</span> as of <span className="mono">{rev.slice(0, 7)}</span></>} />
+      <ModalHead id="fh-title" icon="history" title={name} sub={<><span className="mono">{file}</span> as of <span className="mono">{rev === "HEAD" ? "HEAD" : rev.slice(0, 7)}</span></>} />
       <div className="nb-chips" role="group" aria-label="Show">
         <button type="button" className="chip" aria-pressed={tab === "history"} onClick={() => setTab("history")}>
           History{log.data && ` (${log.data.length === 2000 ? "2000+" : log.data.length})`}
         </button>
         <button type="button" className="chip" aria-pressed={tab === "blame"} onClick={() => setTab("blame")}>Blame</button>
+        <button type="button" className="chip" aria-pressed={tab === "compare"} onClick={() => setTab("compare")}>Compare</button>
       </div>
       {tab === "history" ? (
         <div className="fh-split">
@@ -68,12 +74,54 @@ function Body({ path, rev, file }: { path: string; rev: string; file: string }) 
           )}
           {shown && <CommitDiff path={path} oid={shown.oid} file={shown.path} />}
         </div>
-      ) : (
+      ) : tab === "blame" ? (
         <BlameView path={path} rev={rev} file={file} onPick={show} />
+      ) : (
+        <CompareView path={path} rev={rev} file={file} />
       )}
       <div className="dialog-actions">
         <button type="button" onClick={close}>Close</button>
       </div>
+    </div>
+  );
+}
+
+/** The file on two branches, tags or the working copy ("" in the pickers). */
+function CompareView({ path, rev, file }: { path: string; rev: string; file: string }) {
+  const refs = useQuery(refsQuery(path)).data;
+  // Default: another branch → what was open (the working copy from File Status, else the commit).
+  const [from, setFrom] = useState<string | null>(null);
+  const [to, setTo] = useState(rev === "HEAD" ? "" : rev);
+  const a = from ?? (refs && (refs.local.find((b) => b.name !== refs.head)?.name ?? refs.head ?? "HEAD"));
+  const diff = useQuery({
+    queryKey: ["compare", path, a, to, file],
+    queryFn: () => compareFile(path, a || null, to || null, file),
+    enabled: a != null,
+  });
+  const name = (v: string) => (v === "" ? "working copy" : v === rev ? rev.slice(0, 7) : v);
+  const pick = (id: string, label: string, value: string, set: (v: string) => void) => (
+    <div className="nb-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="select">
+        <select id={id} value={value} onChange={(e) => set(e.target.value)}>
+          <option value="">Working copy</option>
+          {rev !== "HEAD" && <option value={rev}>This commit ({rev.slice(0, 7)})</option>}
+          <RefOptions refs={refs} />
+        </select>
+        <Icon name="chevron" />
+      </div>
+    </div>
+  );
+  return (
+    <div className="fh-compare">
+      <div className="fh-range">
+        {pick("fh-from", "From", a ?? "", setFrom)}
+        <button type="button" className="small ghost" title="Swap sides" aria-label="Swap sides" disabled={a == null}
+          onClick={() => { setFrom(to); setTo(a!); }}>⇄</button>
+        {pick("fh-to", "To", to, setTo)}
+      </div>
+      <p className="nb-hint"><span className="del-mark">−</span> lines only on {name(a ?? "")}, <span className="add-mark">+</span> lines only on {name(to)}.</p>
+      <ReadDiff file={file} data={diff.data} error={diff.error} />
     </div>
   );
 }
