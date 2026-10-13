@@ -9,6 +9,7 @@ import type { GraphOpts } from "../bindings/GraphOpts";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
+import type { StashMode } from "../bindings/StashMode";
 import type { FileChange } from "../bindings/FileChange";
 import type { Side } from "../bindings/Side";
 import type { Editors } from "../bindings/Editors";
@@ -47,6 +48,8 @@ const FAILED: Record<string, (a: Args) => string> = {
   delete_tag: (a) => `Failed to delete tag ${a.name}`,
   stash_save: () => "Failed to stash changes",
   stash: (a) => `Failed to ${a.op.toLowerCase()} stash`,
+  stash_rename: () => "Failed to rename the stash",
+  stash_branch: () => "Failed to create a branch from the stash",
   fetch: () => "Fetch failed",
   pull: () => "Pull failed",
   push: () => "Push failed",
@@ -168,10 +171,14 @@ export const blame = (path: string, rev: string, file: string) => invoke<Blame>(
 export const createTag = (path: string, name: string, target: string, message: string) =>
   invoke<void>("create_tag", { path, name, target, message });
 export const deleteTag = (path: string, name: string) => invoke<void>("delete_tag", { path, name });
-/** Stashes all changes, untracked files included. */
-export const stashSave = (path: string, message: string) => invoke<void>("stash_save", { path, message });
+/** Stashes the changes `mode` picks (default: all, untracked too). Code "empty" when the chosen changes were nothing. `keep` puts them straight back (a checkpoint). */
+export const stashSave = (path: string, message: string, mode: StashMode = "All", keep = false, paths: string[] = []) => invoke<void>("stash_save", { path, message, mode, keep, paths });
 /** `oid` must still be stash@{index}, else code "stale". */
 export const stash = (path: string, op: StashOp, index: number, oid: string) => invoke<void>("stash", { path, op, index, oid });
+/** Moves the stash to stash@{0} under the new name (git can't rename in place). */
+export const stashRename = (path: string, index: number, oid: string, message: string) => invoke<void>("stash_rename", { path, index, oid, message });
+/** New branch at the stash's base commit, switched to, with the stash applied and dropped. */
+export const stashBranch = (path: string, index: number, oid: string, branch: string) => invoke<void>("stash_branch", { path, index, oid, branch });
 /** A stash's files: tracked changes plus untracked files. */
 export const stashFiles = (path: string, oid: string) => invoke<FileChange[]>("stash_files", { path, oid });
 /** null = binary or over 1 MB. */

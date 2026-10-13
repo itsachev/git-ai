@@ -337,15 +337,27 @@ pub fn delete_tag(path: String, name: String) -> Result<(), AppError> {
 }
 
 #[tauri::command(async)]
-pub fn stash_save(path: String, message: String) -> Result<(), AppError> {
+pub fn stash_save(path: String, message: String, mode: cli::StashMode, keep: bool, paths: Vec<String>) -> Result<(), AppError> {
     let _op = serial();
-    cli::stash_save(Path::new(&path), &message)
+    cli::stash_save(Path::new(&path), &message, mode, keep, &paths)
 }
 
 #[tauri::command(async)]
 pub fn stash(path: String, op: cli::StashOp, index: usize, oid: String) -> Result<(), AppError> {
     let _op = serial();
     cli::stash(Path::new(&path), op, index, &oid)
+}
+
+#[tauri::command(async)]
+pub fn stash_rename(path: String, index: usize, oid: String, message: String) -> Result<(), AppError> {
+    let _op = serial();
+    cli::stash_rename(Path::new(&path), index, &oid, &message)
+}
+
+#[tauri::command(async)]
+pub fn stash_branch(path: String, index: usize, oid: String, branch: String) -> Result<(), AppError> {
+    let _op = serial();
+    cli::stash_branch(Path::new(&path), index, &oid, &branch)
 }
 
 // Network ops are async (off the main thread) so the UI, and with it askpass prompts, keep working.

@@ -1,14 +1,14 @@
 ﻿import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashSave, undo } from "../../lib/ipc";
+import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
-import { openStash } from "./Stash";
+import { openStash, openStashSave } from "./Stash";
 import { choose, confirm, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
@@ -159,7 +159,6 @@ export function Sidebar({ path }: { path: string }) {
   const run = useRun();
   const actions = useRefActions(path);
   const [filter, setFilter] = useState("");
-  const [creating, setCreating] = useState<"stash" | null>(null);
   // Branch drag and drop: one end must be the current branch; the drop menu offers merge/rebase with the other.
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropActions, setDropActions] = useState<Action[]>([]);
@@ -187,12 +186,6 @@ export function Sidebar({ path }: { path: string }) {
       showMenu(dropPop.current, e);
     },
   });
-  // The form lives inside the section, so open the section too (Stashes starts collapsed).
-  const toggle = (what: "stash") => (e: React.MouseEvent<HTMLElement>) => {
-    e.preventDefault();
-    e.currentTarget.closest("details")!.open = true;
-    setCreating((c) => (c === what ? null : what));
-  };
 
   if (error) return <div className="sidebar error" role="alert">{errorText(error)}</div>;
   if (!data) return <div className="sidebar" />;
@@ -231,6 +224,18 @@ export function Sidebar({ path }: { path: string }) {
     ];
   };
 
+  // Stash names read "On main: wip" / "WIP on main: abc subject"; renaming keeps the "On main:" part.
+  async function renameStash(i: number, s: RefItem) {
+    const m = /^(?:WIP on|On) ([^:]+): (.*)$/s.exec(s.name);
+    const v = await prompt("Rename stash", "It moves to the top of the list.", [{ label: "Name", value: m ? m[2] : s.name }], "Rename", "stash");
+    if (v?.[0] && v[0] !== (m ? m[2] : s.name)) run(() => stashRename(path, i, s.oid, m ? `On ${m[1]}: ${v[0]}` : v[0]), `Renamed the stash to “${v[0]}”`);
+  }
+  async function branchFromStash(i: number, s: RefItem) {
+    const v = await prompt("New branch from stash",
+      "Starts at the commit the stash was made on, so its changes fit. The stash is applied there, then dropped.",
+      [{ label: "Branch name", placeholder: "feature/…" }], "Create branch", "branch");
+    if (v?.[0]) run(() => stashBranch(path, i, s.oid, v[0]), `Created and switched to ${v[0]} with the stash applied`);
+  }
   async function dropStash(i: number, s: RefItem) {
     if (await confirm("Drop stash", `Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, "Drop", "danger"))
       run(() => stash(path, "Drop", i, s.oid));
@@ -279,16 +284,16 @@ export function Sidebar({ path }: { path: string }) {
       <details>
         <summary>
           <Icon name="stash" />Stashes <span className="count">{data.stashes.length}</span>
-          <button className="icon-btn" onClick={toggle("stash")} aria-expanded={creating === "stash"} aria-label="Stash all changes" title="Stash all changes"><Icon name="add" /></button>
+          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openStashSave(); }} aria-label="Stash changes…" title="Stash changes…"><Icon name="add" /></button>
         </summary>
-        {creating === "stash" && <NameForm label="Stash message (optional)" button="Stash" optional onCancel={() => setCreating(null)}
-          onSubmit={async (msg) => { if (await run(() => stashSave(path, msg))) setCreating(null); }} />}
         <ul className="refs">
           {data.stashes.map((s, i) => s.name.toLowerCase().includes(f) && (
             <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} onPick={() => openStash(s.oid, `stash@{${i}}: ${s.name}`)} actions={[
               ["Show changes", () => openStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
               ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
+              ["Rename…", () => renameStash(i, s)],
+              ["New branch from stash…", () => branchFromStash(i, s)],
               ["Explain (AI)", () => openExplainStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Drop", () => dropStash(i, s)],
             ]} />
@@ -368,17 +373,15 @@ type NameFormProps = {
   button: string;
   /** Checkbox label; its value is passed to `onSubmit`. */
   check?: string;
-  /** Allow submitting an empty name. */
-  optional?: boolean;
   onSubmit: (name: string, checked: boolean) => void;
   onCancel: () => void;
 };
 
 /** Small inline form: one text field, optional checkbox, Esc cancels. */
-export function NameForm({ label, button, check, optional, onSubmit, onCancel }: NameFormProps) {
+export function NameForm({ label, button, check, onSubmit, onCancel }: NameFormProps) {
   const [name, setName] = useState("");
   const [on, setOn] = useState(true);
-  const ok = optional || !!name.trim();
+  const ok = !!name.trim();
   return (
     <form className="new-branch" onSubmit={(e) => { e.preventDefault(); if (ok) onSubmit(name.trim(), on); }}
       onKeyDown={(e) => e.key === "Escape" && onCancel()}>

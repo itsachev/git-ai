@@ -67,7 +67,9 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - Create, switch (carrying your changes), rename, track, delete
 - Merge, cherry-pick and **interactive rebase**
 - **Drag and drop** a branch onto another to merge or rebase
-- Tags and stashes (one-click Stash in the toolbar), with AI explanations for branches and stashes
+- Tags and stashes. Stash everything, tracked files only, staged only or just the files you pick, under a name you choose, or save a checkpoint that keeps your files
+- Rename a stash, or turn it into a branch; Apply and Pop restore what was staged
+- AI explanations for branches and stashes
 
 ### ☁️ Remotes & hosting
 - Fetch, pull (merge or rebase) and push, with ahead/behind counts. Push and Commit grey out when they can't run, and say why on hover

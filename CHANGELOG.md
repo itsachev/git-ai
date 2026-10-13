@@ -21,7 +21,7 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - **Pull requests:** create GitHub pull requests and GitLab merge requests from the branch menu.
 - **Conflict tools:** keep mine, keep theirs or keep both sides. Open the file in your editor, and finish the merge from the conflict bar.
 - **Diffs** with syntax colours, file-type icons, file history and blame, and comparing a file between any two branches or tags.
-- **Stashes:** a toolbar button, and see what a stash holds.
+- **Stashes:** stash everything, tracked files only, staged only or just the files you pick, under a name you choose, or save a checkpoint that keeps your changes in place. A notice confirms what was stashed. See what a stash holds, rename it, or turn it into a branch. Apply and Pop bring back what was staged too.
 - **Git LFS** dialog for tracking large files.
 - **Command palette** (Ctrl+K) that shows the git command behind each action, a keyboard shortcuts page (Ctrl+/), and Open in terminal.
 - **Your look:** System, Light or Dark theme and seven app colors.

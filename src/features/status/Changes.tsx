@@ -16,6 +16,7 @@ import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
 import { RefMenu, showMenu } from "../refs/Sidebar";
 import { openFileHistory } from "../graph/FileHistory";
+import { openStashSave } from "../refs/Stash";
 
 export const statusQuery = (path: string) => ({ queryKey: ["status", path], queryFn: () => repoStatus(path) });
 export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryFn: () => opLog(path) });
@@ -359,6 +360,8 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
   const active = sel?.staged === staged && files.some((f) => f.path === sel.file);
   const isMarked = (f: FileChange) => active && (marked.has(f.path) || f.path === sel?.file);
   const picked = files.filter(isMarked);
+  // The context menu acts on the selection when its row is part of it.
+  const ctxFiles = ctx && picked.length > 1 && picked.includes(ctx) ? picked : ctx ? [ctx] : [];
   const range = (a: number, b: number) => new Set(files.slice(Math.min(a, b), Math.max(a, b) + 1).map((f) => f.path));
   function click(e: React.MouseEvent, i: number) {
     const p = files[i].path;
@@ -413,6 +416,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
       <RefMenu pop={menu} label={`Actions for ${ctx?.path ?? "file"}`} actions={ctx ? [
         ["Compare with branch…", () => openFileHistory("HEAD", ctx.path, "compare")],
         ["History and blame", () => openFileHistory("HEAD", ctx.path), ctx.kind === "?" || ctx.kind === "A" ? "New file: no history yet" : undefined],
+        [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files…` : "Stash this file…", () => openStashSave(pathsOf(ctxFiles))],
       ] : []} />
     </section>
   );

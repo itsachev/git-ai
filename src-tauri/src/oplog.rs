@@ -345,7 +345,7 @@ mod tests {
 ").unwrap();
         fs::write(dir.join("new.txt"), "new
 ").unwrap();
-        cli::stash_save(p, "wip").unwrap();
+        cli::stash_save(p, "wip", cli::StashMode::All, false, &[]).unwrap();
         assert!(!dir.join("new.txt").exists());
         let oid = cli::rev(p, "stash@{0}").unwrap();
         assert_eq!(cli::stash(p, cli::StashOp::Drop, 0, "nope").unwrap_err().code, "stale");
@@ -358,6 +358,32 @@ mod tests {
 ");
         assert_eq!(fs::read_to_string(dir.join("new.txt")).unwrap(), "new
 ");
+        assert_eq!(top().op, "drop stash");
+
+        // Checkpoint keeps the files; staged-only leaves the rest; nothing to stash is an error.
+        cli::stash_save(p, "", cli::StashMode::All, true, &[]).unwrap();
+        assert!(dir.join("new.txt").exists());
+        assert!(cli::rev(p, "stash@{0}").is_ok());
+        git(p, &["add", "a.txt"]).unwrap();
+        cli::stash_save(p, "staged", cli::StashMode::Staged, false, &[]).unwrap();
+        assert_ne!(fs::read_to_string(dir.join("a.txt")).unwrap(), "wip\n");
+        assert!(dir.join("new.txt").exists());
+        assert_eq!(cli::stash_save(p, "", cli::StashMode::Staged, false, &[]).unwrap_err().code, "empty");
+
+        // Only some paths; rename; pop brings staging back; branch from a stash.
+        cli::stash_save(p, "one", cli::StashMode::All, false, &["new.txt".into()]).unwrap();
+        assert!(!dir.join("new.txt").exists());
+        let one = cli::rev(p, "stash@{0}").unwrap();
+        cli::stash(p, cli::StashOp::Pop, 2, &cli::rev(p, "stash@{2}").unwrap()).unwrap(); // the checkpoint
+        cli::stash_rename(p, 1, &cli::rev(p, "stash@{1}").unwrap(), "On main: renamed").unwrap();
+        assert_eq!(git(p, &["stash", "list", "--format=%gs"]).unwrap(), "On main: renamed
+On main: one
+");
+        assert_eq!(cli::rev(p, "stash@{1}").unwrap(), one);
+        git(p, &["reset", "-q", "--hard"]).unwrap();
+        cli::stash_branch(p, 0, &cli::rev(p, "stash@{0}").unwrap(), "from-stash").unwrap();
+        assert_eq!(git(p, &["branch", "--show-current"]).unwrap().trim(), "from-stash");
+        assert!(git(p, &["diff", "--cached", "--name-only"]).unwrap().contains("a.txt"), "staging restored");
         assert_eq!(top().op, "drop stash");
         let _ = fs::remove_dir_all(&dir);
     }

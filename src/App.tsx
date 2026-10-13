@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, stashSave, toolVersions, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, toolVersions, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -16,7 +16,7 @@ import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs
 import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { RebaseDialog } from "./features/graph/Rebase";
 import { FileHistoryDialog } from "./features/graph/FileHistory";
-import { StashDialog } from "./features/refs/Stash";
+import { StashDialog, StashSaveDialog, openStashSave } from "./features/refs/Stash";
 import { AskpassDialog, CloneDialog, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
@@ -418,6 +418,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   ];
   if (status?.unstaged.length)
     commands.push({ label: "Stage all changes", keys: "Ctrl+Shift+S", git: "git add -A", run: () => run(() => stage(path, pathsOf(status.unstaged))) });
+  if (changed) commands.push({ label: "Stash changes…", git: "git stash push -u -m <name>", run: () => openStashSave() });
   if (status?.staged.length) commands.push({ label: "Unstage all", git: "git reset", run: () => run(() => unstage(path, pathsOf(status.staged))) });
   // The label is what the new entry will be: undoing an undo is a redo.
   if (log?.[0]) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: () => run(() => undo(path, log[0].id)) });
@@ -459,7 +460,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
           <SyncButtons sync={sync}>
-            <button disabled={!changed} onClick={() => run(() => stashSave(path, ""))} title="Stash all changes, untracked files included">
+            <button disabled={!changed} onClick={() => openStashSave()} title="Stash changes: name it, pick which ones">
               <Icon name="stash" /><span className="btn-label">Stash</span>
             </button>
             <NewBranchButton />
@@ -477,6 +478,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <RebaseDialog path={path} />
         <FileHistoryDialog path={path} />
         <StashDialog path={path} />
+        <StashSaveDialog path={path} />
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
         {/* No shortcuts or palette commands while busy. */}

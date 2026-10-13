@@ -792,10 +792,47 @@ pub fn delete_tag(repo: &Path, name: &str) -> Result<(), AppError> {
     crate::oplog::record(repo, e)
 }
 
-/// Stashes all changes, untracked files included.
-pub fn stash_save(repo: &Path, message: &str) -> Result<(), AppError> {
-    let args: &[&str] = if message.trim().is_empty() { &["stash", "push", "-q", "-u"] } else { &["stash", "push", "-q", "-u", "-m", message] };
-    git(repo, args).map(drop)
+/// Which changes a new stash takes.
+#[derive(Debug, Clone, Copy, Deserialize, TS)]
+#[ts(export)]
+pub enum StashMode {
+    /// Tracked and untracked files.
+    All,
+    Tracked,
+    Staged,
+}
+
+/// Stashes the changes `mode` picks, only in `paths` when given. An empty `message` gets git's
+/// "WIP on <branch>". With `keep`, the changes are put straight back (staging too), so the stash is a
+/// checkpoint. Code "empty" when nothing was stashed.
+pub fn stash_save(repo: &Path, message: &str, mode: StashMode, keep: bool, paths: &[String]) -> Result<(), AppError> {
+    // `--staged -- <paths>` resets the working copy of other staged files (git 2.55).
+    if matches!(mode, StashMode::Staged) && !paths.is_empty() {
+        return Err(AppError::new("bad_mode", "Staged only can't be combined with picked files."));
+    }
+    let mut args = vec!["stash", "push", "-q"];
+    args.push(match mode {
+        StashMode::All => "-u",
+        StashMode::Tracked => "--no-include-untracked",
+        StashMode::Staged => "--staged",
+    });
+    if !message.trim().is_empty() {
+        args.extend(["-m", message.trim()]);
+    }
+    if !paths.is_empty() {
+        args.push("--");
+        args.extend(paths.iter().map(String::as_str));
+    }
+    let before = rev(repo, "refs/stash").ok();
+    let res = git(repo, &args);
+    if rev(repo, "refs/stash").ok() == before {
+        res?;
+        return Err(AppError::new("empty", "There was nothing to stash for that choice."));
+    }
+    if keep {
+        git(repo, &["stash", "apply", "-q", "--index"])?;
+    }
+    Ok(())
 }
 
 /// What to do with `stash@{index}`.
@@ -820,7 +857,12 @@ pub fn stash(repo: &Path, op: StashOp, index: usize, oid: &str) -> Result<(), Ap
         StashOp::Pop => "pop",
         StashOp::Drop => "drop",
     };
-    let res = git(repo, &["stash", verb, "-q", &name]).map(drop);
+    // Apply and Pop bring staging back too, unless it can't be (staged changes clash): then plain.
+    let index = !matches!(op, StashOp::Drop);
+    let mut res = git(repo, &if index { vec!["stash", verb, "-q", "--index", &name] } else { vec!["stash", verb, "-q", &name] }).map(drop);
+    if index && res.as_ref().is_err_and(|e| e.message.contains("--index")) {
+        res = git(repo, &["stash", verb, "-q", &name]).map(drop);
+    }
     let still_there = git(repo, &["stash", "list", "--format=%H"])?.lines().any(|l| l == oid);
     if !still_there {
         crate::oplog::record(repo, crate::oplog::OpEntry::new("drop stash", Some(oid.to_string()), None))?;
@@ -830,6 +872,36 @@ pub fn stash(repo: &Path, op: StashOp, index: usize, oid: &str) -> Result<(), Ap
     } else {
         e
     })
+}
+
+/// Renames `stash@{index}` (still `oid`) to `message`. Git can't rename in place: the stash is stored
+/// again under the new name, then the old entry dropped, so it moves to the top of the list.
+// ponytail: moves to stash@{0}; rewrite the whole stash reflog if keeping the position matters.
+pub fn stash_rename(repo: &Path, index: usize, oid: &str, message: &str) -> Result<(), AppError> {
+    if rev(repo, &format!("stash@{{{index}}}")).ok().as_deref() != Some(oid) {
+        return Err(AppError::new("stale", "The stash list changed. Try again."));
+    }
+    if message.trim().is_empty() {
+        return Err(AppError::new("bad_name", "Give the stash a name."));
+    }
+    git(repo, &["stash", "store", "-m", message.trim(), oid])?;
+    // The store pushed everything down one.
+    git(repo, &["stash", "drop", "-q", &format!("stash@{{{}}}", index + 1)]).map(drop)
+}
+
+/// `git stash branch`: creates `branch` at the commit the stash was made on, switches to it and applies
+/// the stash there (staging too), dropping it when it applied cleanly. The drop is logged for undo.
+pub fn stash_branch(repo: &Path, index: usize, oid: &str, branch: &str) -> Result<(), AppError> {
+    ref_arg(branch)?;
+    let name = format!("stash@{{{index}}}");
+    if rev(repo, &name).ok().as_deref() != Some(oid) {
+        return Err(AppError::new("stale", "The stash list changed. Try again."));
+    }
+    let res = git(repo, &["stash", "branch", branch, &name]).map(drop);
+    if !git(repo, &["stash", "list", "--format=%H"])?.lines().any(|l| l == oid) {
+        crate::oplog::record(repo, crate::oplog::OpEntry::new("drop stash", Some(oid.to_string()), None))?;
+    }
+    res
 }
 
 /// Switches to a local branch, or with `track` creates a local branch tracking the remote branch `name`.

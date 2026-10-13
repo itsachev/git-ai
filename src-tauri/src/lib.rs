@@ -66,6 +66,8 @@ pub fn run() {
             commands::delete_tag,
             commands::stash_save,
             commands::stash,
+            commands::stash_rename,
+            commands::stash_branch,
             commands::fetch,
             commands::pull,
             commands::push,

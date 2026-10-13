@@ -1408,13 +1408,15 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 }
 
 /* ---------- New branch dialog (features/refs/NewBranch.tsx) ---------- */
-.new-branch-dialog form { display: grid; gap: 1.1rem; }
-.new-branch-dialog .modal-head { margin-bottom: 0; }
-.new-branch-dialog .dialog-actions { margin-top: 0; }
+.new-branch-dialog form, .stash-save-dialog form { display: grid; gap: 1.1rem; }
+:is(.new-branch-dialog, .stash-save-dialog) .modal-head { margin-bottom: 0; }
+:is(.new-branch-dialog, .stash-save-dialog) .dialog-actions { margin-top: 0; }
+/* Stash dialog: the "What to stash" segments wrap on narrow windows. */
+.stash-save-dialog .seg { flex-wrap: wrap; justify-self: start; }
 .nb-field { display: grid; gap: 0.4rem; }
 .prompt-field { margin-bottom: 0.9rem; font-size: 0.85rem; font-weight: 700; }
 .prompt-field input { font-weight: 400; }
-.nb-field > label { font-size: 0.85rem; font-weight: 700; }
+.nb-field > label, .nb-field > .label { font-size: 0.85rem; font-weight: 700; }
 .nb-field input, .select select { min-height: calc(var(--ctl) + 0.4rem); font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0; }
 .nb-field input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .nb-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
