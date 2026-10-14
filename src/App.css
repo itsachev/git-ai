@@ -210,9 +210,10 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .mark { width: 1.6rem; height: 1.6rem; color: var(--fg); }
 /* The headline is the hero; the brand sits above it as a lockup. */
 .home h1 {
-  max-width: 13ch; font: 650 clamp(2.4rem, 4.6vw, 4rem)/0.98 var(--display); letter-spacing: -0.04em; text-wrap: balance;
+  max-width: 13ch; font: 650 clamp(2rem, 3.6vw, 3.2rem)/0.98 var(--display); letter-spacing: -0.04em; text-wrap: balance;
 }
-.home h1 .w-mask { padding-bottom: 0.12em; margin-bottom: -0.12em; } /* SplitText word masks (App.tsx intro): keep descenders */
+/* SplitText word masks (home and shortcuts intros): room for descenders and for glyphs that overhang the tight tracking. */
+.w-mask { padding: 0 0.12em 0.12em; margin: 0 -0.12em -0.12em; }
 /* The app name (lib/modal.tsx Brand): a size up, heavier, in a spruce → sea-glass → honey gradient that slowly drifts.
    Mixing the stops with --fg deepens them on light themes and lifts them on dark, so the name keeps its contrast. */
 .brand-name {
@@ -398,6 +399,8 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   flex: 0 1 12rem; min-width: 7.5rem; display: flex; align-items: center; border-radius: var(--r) var(--r) 0 0;
   color: var(--muted); transition: background-color 180ms var(--ease), color 180ms var(--ease); animation: rise 260ms var(--ease);
 }
+/* Inactive tabs have no fill, so the strip reads as their box: span its full height (through the top padding) to center on it. */
+.tab:not([aria-current]) { align-self: stretch; margin-top: -0.3rem; }
 .tab:hover { background: var(--pick); color: var(--fg); }
 /* Active: filled with the accent. */
 .tab[aria-current] { background: var(--accent); color: var(--accent-ink); }
@@ -1233,8 +1236,8 @@ dialog.settings .setting > p.muted { max-width: 68ch; line-height: 1.5; text-wra
 dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards; animation-delay: calc(200ms + var(--i) * 60ms); }
 @media (min-width: 52rem) {
   .settings-layout { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; }
-  /* Header = pad + 2.6rem badge + 1rem; sticky offsets start at the content edge. */
-  .settings-nav { position: sticky; top: 4.1rem; align-self: start; grid-template-columns: none; }
+  /* --stick = the nav's resting offset from the content edge (measured in SettingsNav), so it never moves. */
+  .settings-nav { position: sticky; top: var(--stick, 4.7rem); align-self: start; grid-template-columns: none; }
   .settings-nav button.settings-go { margin-top: 0.6rem; }
 }
 /* Section titles inside any modal: larger and heavier than body text so sections scan at a glance. */
@@ -1285,7 +1288,7 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 .sc-eyebrow { grid-row: 1; display: flex; align-items: center; gap: 0.45rem; margin: 0; font: 700 0.75rem var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-fg); }
 .sc-eyebrow .icon { width: 1rem; height: 1rem; }
 /* Sized off the page width so the line fills it: ~15.5em of text at this weight and tracking. */
-.sc-title { margin: 0; font: 800 clamp(2rem, 6.3cqi, 8rem)/0.98 var(--display); letter-spacing: -0.05em; text-wrap: balance; }
+.sc-title { margin: 0; font: 800 clamp(1.8rem, 4.4cqi, 4.8rem)/0.98 var(--display); letter-spacing: -0.05em; text-wrap: balance; }
 .sc-lede { max-width: 46ch; margin: 0; font-size: 1.02rem; line-height: 1.9; color: var(--muted); text-wrap: pretty; }
 /* The one shortcut to remember: a strip of caps, divider, then what it does. K glows and pings every few seconds. */
 .sc-hero-keys {

@@ -92,7 +92,7 @@ export function Shortcuts({ commands }: { commands: Command[] }) {
   // Intro: headline out of its word masks, the hero caps drop in like struck keys, then the bands rise.
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => {
-      const words = SplitText.create(".sc-title", { type: "words", mask: "words", aria: "auto" }).words;
+      const words = SplitText.create(".sc-title", { type: "words", wordsClass: "w", mask: "words", aria: "auto" }).words;
       gsap.timeline({ defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
         .from(".sc-eyebrow", { opacity: 0, y: 8, duration: 0.5 })
         .from(words, { yPercent: 110, stagger: 0.055, duration: 0.9 }, 0.05)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { open as pickFile } from "@tauri-apps/plugin-dialog";
@@ -74,6 +74,15 @@ function SettingsNav() {
   const ai = PROVIDERS[cfg && cfg.provider in PROVIDERS ? cfg.provider : "gemini"];
   const local = cfg?.provider === "openai" && !!cfg.base_url.trim();
   const accent = useAccent();
+  // Stick exactly where the nav starts, so it doesn't slide under a header taller than expected before sticking.
+  const nav = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = nav.current!, d = el.closest("dialog")!, head = d.querySelector(".modal-head");
+    const fit = () => el.style.setProperty("--stick", `${el.parentElement!.offsetTop - parseFloat(getComputedStyle(d).paddingTop)}px`);
+    const ro = new ResizeObserver(fit);
+    if (head) ro.observe(head);
+    return () => ro.disconnect();
+  }, []);
   // [value, state]: ok = set up, idle = fine as is, todo = needs doing.
   const status: Record<string, [string, "ok" | "idle" | "todo"]> = {
     "settings-identity": setup?.name && setup.email ? [`${setup.name} · ${setup.email}`, "ok"] : ["Not set", "todo"],
@@ -90,7 +99,7 @@ function SettingsNav() {
     card?.classList.add("lit");
   }
   return (
-    <nav className="settings-nav" aria-label="Settings sections">
+    <nav ref={nav} className="settings-nav" aria-label="Settings sections">
       {SECTIONS.map(({ id, title, icon, hue }, i) => {
         const [value, state] = status[id];
         return (
