@@ -4,6 +4,9 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+- **Open tabs come back:** repositories you had open in tabs reopen the next time you start git-ai, on the tab you were last using.
+
 ## [0.1.1] - 2026-10-13
 
 First release. Windows only for now: macOS and Linux installers will follow once the macOS app is code-signed and the Linux build is tested.

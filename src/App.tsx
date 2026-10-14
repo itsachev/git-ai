@@ -119,10 +119,21 @@ function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]
   );
 }
 
+/** Open tabs and the active one, kept across restarts (a per-window convenience, like the other UI choices). */
+const TABS_KEY = "gitai.tabs";
+function savedTabs(): { tabs: RepoInfo[]; active: string | null } {
+  try {
+    const s = JSON.parse(localStorage.getItem(TABS_KEY) ?? "null");
+    if (Array.isArray(s?.tabs)) return { tabs: s.tabs, active: s.tabs.some((t: RepoInfo) => t.path === s.active) ? s.active : null };
+  } catch { /* storage blocked or corrupt */ }
+  return { tabs: [], active: null };
+}
+const saved = savedTabs();
+
 function App() {
   // Open repos as tabs. Only the active one is mounted: the backend watches one repo at a time.
-  const [tabs, setTabs] = useState<RepoInfo[]>([]);
-  const [active, setActive] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<RepoInfo[]>(saved.tabs);
+  const [active, setActive] = useState<string | null>(saved.active);
   const repo = tabs.find((t) => t.path === active) ?? null;
   const qc = useQueryClient();
   const [recent, setRecent] = useState<string[]>([]);
@@ -167,8 +178,18 @@ function App() {
     setMissing(m);
   }
 
+  useEffect(() => {
+    try { localStorage.setItem(TABS_KEY, JSON.stringify({ tabs, active })); } catch { /* storage blocked */ }
+  }, [tabs, active]);
+
   // Re-check on focus: folders get deleted outside the app.
   useEffect(() => {
+    // Restored tabs: point the watcher at the active one. Inactive ones get checked when selected (select()).
+    if (saved.active) openRepo(saved.active).catch((e) => {
+      setError((e as AppError).message ?? String(e));
+      drop(saved.active!);
+      setActive(null);
+    });
     refresh();
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
