@@ -52,6 +52,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - Commit and amend, with an **AI-generated commit message**
 - Ignore files by name, extension or folder
 - **Git LFS**: track or untrack patterns, download LFS files
+- **Syntax colours** in diffs for about 190 languages, plus Vue, Svelte and Astro components
 - Binary files and files over 1 MB get no inline diff
 
 ### 🕸️ History

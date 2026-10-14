@@ -26,6 +26,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Amend the last commit", "Commit box → Amend last commit", "Fixes the most recent commit instead of adding a new one: correct its message or add a forgotten file. Recorded, so it can be undone."],
     ["AI commit message", "Commit box → Generate message · Ctrl+Shift+M jumps to the box", "The AI reads your staged diff and writes the commit message for you to review. Needs AI set up in Settings."],
     ["Ignore files", "Ignore on an untracked file", "Adds that file, every file with its extension, or its folder to .gitignore, so git stops listing them. Commit .gitignore like any file."],
+    ["Syntax colours", "Automatic, in every diff", "Code is coloured by language: about 190 of them, from C, C++, Python and TypeScript to Elixir and Haskell, plus Vue, Svelte and Astro components."],
     ["Large and binary files", "Automatic", "No inline diff for binary files or files over 1 MB, and LFS pointer files show as files, so big repositories stay fast."],
     ["Git LFS", "Ctrl+K → Git LFS… · or Track *.ext with Git LFS… under a big file", "Stores large files on the LFS server and keeps small pointers in the repository. Track or untrack file patterns, and download LFS files that still show as pointers."],
   ]],

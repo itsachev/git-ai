@@ -8,6 +8,7 @@ What's new in each git-ai release. Newest first.
 - **Open tabs come back:** repositories you had open in tabs reopen the next time you start git-ai, on the tab you were last using.
 
 ### Changed
+- **Syntax colours for many more languages:** diffs now colour nearly every programming language, about 190 in all (Elixir, Haskell, Scala, Dart, PowerShell, Clojure and more), plus Vue, Svelte and Astro components. Rarer languages load the first time you open such a file.
 - **Ask before risky actions:** resetting a branch (after you pick Soft, Mixed, Keep or Hard), recreating a branch from its remote, merging or rebasing from a menu or by dragging a branch, force pushing, and undoing now each ask you to confirm first.
 - **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.
 - **Roomier Settings, About and File history on big screens:** they open at 80% of the window, and Settings lays its sections out two by two with paired fields side by side. Small windows keep the stacked layout.
