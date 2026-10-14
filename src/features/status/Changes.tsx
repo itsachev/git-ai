@@ -125,7 +125,6 @@ export function OpErrorDialog({ path }: { path: string }) {
 export function Notice() {
   // The snapshot must be `notice` itself: a success changes it but not `opGen`.
   const shown = useSyncExternalStore(subscribeOps, () => notice);
-  const [hidden, setHidden] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now);
   // Ticks while an op runs: reveals it at 250 ms, then counts seconds.
   useEffect(() => {
@@ -134,7 +133,7 @@ export function Notice() {
     const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
   }, [shown]);
-  const cur = shown && hidden !== shown.gen && (!shown.pending || now - shown.pending >= 250) ? shown : null;
+  const cur = shown && (!shown.pending || now - shown.pending >= 250) ? shown : null;
   const ref = useRef<HTMLParagraphElement>(null);
   const visible = !!cur;
   useEffect(() => {
@@ -147,7 +146,12 @@ export function Notice() {
   }, [visible, cur?.gen]);
   useEffect(() => {
     if (!cur || cur.pending) return;
-    const t = setTimeout(() => setHidden(cur.gen), 4000);
+    // Clears the shared notice, not local state: Notice remounts on a repo switch and would show it again.
+    const t = setTimeout(() => {
+      if (notice?.gen !== cur.gen) return;
+      notice = null;
+      opSubs.forEach((f) => f());
+    }, 4000);
     return () => clearTimeout(t);
   }, [cur]);
   const secs = cur?.pending ? Math.floor((now - cur.pending) / 1000) : 0;

@@ -16,6 +16,7 @@ What's new in each git-ai release. Newest first.
 ### Fixed
 - Scrollbars in dialogs no longer stick out past their rounded corners.
 - Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
+- A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.
 
 ## [0.1.1] - 2026-10-13
 
