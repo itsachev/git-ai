@@ -152,7 +152,7 @@ export function showMenu(el: HTMLElement | null, e: React.MouseEvent<HTMLElement
 export function RefMenu({ pop, label, actions }: { pop: React.RefObject<HTMLDivElement | null>; label: string; actions: Action[] }) {
   return (
     <div ref={pop} popover="auto" className="row-menu" role="menu" aria-label={label}>
-      {actions.map(([a, fn, off]) => <button key={a} role="menuitem" disabled={!!off} title={off} onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}</button>)}
+      {actions.map(([a, fn, off]) => <button key={a} role="menuitem" disabled={!!off} onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}{off && <small>{off}</small>}</button>)}
     </div>
   );
 }

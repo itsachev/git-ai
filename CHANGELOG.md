@@ -14,6 +14,7 @@ What's new in each git-ai release. Newest first.
 - **Calmer dark theme:** text no longer glares white everywhere. Titles, commit subjects and the current branch stay bright; body text is a soft parchment, and dates, authors, hashes and labels step back. Easier to scan, easier on the eyes.
 - **Coloured toolbar icons:** Fetch and Pull, Push, Stash and Branch each have their own icon colour, so you can find them at a glance.
 - **Commit title in colour:** the selected commit's title in the details pane fades from your accent colour into white.
+- **Greyed-out menu items say why:** in a branch's menu, an option you can't use right now shows the reason underneath it, instead of in a plain pop-up you had to hover for.
 - **Better-looking dropdowns:** on Windows, every dropdown opens as a soft, translucent menu that matches the rest of the app, with group headings for branches, remote branches and tags, a highlight on the option you're pointing at and a check next to the current choice. They still work fully from the keyboard.
 - **Syntax colours for many more languages:** diffs now colour nearly every programming language, about 190 in all (Elixir, Haskell, Scala, Dart, PowerShell, Clojure and more), plus Vue, Svelte and Astro components. Rarer languages load the first time you open such a file.
 - **Ask before risky actions:** resetting a branch (after you pick Soft, Mixed, Keep or Hard), recreating a branch from its remote, merging or rebasing from a menu or by dragging a branch, force pushing, and undoing now each ask you to confirm first.

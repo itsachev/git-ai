@@ -623,6 +623,9 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .row-menu:popover-open { display: grid; gap: 1px; opacity: 1; scale: 1; }
 @starting-style { .row-menu:popover-open { opacity: 0; scale: 0.94; } }
 .row-menu button { justify-content: flex-start; color: inherit; background: none; box-shadow: none; padding: 0 0.7rem; border-radius: 6px; font-weight: 500; }
+/* Disabled item with a reason: the reason sits under the label, so it reads without hover (and on touch). */
+.row-menu button:has(small) { flex-direction: column; align-items: flex-start; gap: 0.05rem; padding-block: 0.4rem; opacity: 1; color: var(--faint); }
+.row-menu button small { max-width: 15rem; white-space: normal; text-align: left; font-size: 0.76rem; line-height: 1.35; color: var(--muted); }
 .row-menu button:hover:not(:disabled), .row-menu button:focus-visible { background: var(--accent); color: var(--accent-ink); outline: none; }
 /* Undo history: label over its time, Undo always visible. */
 .ops .name { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0.3rem 0.25rem 0.3rem 1.6rem; font-family: inherit; }
