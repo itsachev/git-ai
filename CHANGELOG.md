@@ -16,6 +16,7 @@ What's new in each git-ai release. Newest first.
 - **Ask before risky actions:** resetting a branch (after you pick Soft, Mixed, Keep or Hard), recreating a branch from its remote, merging or rebasing from a menu or by dragging a branch, force pushing, and undoing now each ask you to confirm first.
 - **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.
 - **Current branch stays in view:** in the sidebar's branch list, your current branch stays stuck at the top while you scroll through the others.
+- **Blame opens at the commit you picked:** in a file's history, switching to Blame scrolls to the first lines that the selected commit last changed. Clicking a commit in Blame scrolls the History list to it.
 - **Undo history keeps 30 days:** operations older than 30 days leave the undo list, and the backup copies kept for them are released so Git can free the disk space.
 - **Roomier Settings, About and File history on big screens:** they open at 80% of the window, and Settings lays its sections out two by two with paired fields side by side. Small windows keep the stacked layout.
 

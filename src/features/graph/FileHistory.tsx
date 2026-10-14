@@ -41,6 +41,9 @@ function Body({ path, rev, file, initial }: { path: string; rev: string; file: s
   const shown = log.data?.find((c) => c.oid === picked) ?? log.data?.[0];
   const name = file.slice(file.lastIndexOf("/") + 1);
   const show = (oid: string) => { setPicked(oid); setTab("history"); };
+  // A commit picked from Blame may be far down the list.
+  const selRow = useRef<HTMLLIElement>(null);
+  useEffect(() => { selRow.current?.scrollIntoView({ block: "nearest" }); }, [shown, tab]);
 
   return (
     <div className="fh">
@@ -61,7 +64,7 @@ function Body({ path, rev, file, initial }: { path: string; rev: string; file: s
               {log.data.map((c) => {
                 const on = c === shown;
                 return (
-                  <li key={c.oid} className={on ? "sel" : undefined}>
+                  <li key={c.oid} ref={on ? selRow : undefined} className={on ? "sel" : undefined}>
                     <button type="button" className="row" aria-pressed={on} onClick={() => setPicked(c.oid)}>
                       <strong>{c.subject}</strong>
                       <small><span className="mono">{c.oid.slice(0, 7)}</span> · {c.author} · {ago(c.time)}</small>
@@ -75,7 +78,7 @@ function Body({ path, rev, file, initial }: { path: string; rev: string; file: s
           {shown && <CommitDiff path={path} oid={shown.oid} file={shown.path} />}
         </div>
       ) : tab === "blame" ? (
-        <BlameView path={path} rev={rev} file={file} onPick={show} />
+        <BlameView path={path} rev={rev} file={file} onPick={show} focus={shown?.oid} />
       ) : (
         <CompareView path={path} rev={rev} file={file} />
       )}
@@ -126,12 +129,16 @@ function CompareView({ path, rev, file }: { path: string; rev: string; file: str
   );
 }
 
-function BlameView({ path, rev, file, onPick }: { path: string; rev: string; file: string; onPick: (oid: string) => void }) {
+/** `focus`: the commit picked in History; its first lines scroll to the top. */
+function BlameView({ path, rev, file, onPick, focus }: { path: string; rev: string; file: string; onPick: (oid: string) => void; focus?: string }) {
   const { data, error } = useQuery({ queryKey: ["blame", path, rev, file], queryFn: () => blame(path, rev, file), staleTime: Infinity });
+  const target = useRef<HTMLDivElement>(null);
+  useEffect(() => { target.current?.scrollIntoView({ block: "start" }); }, [data]);
   if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
   if (!data) return <p className="nb-hint">Blaming… (long-lived files can take a few seconds)</p>;
   if (data.text === null) return <section className="diff muted">Binary file or larger than 1 MB, no blame.</section>;
   const lines = data.text.replace(/\n$/, "").split("\n");
+  const at = data.hunks.findIndex((h) => h.oid === focus);
   // ponytail: renders every line (≤ 1 MB file), like the diff view; virtualize if big files feel slow.
   return (
     <section className="diff">
@@ -140,7 +147,7 @@ function BlameView({ path, rev, file, onPick }: { path: string; rev: string; fil
           Array.from({ length: h.lines }, (_, i) => {
             const n = h.start + i;
             return (
-              <div key={n} className={`${k % 2 ? "alt" : ""}${i === 0 ? " first" : ""}`}>
+              <div key={n} ref={k === at && i === 0 ? target : undefined} className={`${k % 2 ? "alt" : ""}${i === 0 ? " first" : ""}`}>
                 <span className="who">
                   {i === 0 && (
                     <button type="button" className="link" title={`${h.subject}\nShow this commit's change`} onClick={() => onPick(h.oid)}>
