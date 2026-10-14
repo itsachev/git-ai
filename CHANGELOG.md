@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-14
+
 ### Added
 - **Find any file's history from Ctrl+K:** type part of a file name in the command palette and pick the file to open its history and blame. You no longer need to find a commit that changed it first.
 - **Choose what History search looks at:** a menu next to the search box picks All, Message, Author, Commit id, or File or folder. With File or folder, type part of a path (for example `App.tsx` or `src/lib`) to highlight every commit that changed it.
@@ -63,5 +65,6 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - **Auto-update**, first-run setup, an About guide to every feature, SSH key choice, and Git and Node versions in the status bar.
 - **Portable Windows app:** `git-ai_<version>_x64-portable.exe` runs from any folder without installing.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/itsachev/git-ai/releases/tag/v0.1.1
