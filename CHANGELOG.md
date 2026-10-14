@@ -13,6 +13,8 @@ What's new in each git-ai release. Newest first.
 ### Changed
 - **Calmer dark theme:** text no longer glares white everywhere. Titles, commit subjects and the current branch stay bright; body text is a soft parchment, and dates, authors, hashes and labels step back. Easier to scan, easier on the eyes.
 - **Coloured toolbar icons:** Fetch and Pull, Push, Stash and Branch each have their own icon colour, so you can find them at a glance.
+- **Colourful feature names in About:** each feature name in the About dialog now shows in its area's colour, with a small marker in front, so the list is no longer a wall of white.
+- **Tidier Clone and Create buttons:** on the home screen their titles now sit next to their icons.
 - **Commit title in colour:** the selected commit's title in the details pane fades from your accent colour into white.
 - **Push works before you have a remote:** in a repository with no remote yet, Push asks for the repository URL, adds it as origin, and pushes your branch there. Push stays greyed out when there's nothing new to send, including a fresh branch that still matches a branch on the remote you push to. Pull is greyed out, with the reason, when your branch doesn't track a remote branch yet.
 - **Revert any commit:** Revert in commit details now works on commits from other branches too, not only the current one.

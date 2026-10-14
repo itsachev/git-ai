@@ -267,6 +267,10 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .tile:hover:not(:disabled) .icon { scale: 1.08; rotate: -6deg; }
 .tile.primary .icon { color: var(--accent-ink); background: rgb(255 255 255 / 0.18); }
 .tile span { display: grid; gap: 0.15rem; }
+/* Small tiles: title beside its icon, the description underneath across the tile. */
+.tile:not(.primary) { grid-template-columns: auto 1fr; align-items: center; align-content: center; gap: 0.6rem 0.75rem; min-height: 0; }
+.tile:not(.primary) span { display: contents; }
+.tile:not(.primary) small { grid-column: 1 / -1; }
 .tile strong { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.015em; }
 .tile small { font-size: 0.84rem; line-height: 1.35; color: var(--muted); font-weight: 400; }
 .tile.primary small { color: color-mix(in srgb, var(--accent-ink) 75%, transparent); }
@@ -1220,7 +1224,18 @@ dialog.modal[open] .about-grid section { animation: rise 460ms var(--ease) backw
 .about-grid li { display: grid; gap: 0.35rem; align-content: start; margin: 0 -0.6rem; padding: 0.75rem 0.6rem; border-radius: 10px; box-shadow: inset 0 1px color-mix(in srgb, var(--line) 80%, transparent); }
 .about-grid li.lit { animation: lit 1.6s var(--ease); }
 @keyframes lit { from, 30% { background: color-mix(in srgb, var(--hc) 16%, transparent); } }
-.about-grid li strong { font-size: 0.98rem; }
+/* Feature names take their area's hue, drifting to the next hue along, behind a short tick that stretches on hover. */
+.about-grid li strong {
+  display: flex; align-items: center; gap: 0.5rem; width: fit-content; font-size: 0.98rem; letter-spacing: -0.01em;
+  background: linear-gradient(95deg, var(--hc), color-mix(in oklab, oklch(0.66 0.16 calc(var(--h) + 50)) 80%, var(--fg)));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+.about-grid li strong::before {
+  content: ""; flex: none; width: 0.9rem; height: 3px; border-radius: 2px; background: var(--hc);
+  transform-origin: left; transition: transform 220ms var(--ease);
+}
+.about-grid li:hover strong::before { transform: scaleX(1.5); }
+.about-grid li strong mark { -webkit-text-fill-color: var(--hc); }
 .about-grid li p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
 /* Where to find it: steps as pills joined by chevrons, shortcuts as keys. */
 .feat-how { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font-size: 0.79rem; color: var(--fg); }
