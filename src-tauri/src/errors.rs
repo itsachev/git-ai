@@ -16,6 +16,8 @@ impl AppError {
 
     /// A failed git command: known failures get a code and a plain explanation, the rest keep git's text (code "git").
     pub fn from_stderr(stderr: &str) -> Self {
+        let stripped = strip_ansi(stderr);
+        let stderr = stripped.as_str();
         // The second is `reset --keep` refusing to touch an edited file.
         if stderr.contains("would be overwritten by") || stderr.contains("not uptodate. Cannot merge") {
             return Self::new("dirty", "You have uncommitted changes. Stash, commit or discard them, then try again.");
@@ -31,6 +33,38 @@ impl AppError {
         }
         Self::new("git", stderr.trim())
     }
+}
+
+/// Drops terminal escape sequences (colours, cursor moves, hyperlinks) that hooks like lefthook print even into a pipe.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            // CSI: parameters, then one final byte in @..~.
+            Some('[') => {
+                for c in chars.by_ref() {
+                    if ('@'..='~').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            // OSC: ends at BEL or ESC \.
+            Some(']') => {
+                while let Some(c) = chars.next() {
+                    if c == '\x07' || (c == '\x1b' && chars.next_if_eq(&'\\').is_some()) {
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 impl From<git2::Error> for AppError {
@@ -62,6 +96,12 @@ Aborting
         assert_eq!(AppError::from_stderr(lfs).code, "lfs_missing");
         assert_eq!(AppError::from_stderr("This repository is configured for Git LFS but 'git-lfs' was not found on your path.").code, "lfs_missing");
         assert_eq!(AppError::from_stderr("fatal: destination path 'x' already exists and is not an empty directory.\n").code, "exists");
+    }
+
+    #[test]
+    fn hook_colours_stripped() {
+        let e = AppError::from_stderr("\x1b[38;2;56;56;56m\u{2502} \x1b[0mlefthook  hook: \x1b[1mcommit-msg\x1b[0m\n\x1b]8;;https://x\x07link\x1b]8;;\x1b\\\n");
+        assert_eq!(e.message, "\u{2502} lefthook  hook: commit-msg\nlink");
     }
 
     #[test]
