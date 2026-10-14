@@ -49,6 +49,21 @@ pub struct GraphOpts {
     pub by_date: bool,
 }
 
+/// Which part of a commit the history search looks at.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, TS)]
+#[ts(export)]
+pub enum SearchIn {
+    /// Message, author or id.
+    All,
+    Message,
+    /// Name or email.
+    Author,
+    /// Id prefix.
+    Id,
+    /// Commits that changed a matching file or folder path.
+    File,
+}
+
 struct Layout {
     repo: String,
     opts: GraphOpts,
@@ -91,15 +106,25 @@ pub fn rows(cache: &GraphCache, path: &Path, opts: GraphOpts, offset: usize, lim
     Ok(GraphPage { total: l.rows.len() as u32, lanes: l.lanes, rows: rows.collect::<Result<_, AppError>>()? })
 }
 
-/// Rows whose message, author name or email contains `q` (any case), or whose id starts with it: (row, oid), newest first.
-pub fn search(cache: &GraphCache, path: &Path, opts: GraphOpts, q: &str) -> Result<Vec<(u32, String)>, AppError> {
+/// Rows matching `q` in `field` (any case; ids by prefix): (row, oid), newest first.
+pub fn search(cache: &GraphCache, path: &Path, opts: GraphOpts, field: SearchIn, q: &str) -> Result<Vec<(u32, String)>, AppError> {
     let q = q.trim().to_lowercase();
     if q.is_empty() {
         return Ok(vec![]);
     }
     let repo = Repository::open(path)?;
     // Copy the oids out so paging isn't blocked while this runs.
-    let oids: Vec<Oid> = fresh(cache, &repo, path, opts)?.0.as_ref().unwrap().rows.iter().map(|r| r.0).collect();
+    let (oids, key, not) = {
+        let g = fresh(cache, &repo, path, opts)?.0;
+        let l = g.as_ref().unwrap();
+        (l.rows.iter().map(|r| r.0).collect::<Vec<Oid>>(), l.key.clone(), l.not.clone())
+    };
+    if field == SearchIn::File {
+        return touching(path, &oids, &key, &not, &q);
+    }
+    if field == SearchIn::Id {
+        return Ok(oids.iter().enumerate().map(|(i, o)| (i as u32, o.to_string())).filter(|h| h.1.starts_with(&q)).collect());
+    }
     let has = |b: &[u8]| String::from_utf8_lossy(b).to_lowercase().contains(&q);
     // ponytail: parses every commit per search (~1 s per 100k); keep messages in the layout if that's slow.
     let mut hits = vec![];
@@ -107,11 +132,34 @@ pub fn search(cache: &GraphCache, path: &Path, opts: GraphOpts, q: &str) -> Resu
         let id = oid.to_string();
         let c = repo.find_commit(oid)?;
         let a = c.author();
-        if id.starts_with(&q) || has(c.message_bytes()) || has(a.name_bytes()) || has(a.email_bytes()) {
+        let msg = || has(c.message_bytes());
+        let who = || has(a.name_bytes()) || has(a.email_bytes());
+        let hit = match field {
+            SearchIn::Message => msg(),
+            SearchIn::Author => who(),
+            _ => id.starts_with(&q) || msg() || who(),
+        };
+        if hit {
             hits.push((i as u32, id));
         }
     }
     Ok(hits)
+}
+
+/// Rows of commits that changed a path containing `p` (any case, any folder): a file or a whole folder.
+/// The walk runs the `git` binary like `compute`.
+fn touching(path: &Path, oids: &[Oid], key: &[Oid], not: &[Oid], p: &str) -> Result<Vec<(u32, String)>, AppError> {
+    if key.is_empty() {
+        return Ok(vec![]);
+    }
+    // Glob pathspecs don't match a folder's files on their own, hence the second `/**` one.
+    // ponytail: globs skip the changed-path Bloom filters (~1 s per 100k commits); pass exact paths through if that's slow.
+    let file = format!(":(glob,icase)**/*{p}*");
+    let dir = format!("{file}/**");
+    let tips: String = key.iter().map(|o| format!("{o}\n")).chain(not.iter().map(|o| format!("^{o}\n"))).collect();
+    let out = crate::git::cli::git_input(path, &["rev-list", "--stdin", "--", &file, &dir], &tips)?;
+    let hit: std::collections::HashSet<Oid> = out.lines().filter_map(|l| Oid::from_str(l).ok()).collect();
+    Ok(oids.iter().enumerate().filter(|(_, o)| hit.contains(o)).map(|(i, o)| (i as u32, o.to_string())).collect())
 }
 
 /// The cached layout for `opts`, recomputed when the repo, the options or any ref changed. Also the tips and HEAD.
@@ -234,7 +282,35 @@ fn layout<T: Copy + PartialEq>(commits: &[(T, Vec<T>)]) -> (Vec<(u32, Vec<(u32, 
 
 #[cfg(test)]
 mod tests {
-    use super::layout;
+    use super::{layout, search, GraphCache, GraphOpts, SearchIn};
+
+    #[test]
+    fn search_fields() {
+        let dir = std::env::temp_dir().join(format!("git-ai-test-file-search-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src/lib")).unwrap();
+        let p = dir.as_path();
+        let git = |a: &[&str]| crate::git::cli::git(p, a).unwrap();
+        git(&["init", "-q", "-b", "main"]);
+        git(&["config", "user.name", "t"]);
+        git(&["config", "user.email", "t@t"]);
+        for (f, msg) in [("README.md", "one"), ("src/App.tsx", "two"), ("src/lib/ipc.ts", "three"), ("src/App.tsx", "four")] {
+            std::fs::write(dir.join(f), msg).unwrap();
+            git(&["add", "--", f]);
+            git(&["commit", "-q", "-m", msg]);
+        }
+        let opts = GraphOpts { all: true, own: false, remotes: false, by_date: false };
+        let rows = |f, q: &str| search(&GraphCache::default(), p, opts, f, q).unwrap().into_iter().map(|h| h.0).collect::<Vec<_>>();
+        assert_eq!(rows(SearchIn::File, "app.tsx"), vec![0, 2]); // any case, any folder
+        assert_eq!(rows(SearchIn::File, "src/lib"), vec![1]); // a folder's files
+        assert_eq!(rows(SearchIn::File, "src"), vec![0, 1, 2]);
+        assert_eq!(rows(SearchIn::File, "nope"), Vec::<u32>::new());
+        assert_eq!(rows(SearchIn::Message, "four"), vec![0]);
+        assert_eq!(rows(SearchIn::Message, "t@t"), Vec::<u32>::new());
+        assert_eq!(rows(SearchIn::Author, "t@t"), vec![0, 1, 2, 3]);
+        assert_eq!(rows(SearchIn::All, "three"), vec![1]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn lays_out_lanes() {
@@ -301,7 +377,7 @@ mod tests {
         assert_eq!(order(own), ["base"]);
         repo.set_head("refs/heads/a").unwrap();
         // Search: message, author, id prefix; rows match the page order.
-        let find = |q: &str| super::search(&cache, &dir, on, q).unwrap().into_iter().map(|h| h.0).collect::<Vec<_>>();
+        let find = |q: &str| super::search(&cache, &dir, on, super::SearchIn::All, q).unwrap().into_iter().map(|h| h.0).collect::<Vec<_>>();
         assert_eq!(find("A2"), [2]);
         assert_eq!(find("t@T").len(), 6);
         assert_eq!(find(&x.to_string()[..7]), [0]);

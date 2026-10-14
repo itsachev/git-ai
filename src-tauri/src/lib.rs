@@ -39,6 +39,7 @@ pub fn run() {
             commands::undo,
             commands::graph_rows,
             commands::graph_search,
+            commands::tracked_files,
             commands::commit_details,
             commands::commit_file_diff,
             commands::compare_file,

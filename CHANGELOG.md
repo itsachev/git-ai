@@ -5,10 +5,13 @@ What's new in each git-ai release. Newest first.
 ## [Unreleased]
 
 ### Added
+- **Find any file's history from Ctrl+K:** type part of a file name in the command palette and pick the file to open its history and blame. You no longer need to find a commit that changed it first.
+- **Choose what History search looks at:** a menu next to the search box picks All, Message, Author, Commit id, or File or folder. With File or folder, type part of a path (for example `App.tsx` or `src/lib`) to highlight every commit that changed it.
 - **See who you commit as:** the status bar at the bottom of a repository shows the name and email your commits in that repository will carry.
 - **Open tabs come back:** repositories you had open in tabs reopen the next time you start git-ai, on the tab you were last using.
 
 ### Changed
+- **Better-looking dropdowns:** on Windows, every dropdown opens as a soft, translucent menu that matches the rest of the app, with group headings for branches, remote branches and tags, a highlight on the option you're pointing at and a check next to the current choice. They still work fully from the keyboard.
 - **Syntax colours for many more languages:** diffs now colour nearly every programming language, about 190 in all (Elixir, Haskell, Scala, Dart, PowerShell, Clojure and more), plus Vue, Svelte and Astro components. Rarer languages load the first time you open such a file.
 - **Ask before risky actions:** resetting a branch (after you pick Soft, Mixed, Keep or Hard), recreating a branch from its remote, merging or rebasing from a menu or by dragging a branch, force pushing, and undoing now each ask you to confirm first.
 - **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.

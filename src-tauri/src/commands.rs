@@ -189,9 +189,15 @@ pub async fn graph_search(
     cache: State<'_, graph::GraphCache>,
     path: String,
     opts: graph::GraphOpts,
+    field: graph::SearchIn,
     query: String,
 ) -> Result<Vec<(u32, String)>, AppError> {
-    graph::search(&cache, Path::new(&path), opts, &query)
+    graph::search(&cache, Path::new(&path), opts, field, &query)
+}
+
+#[tauri::command(async)]
+pub fn tracked_files(path: String) -> Result<Vec<String>, AppError> {
+    read::tracked_files(Path::new(&path))
 }
 
 #[tauri::command]

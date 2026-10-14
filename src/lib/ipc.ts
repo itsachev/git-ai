@@ -6,6 +6,7 @@ import type { OpEntry } from "../bindings/OpEntry";
 import type { GraphPage } from "../bindings/GraphPage";
 import type { AiConfig } from "../bindings/AiConfig";
 import type { GraphOpts } from "../bindings/GraphOpts";
+import type { SearchIn } from "../bindings/SearchIn";
 import type { CommitDetails } from "../bindings/CommitDetails";
 import type { Refs } from "../bindings/Refs";
 import type { StashOp } from "../bindings/StashOp";
@@ -114,9 +115,11 @@ export const fileDiff = (path: string, file: string, staged: boolean) =>
 /** Graph rows `offset..offset + limit`, newest first. */
 export const graphRows = (path: string, opts: GraphOpts, offset: number, limit: number) =>
   invoke<GraphPage>("graph_rows", { path, opts, offset, limit });
-/** Matching rows of the same graph as (row, oid), newest first. */
-export const graphSearch = (path: string, opts: GraphOpts, query: string) =>
-  invoke<[number, string][]>("graph_search", { path, opts, query });
+/** Matching rows of the same graph as (row, oid), newest first. `field` File: commits that changed a matching path. */
+export const graphSearch = (path: string, opts: GraphOpts, field: SearchIn, query: string) =>
+  invoke<[number, string][]>("graph_search", { path, opts, field, query });
+/** Every tracked path, for the palette's file search. */
+export const trackedFiles = (path: string) => invoke<string[]>("tracked_files", { path });
 export const commitDetails = (path: string, oid: string) => invoke<CommitDetails>("commit_details", { path, oid });
 /** null = binary or over 1 MB. */
 export const commitFileDiff = (path: string, oid: string, file: string) =>

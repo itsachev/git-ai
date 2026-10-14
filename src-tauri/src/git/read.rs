@@ -244,6 +244,14 @@ pub struct FileCommit {
 
 /// Commits reachable from `rev` that changed `file`, newest first, following renames, at most `max`.
 /// A merge counts only when the file differs from every parent (like `git log -- file`).
+/// Every tracked path (from the index), for the palette's file search.
+pub fn tracked_files(repo: &Path) -> Result<Vec<String>, AppError> {
+    let index = git2::Repository::open(repo)?.index()?;
+    let mut out: Vec<String> = index.iter().map(|e| String::from_utf8_lossy(&e.path).into_owned()).collect();
+    out.dedup(); // a conflicted file has one entry per stage, next to each other
+    Ok(out)
+}
+
 pub fn file_log(repo: &Path, rev: &str, file: &str, max: usize) -> Result<Vec<FileCommit>, AppError> {
     let repo = git2::Repository::open(repo)?;
     let mut walk = repo.revwalk()?;

@@ -507,7 +507,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
         {/* No shortcuts or palette commands while busy. */}
-        <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : commands} /></footer>
+        <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : commands} path={busy ? undefined : path} /></footer>
         </fieldset>
       </main>
     </div>

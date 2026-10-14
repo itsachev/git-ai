@@ -5,6 +5,7 @@ import { commitDetails, graphRows, graphSearch, merge, rebaseOnto, resetTo } fro
 import { openNewBranch } from "../refs/NewBranch";
 import type { GraphRow } from "../../bindings/GraphRow";
 import type { GraphOpts } from "../../bindings/GraphOpts";
+import type { SearchIn } from "../../bindings/SearchIn";
 import { errorText, useRun } from "../status/Changes";
 import { RefMenu, confirmMerge, confirmRebase, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
 import { choose, confirm } from "../../lib/modal";
@@ -68,15 +69,26 @@ export function GraphOptions({ opts, onChange }: { opts: GraphOpts; onChange: (o
   );
 }
 
-/** Search box for the commit table: matches on message, author, email or id prefix. Enter / Shift+Enter step through them. */
+/** What the search box looks at: [field, menu label, placeholder]. */
+const FIELDS: [SearchIn, string, string][] = [
+  ["All", "All", "Message, author or id"],
+  ["Message", "Message", "Words in the message"],
+  ["Author", "Author", "Name or email"],
+  ["Id", "Commit id", "Start of the id"],
+  ["File", "File or folder", "Part of a path, e.g. App.tsx"],
+];
+
+/** Search box for the commit table: a field picker (message, author, id, file or folder) plus the text.
+ *  Enter / Shift+Enter step through the matches. */
 export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
   path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void; onHits: (h: Set<string>) => void;
 }) {
   const [q, setQ] = useState("");
+  const [field, setField] = useState<SearchIn>("All");
   const [term, setTerm] = useState("");
   useEffect(() => { const t = setTimeout(() => setTerm(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   const { data, isFetching, error } = useQuery({
-    queryKey: ["graph-search", path, opts, term], queryFn: () => graphSearch(path, opts, term), enabled: !!term,
+    queryKey: ["graph-search", path, opts, field, term], queryFn: () => graphSearch(path, opts, field, term), enabled: !!term,
   });
   const hits = term ? data ?? [] : [];
   // Highlight every result; jump to the first only for a new search, not a refetch after a repo change.
@@ -84,12 +96,12 @@ export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
   useEffect(() => {
     onHits(new Set(hits.map((h) => h[1])));
     if (!term) jumped.current = "";
-    const key = `${JSON.stringify(opts)}|${term}`;
+    const key = `${JSON.stringify(opts)}|${field}|${term}`;
     if (!data || jumped.current === key) return;
     jumped.current = key;
     if (hits.length) onSelect({ i: hits[0][0], oid: hits[0][1] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, term]);
+  }, [data, term, field]);
   const at = hits.findIndex((h) => h[1] === sel?.oid);
   function step(d: 1 | -1) {
     if (!hits.length) return;
@@ -101,10 +113,16 @@ export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
     : !hits.length ? "No matches" : at >= 0 ? `${at + 1} of ${hits.length}` : `${hits.length} match${hits.length === 1 ? "" : "es"}`;
   return (
     <div className="commit-search" role="search">
+      <label className="search-in" title="What to search">
+        <select aria-label="Search in" value={field} onChange={(e) => { setField(e.target.value as SearchIn); document.getElementById("commit-search")?.focus(); }}>
+          {FIELDS.map(([f, label]) => <option key={f} value={f}>{label}</option>)}
+        </select>
+        <Icon name="chevron" />
+      </label>
       <label className="search">
         <Icon name="search" />
-        <input id="commit-search" type="search" placeholder="Search commits" aria-label="Search commits (message, author or id)"
-          title="Message, author, email or commit id. Enter: next match, Shift+Enter: previous" spellCheck={false} autoComplete="off"
+        <input id="commit-search" type="search" placeholder={FIELDS.find((f) => f[0] === field)![2]} aria-label="Search commits"
+          title="Enter: next match, Shift+Enter: previous" spellCheck={false} autoComplete="off"
           value={q} onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
