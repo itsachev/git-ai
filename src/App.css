@@ -10,6 +10,7 @@
   --line: rgb(60 45 25 / 0.1);
   --line-strong: rgb(60 45 25 / 0.18);
   --fg: #1d1b18;          /* ink */
+  --fg-hi: #12110f;       /* headlines and the current thing */
   --muted: #5a554e;       /* 7:1 on --panel: secondary text stays readable */
   --faint: #8a847a;
   --accent: #0f766e;      /* fills: the "signal" (spruce teal); white text on it is 5.4:1 */
@@ -65,9 +66,13 @@
   --rail: #252321;
   --line: rgb(255 245 230 / 0.08);
   --line-strong: rgb(255 245 230 / 0.15);
-  --fg: #f2efe9;
-  --muted: #bcb6ac;
-  --faint: #8c867c;
+  /* Tonal ladder, not "white everywhere": bright ink is reserved for headlines and the current thing;
+     body text is parchment, metadata steps down twice. Contrast on --panel: 15:1, 10.5:1, 6:1, 3.8:1. */
+  --fg-hi: #f5f2ec;
+  --fg: #d6d0c6;
+  --muted: #9d978d;
+  --faint: #7a7469;
+  --tool-ink: #cbc5ba;
   --accent: #13817a;      /* white text on it is 4.7:1 */
   --accent-ink: #ffffff;
   --accent-fg: #5fd9c8;
@@ -94,6 +99,10 @@
 html, body, #root { height: 100%; }
 body { margin: 0; background: var(--bg); }
 h1, h2, h3 { margin: 0; font-weight: 600; text-wrap: balance; }
+/* The top of the tonal ladder: only what names the screen or marks "you are here". */
+h1, h2, h3, .rail-head .back strong, .commit-info .subject, .ci-author strong, .grow.head .sum, .grow.hit .sum,
+.tile:not(.primary) strong, .recent strong, .about-stats dd { color: var(--fg-hi); }
+.grow.sel .sum { color: inherit; } /* on the accent fill */
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 .icon { width: 1.15em; height: 1.15em; flex-shrink: 0; }
 .muted { color: var(--muted); }
@@ -478,6 +487,13 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   opacity: 0; transition: opacity 280ms var(--ease);
 }
 .sync button:focus-visible::before { opacity: 1; }
+/* Icon hue says what the action does: incoming (fetch/pull) slate, outgoing (push) the accent, shelve (stash)
+   ochre, branch leaf; terminal stays neutral. Labels keep the ink colour. */
+.sync .icon[data-icon="fetch"], .sync .icon[data-icon="pull"] { color: var(--info); }
+.sync .icon[data-icon="push"] { color: var(--accent-fg); }
+.sync .icon[data-icon="stash"] { color: var(--mod); }
+.sync .icon[data-icon="branch"] { color: var(--add); }
+.sync .icon[data-icon="terminal"], .sync .icon[data-icon="chevron"] { color: var(--muted); }
 .sync .icon, .toolbar > .icon-btn .icon { transition: rotate 560ms var(--spring), translate 380ms var(--spring), scale 380ms var(--spring); }
 @media (hover: hover) {
   .sync button:hover:not(:disabled)::before { opacity: 1; }
@@ -761,7 +777,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff-head:has(.picked) { background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
 .diff-file { flex: 1; min-width: 0; display: flex; align-items: baseline; overflow: hidden; white-space: nowrap; font: 0.84rem var(--mono); letter-spacing: 0; }
 .diff-file small { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: inherit; color: var(--faint); }
-.diff-file strong { flex-shrink: 0; font-weight: 700; color: var(--fg); }
+.diff-file strong { flex-shrink: 0; font-weight: 700; color: var(--fg-hi); }
 .stat { flex: none; display: flex; gap: 0.5rem; font: 700 0.78rem var(--mono); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .stat .plus { color: var(--add); }
 .stat .minus { color: var(--danger); }
@@ -820,7 +836,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff .pick.on { box-shadow: inset 3px 0 var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
 /* Empty, binary, clean: a centered note filling the pane. */
 .pane-note { flex: 1; display: grid; place-content: center; justify-items: center; gap: 0.35rem; padding: 2rem 1.25rem; text-align: center; color: var(--muted); animation: rise 360ms var(--ease); }
-.pane-note strong { font: 700 1.05rem/1.25 var(--display); letter-spacing: -0.02em; color: var(--fg); }
+.pane-note strong { font: 700 1.05rem/1.25 var(--display); letter-spacing: -0.02em; color: var(--fg-hi); }
 .pane-note p { margin: 0; max-width: 34ch; font-size: 0.9rem; text-wrap: pretty; }
 .pane-note button { margin-top: 0.6rem; }
 .pane-note-icon {
@@ -954,7 +970,8 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 }
 :root[data-theme="dark"] .avatar { color: oklch(0.9 0.08 var(--h)); background: oklch(0.38 0.08 var(--h)); }
 .grow .avatar { width: 1.15rem; height: 1.15rem; font-size: 0.48rem; }
-.grow.sel .avatar { box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.6); }
+/* Inset ring: the author cell clips overflow, so an outer ring would be cut on the left. */
+.grow.sel .avatar { box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.6); }
 /* Columns follow the table's own width (the sidebar takes part of the window). */
 .graph { container-type: inline-size; }
 @container (max-width: 46rem) {
@@ -985,6 +1002,14 @@ button.sha .icon { width: 0.9rem; height: 0.9rem; opacity: 0.75; }
 .ci-tag { padding: 0.1rem 0.5rem; border-radius: 999px; font: 700 0.66rem/1.5 var(--sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--pick); }
 .ci-tag.on { color: var(--add); background: color-mix(in srgb, var(--add) 13%, transparent); }
 .commit-info .subject { font: 700 clamp(1.15rem, 0.85rem + 1.6cqi, 1.65rem)/1.18 var(--display); letter-spacing: -0.032em; overflow-wrap: anywhere; text-wrap: balance; }
+/* Plain subjects: ink fading into the accent. Merge subjects keep their own branch colours below. */
+/* fit-content: the gradient spans the text, not the whole pane (a block h2 left short titles all white). */
+.commit-info .subject:not(:has(.merge-from, .merge-into)) {
+  width: fit-content;
+  background: linear-gradient(280deg, var(--fg-hi) 10%, var(--accent-fg) 60%, color-mix(in oklab, var(--accent) 60%, var(--accent-fg)));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
 /* Merge subjects: the merged branch borrows the brand gradient (static), the target branch the accent. */
 .merge-from {
   background: linear-gradient(100deg, var(--accent-fg), color-mix(in oklab, #14b8a6 80%, var(--fg)) 45%, color-mix(in oklab, #d4a017 80%, var(--fg)) 80%, color-mix(in oklab, #e0703a 78%, var(--fg)));
@@ -1253,7 +1278,7 @@ dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards;
   .settings-nav button.settings-go { margin-top: 0.6rem; }
 }
 /* Section titles inside any modal: larger and heavier than body text so sections scan at a glance. */
-dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg); }
+dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg-hi); }
 .modal-text { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
 button.danger {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, white), var(--danger));
@@ -1332,7 +1357,7 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 @media (prefers-reduced-motion: reduce) { .sc-hero-keys .sc-cap[data-k="k"]::after { animation: none; } }
 .sc-plus { font: 500 1.5rem/1 var(--display); color: var(--accent-fg); }
 .sc-hero-say { display: grid; gap: 0.15rem; margin-left: 0.35rem; padding-left: 1rem; border-left: 1px solid var(--line); }
-.sc-hero-say b { font: 700 1.05rem/1.2 var(--sans); color: var(--fg); letter-spacing: -0.01em; white-space: nowrap; }
+.sc-hero-say b { font: 700 1.05rem/1.2 var(--sans); color: var(--fg-hi); letter-spacing: -0.01em; white-space: nowrap; }
 .sc-hero-say small { font: 600 0.82rem/1.2 var(--sans); color: var(--muted); }
 @container shortcuts (max-width: 24rem) { .sc-hero-say { flex-basis: 100%; margin: 0; padding: 0.6rem 0 0; border-left: 0; border-top: 1px solid var(--line); } }
 .sc-tools input { min-height: calc(var(--ctl) + 0.75rem); padding-left: 2.2rem; font-size: 1rem; border-radius: 12px; }
