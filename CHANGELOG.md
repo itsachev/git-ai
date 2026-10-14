@@ -23,6 +23,7 @@ What's new in each git-ai release. Newest first.
 - Scrollbars in dialogs no longer stick out past their rounded corners.
 - **Settings side list stays put:** scrolling the Settings window no longer nudges the section list on the left before it settles.
 - Names of repository tabs you are not on now sit centred in the tab bar instead of slightly low.
+- **Every graph dot names its branch:** hovering a commit that came in through a merge (including `git pull` merges) now shows the branch it was merged into, and dots far down the history show their branch too.
 - Big headings on the home screen and the Keyboard shortcuts page are smaller and no longer clip the edges of letters such as "y" and "e".
 - Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
 - A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.

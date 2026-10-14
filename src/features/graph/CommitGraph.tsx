@@ -4,6 +4,7 @@ import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commitDetails, graphRows, graphSearch, merge, rebaseOnto, resetTo } from "../../lib/ipc";
 import { openNewBranch } from "../refs/NewBranch";
 import type { GraphRow } from "../../bindings/GraphRow";
+import type { GraphPage } from "../../bindings/GraphPage";
 import type { GraphOpts } from "../../bindings/GraphOpts";
 import type { SearchIn } from "../../bindings/SearchIn";
 import { errorText, useRun } from "../status/Changes";
@@ -272,17 +273,21 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
     else if ((selI + 1) * ROW > el.scrollTop + el.clientHeight) el.scrollTop = (selI + 1) * ROW - el.clientHeight;
   }, [selI]);
 
-  /** Branches a dot sits on: every branch label up its lane, following the straight line; local branches first. */
+  /** Branches a dot sits on: every branch label on the line up from it to a tip; local branches first. */
   function branchesOf(i: number, c: number): string[] {
     const tags = new Set(refsData?.tags.map((t) => t.name));
     const local = new Set(refsData?.local.map((b) => b.name));
     const out: string[] = [];
-    // Stops at an unloaded page or where the lane starts or bends in (merge, fork, reused lane).
+    // Scrolled-away pages are still in the query cache.
+    const cached = (k: number) => rowAt(k) ?? qc.getQueryData<GraphPage>(["graph", path, opts, Math.floor(k / PAGE)])?.rows[k % PAGE];
+    // Follows the straight line, else the curve in (a merged-in lane leads to its merge commit). Stops at a tip or an unloaded page.
     for (let k = i; ; k--) {
-      const row = rowAt(k);
+      const row = cached(k);
       if (!row) break;
       if (row.col === c) out.push(...row.refs.filter((n) => !tags.has(n)));
-      if (!row.edges.some(([a, b]) => a === c && b === c)) break;
+      const up = row.edges.find(([a, b]) => a === c && b === c) ?? row.edges.find(([, b]) => b === c);
+      if (!up) break;
+      c = up[0];
     }
     return out.sort((a, b) => +local.has(b) - +local.has(a));
   }
