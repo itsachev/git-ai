@@ -180,12 +180,12 @@ function Form({ path, initial }: { path: string; initial: State }) {
         <button type="button" onClick={close}>Close</button>
         {text && <button type="button" onClick={copy}>{copied ? "Copied" : "Copy"}</button>}
         <button className={pr ? undefined : "primary"} type={pr ? "button" : "submit"} onClick={pr ? generate : undefined}
-          disabled={!ok} title={hasKey ? undefined : "Set up AI in Settings first"}>
+          disabled={!ok} title={!hasKey ? "Set up AI in Settings first" : !ok && !busy ? "Pick a branch or tag to compare against" : undefined}>
           {busy ? "Working…" : pr ? "Write with AI" : explain ? (text ? "Explain again" : "Explain") : text ? "Write again" : "Write"}
         </button>
         {pr && (
           <button type="button" className="primary" onClick={create} disabled={!ok || !title.trim() || !login}
-            title={login ? undefined : `Sign in to ${host} first`}>
+            title={!login ? `Sign in to ${host} first` : !title.trim() && !busy ? "Write a title first" : undefined}>
             Create {req}
           </button>
         )}

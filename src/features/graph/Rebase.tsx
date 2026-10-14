@@ -129,7 +129,7 @@ function Form({ path, base }: { path: string; base: string }) {
                     <small><span className="mono">{id.slice(0, 7)}</span> · {r.c.author}</small>
                   </span>
                   <span className="rb-btns">
-                    <button type="button" className="small" aria-expanded={editing === id} disabled={r.action === "Drop"}
+                    <button type="button" className="small" aria-expanded={editing === id} disabled={r.action === "Drop"} title={r.action === "Drop" ? "Dropped commits have no message to edit" : undefined}
                       onClick={() => setEditing(editing === id ? null : id)}>Message</button>
                     <button type="button" className="small icon-btn up" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1, "Move up")}><Icon name="chevron" /></button>
                     <button type="button" className="small icon-btn" aria-label="Move down" disabled={i === rows.length - 1} onClick={() => move(i, 1, "Move down")}><Icon name="chevron" /></button>
@@ -155,7 +155,8 @@ function Form({ path, base }: { path: string; base: string }) {
 
       <div className="dialog-actions">
         <button type="button" onClick={close}>Cancel</button>
-        <button className="primary" disabled={!rows || !!problem || !changed || busy}>{busy ? "Rebasing…" : "Rebase"}</button>
+        <button className="primary" disabled={!rows || !!problem || !changed || busy}
+          title={problem ?? (rows && !changed ? "Nothing changed yet: reorder, drop, squash or edit a commit first" : undefined)}>{busy ? "Rebasing…" : "Rebase"}</button>
       </div>
     </form>
   );

@@ -132,8 +132,8 @@ export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
       </label>
       {term && <>
         <span className="muted count" aria-live="polite">{status}</span>
-        <button type="button" className="small ghost step" disabled={!hits.length} onClick={() => step(-1)} aria-label="Previous match" title="Previous match (Shift+Enter)">▲</button>
-        <button type="button" className="small ghost step" disabled={!hits.length} onClick={() => step(1)} aria-label="Next match" title="Next match (Enter)">▼</button>
+        <button type="button" className="small ghost step" disabled={!hits.length} onClick={() => step(-1)} aria-label="Previous match" title={hits.length ? "Previous match (Shift+Enter)" : "No matches"}>▲</button>
+        <button type="button" className="small ghost step" disabled={!hits.length} onClick={() => step(1)} aria-label="Next match" title={hits.length ? "Next match (Enter)" : "No matches"}>▼</button>
       </>}
     </div>
   );

@@ -29,6 +29,45 @@ document.addEventListener("click", (e) => {
   if (d && d === pressed && d.dispatchEvent(new Event("cancel", { cancelable: true }))) d.close();
 });
 
+// Themed tooltip for every `title` in the app (native ones are OS-drawn and ignore the theme).
+// While hovered, the title moves to data-tip so the native one stays hidden; it comes back after,
+// so it still names icon buttons for screen readers. A top-layer popover so it shows over dialogs.
+const tip = Object.assign(document.createElement("div"), { className: "tip", popover: "manual" });
+tip.setAttribute("role", "tooltip");
+document.body.append(tip);
+let tipEl: HTMLElement | null = null;
+let tipTimer = 0;
+const hideTip = () => {
+  clearTimeout(tipTimer);
+  if (tipEl && !tipEl.hasAttribute("title") && tipEl.dataset.tip) tipEl.title = tipEl.dataset.tip;
+  delete tipEl?.dataset.tip;
+  tipEl = null;
+  if (tip.matches(":popover-open")) tip.hidePopover();
+};
+document.addEventListener("mouseover", (e) => {
+  const el = (e.target as Element).closest?.<HTMLElement>("[title],[data-tip]") ?? null;
+  if (el === tipEl) return;
+  hideTip();
+  if (!el?.title) return;
+  tipEl = el;
+  el.dataset.tip = el.title;
+  el.removeAttribute("title");
+  tipTimer = window.setTimeout(() => {
+    tip.textContent = el.dataset.tip ?? "";
+    // Disabled control (or a label around a disabled checkbox): the text is the reason, headed "Unavailable".
+    tip.classList.toggle("off", el.matches(":disabled, :has(> input:disabled)"));
+    tip.showPopover();
+    // Below the element, or above it when there's no room; kept inside the window.
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    const top = r.bottom + 6 + h > innerHeight ? r.top - 6 - h : r.bottom + 6;
+    tip.style.top = `${Math.max(4, top)}px`;
+    tip.style.left = `${Math.min(Math.max(4, r.left + r.width / 2 - w / 2), innerWidth - w - 4)}px`;
+  }, 450);
+});
+document.addEventListener("mouseout", (e) => { if (!e.relatedTarget) hideTip(); });
+for (const t of ["pointerdown", "keydown", "wheel"]) document.addEventListener(t, hideTip, true);
+addEventListener("blur", hideTip);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

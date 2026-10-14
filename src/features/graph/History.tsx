@@ -102,7 +102,7 @@ export function History({ path }: { path: string }) {
                 <button className="small ghost" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}><Icon name="tag" />Tag…</button>
                 <button className="small ghost" disabled={!!noRebase} onClick={() => openRebase(d.oid)} title={noRebase ?? "Reorder, edit, squash or drop the commits after this one"}><Icon name="restart" />Rebase…</button>
                 <button className="small ghost ai" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
-                  title={hasKey ? "Explain this commit in plain words (message and diff sent to your AI provider)" : "Set up AI in Settings first"}>
+                  title={d.oid in explained ? "Already explained below" : hasKey ? "Explain this commit in plain words (message and diff sent to your AI provider)" : "Set up AI in Settings first"}>
                   <Icon name="sparkle" />{explaining === d.oid ? "Explaining…" : "Explain"}
                 </button>
               </div>

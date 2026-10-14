@@ -485,7 +485,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
           <SyncButtons sync={sync}>
-            <button disabled={!changed} onClick={() => openStashSave()} title="Stash changes: name it, pick which ones">
+            <button disabled={!changed} onClick={() => openStashSave()} title={changed ? "Stash changes: name it, pick which ones" : "No changes to stash"}>
               <Icon name="stash" /><span className="btn-label">Stash</span>
             </button>
             <NewBranchButton />

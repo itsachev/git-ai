@@ -324,10 +324,11 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
       <div className="commit-row">
         {/* Nothing staged: the backend describes all changes instead. */}
         <button type="button" className="small ghost ai-gen" disabled={amend || !!finishing || writing} aria-busy={writing} onClick={generate}
-          title={hasKey ? `Write a message from the ${canCommit ? "staged" : "changed"} files (sent to your AI provider)` : "Set up AI in Settings first"}>
+          title={amend ? "Not available while amending: the last commit's message is kept" : finishing ? `Not available while finishing the ${finishing}`
+            : hasKey ? `Write a message from the ${canCommit ? "staged" : "changed"} files (sent to your AI provider)` : "Set up AI in Settings first"}>
           <Icon name="sparkle" />{writing ? "Writing…" : "Generate"}
         </button>
-        <label className="check">
+        <label className="check" title={!head ? "No commits to amend yet" : finishing ? `Finish the ${finishing} first` : undefined}>
           <input type="checkbox" checked={amend} disabled={!head || !!finishing} onChange={(e) => toggleAmend(e.target.checked)} />
           Amend last commit
         </label>

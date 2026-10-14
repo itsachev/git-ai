@@ -85,7 +85,7 @@ function SaveForm({ path, paths }: { path: string; paths: string[] }) {
         <span className="label" id="ss-what">What to stash</span>
         <div className="seg" role="group" aria-labelledby="ss-what">
           {modes.map(([m, label, n]) => (
-            <button key={m} type="button" aria-pressed={mode === m} disabled={!n} onClick={() => setMode(m)}>{label} ({n})</button>
+            <button key={m} type="button" aria-pressed={mode === m} disabled={!n} title={n ? undefined : "No changes of this kind"} onClick={() => setMode(m)}>{label} ({n})</button>
           ))}
         </div>
         <p className="nb-hint">{hint}</p>
@@ -103,7 +103,7 @@ function SaveForm({ path, paths }: { path: string; paths: string[] }) {
 
       <div className="dialog-actions">
         <button type="button" onClick={closeSave}>Cancel</button>
-        <button className="primary" disabled={!count || busy}>{busy ? "Stashing…" : keep ? "Save checkpoint" : "Stash"}</button>
+        <button className="primary" disabled={!count || busy} title={count ? undefined : "Nothing to stash"}>{busy ? "Stashing…" : keep ? "Save checkpoint" : "Stash"}</button>
       </div>
     </form>
   );
