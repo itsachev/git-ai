@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { askpassReply, cloneRepo, fetchAll, githubRepos, gitlabRepos, pull, push } from "../../lib/ipc";
+import { askpassReply, cloneRepo, fetchAll, githubRepos, gitlabRepos, pull, push, remoteSet } from "../../lib/ipc";
 import { gitlabUserQuery, userQuery } from "../github/GitHub";
 import type { GhRepo } from "../../bindings/GhRepo";
 import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
@@ -10,7 +10,7 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { RefMenu, refsQuery, remotesQuery, showMenu } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
-import { Brand, ModalHead, choose, confirm, type Choice } from "../../lib/modal";
+import { Brand, ModalHead, choose, confirm, prompt, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
 
 export type Sync = ReturnType<typeof useSync>;
@@ -71,18 +71,32 @@ export function useSync(path: string, run: Run) {
         // No upstream: ahead is unknown (0), but the branch exists only here.
         ...(cur && !cur.upstream ? ["new", `${cur.name} isn't on the remote yet. Push publishes it.`] as const : []));
   // Why Push is off, or "" when it can run. An upstream with 0 ahead is level with (or behind) the remote.
-  const pushOff = !cur ? "Check out a branch to push it"
-    : remoteList?.length === 0 ? "Add a remote first (Remotes → + in the sidebar)"
-    : cur.upstream && !cur.ahead ? "Nothing to push"
+  // No upstream: nothing new when a branch on the remote Push uses (origin, else the first; as cli.rs
+  // `default_remote`) already points at this tip, e.g. a branch just made from main.
+  // ponytail: same-tip check only; a branch behind a remote branch still offers Push. merge-base if that matters.
+  const pushTo = remoteList?.find((r) => r.name === "origin")?.name ?? remoteList?.[0]?.name;
+  const pushOff = !refs?.local.length ? "Make a first commit to push"
+    : !cur ? "Check out a branch to push it"
+    : cur.upstream ? (cur.ahead ? "" : "Nothing to push: no new commits")
+    : refs.remote.some((r) => r.oid === cur.oid && r.name.startsWith(`${pushTo}/`)) ? "Nothing to push: no new commits"
     : "";
+  const pullOff = !cur ? "Check out a branch to pull into it"
+    : !cur.upstream ? `${cur.name} doesn't track a remote branch yet. Push publishes it, or pick one with Track remote branch… in its menu`
+    : "";
+  // No remote yet: the first push asks where to, adds it as origin, then pushes (and sets the upstream).
+  const firstPush = async () => {
+    const v = await prompt("Push to a new remote", `${cur?.name ?? "This branch"} has nowhere to go yet. Paste the URL of the repository to push to, for example an empty one you just made on GitHub.`,
+      [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote");
+    if (v && await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`)) await pushOp.go();
+  };
   return {
     busy, rebase, pickPull,
     pullMerge: pullMerge.go,
     pullRebase: pullRebase.go,
     ops: [
       op("Fetch", "Fetching…", "Fetching from all remotes…", "Fetched all remotes", () => fetchAll(path)),
-      rebase ? pullRebase : pullMerge,
-      { ...pushOp, off: pushOff, go: () => pushOff ? Promise.resolve() : pushOp.go() },
+      { ...(rebase ? pullRebase : pullMerge), off: pullOff },
+      { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushOp.go() },
     ],
   };
 }
@@ -102,7 +116,7 @@ export function SyncButtons({ sync, children }: { sync: Sync; children?: React.R
       {sync.ops.map((o) => (
         <Fragment key={o.label}>
           <button disabled={!!sync.busy || !!o.off} onClick={o.go} aria-busy={sync.busy === o.doing}
-            title={o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"} (right-click to change)` : o.off || o.label}
+            title={o.off || (o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"} (right-click to change)` : o.label)}
             onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
             <Icon name={o.label.toLowerCase() as IconName} />
             <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label === "Pull" && sync.rebase ? "Pull (rebase)" : o.label}</span>
@@ -197,7 +211,8 @@ export function CloneDialog({ onCloned, onClose }: { onCloned: (repo: RepoInfo) 
         <p className="muted progress" role="status">{progress}</p>
         <div className="dialog-actions">
           <button type="button" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="primary" disabled={busy || !url.trim() || !parent.trim() || !folder.trim()}>
+          <button className="primary" disabled={busy || !url.trim() || !parent.trim() || !folder.trim()}
+            title={!url.trim() ? "Enter a repository URL" : !parent.trim() ? "Choose a parent folder" : !folder.trim() ? "Enter a folder name" : undefined}>
             {busy ? "Cloning…" : "Clone"}
           </button>
         </div>
