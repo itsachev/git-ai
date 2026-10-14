@@ -238,6 +238,8 @@ export const sshKeySet = (path: string | null) => invoke<void>("ssh_key_set", { 
 export const sshDetect = () => invoke<string[]>("ssh_detect");
 // Global git setup (identity, credential helper) and the first-run wizard flag.
 export const gitSetup = () => invoke<GitSetup>("git_setup");
+/** Name and email commits in this repo get (local config over global). */
+export const gitIdentity = (path: string) => invoke<[string | null, string | null]>("git_identity", { path });
 /** helper: also turn on the OS credential helper if none is set. */
 export const gitSetupSet = (name: string, email: string, helper: boolean) => invoke<void>("git_setup_set", { name, email, helper });
 export const setupDone = () => invoke<boolean>("setup_done");

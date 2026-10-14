@@ -1200,6 +1200,12 @@ pub fn git_setup() -> GitSetup {
     GitSetup { name: global("user.name"), email: global("user.email"), helper: helper(), helper_default: HELPER_DEFAULT.map(String::from) }
 }
 
+/// The name and email commits in `repo` get (local config over global).
+pub fn identity(repo: &Path) -> (Option<String>, Option<String>) {
+    let get = |k| run(Some(repo), &["config", "--get", k], &[], None).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    (get("user.name"), get("user.email"))
+}
+
 /// Sets the global identity, and the OS credential helper when `helper` is true and none is set.
 pub fn set_global(name: &str, email: &str, helper: bool) -> Result<(), AppError> {
     ensure_version()?;

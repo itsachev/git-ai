@@ -1,6 +1,6 @@
 //! Undo support: backups under `refs/git-ai/backup/<id>` plus one JSON line per op in `.git/git-ai/oplog.jsonl`.
 use crate::errors::AppError;
-use crate::git::cli::{git, git_env, rev};
+use crate::git::cli::{git, git_env, git_input, rev};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -98,8 +98,43 @@ pub(crate) fn snapshot(repo: &Path, op: &str, paths: &[String]) -> Result<OpEntr
 
 pub fn record(repo: &Path, e: OpEntry) -> Result<(), AppError> {
     let line = serde_json::to_string(&e).map_err(|e| AppError::new("io", e.to_string()))?;
-    let mut log = fs::OpenOptions::new().create(true).append(true).open(git_ai_dir(repo)?.join(LOG)).map_err(io)?;
-    writeln!(log, "{line}").map_err(io)
+    let path = git_ai_dir(repo)?.join(LOG);
+    let mut log = fs::OpenOptions::new().create(true).append(true).open(&path).map_err(io)?;
+    writeln!(log, "{line}").map_err(io)?;
+    drop(log);
+    // The op itself succeeded; a failed cleanup just retries on the next one.
+    let _ = prune(repo, &path, e.id.parse::<u128>().unwrap_or(0).saturating_sub(KEEP_MS));
+    Ok(())
+}
+
+/// How long ops stay undoable.
+const KEEP_MS: u128 = 30 * 24 * 60 * 60 * 1000;
+
+/// Drops log entries older than `cutoff` (ms) and deletes their backup/kept refs so gc can free the content.
+/// Only reads the first line when nothing has expired.
+fn prune(repo: &Path, path: &Path, cutoff: u128) -> Result<(), AppError> {
+    use std::io::BufRead;
+    let id = |l: &str| serde_json::from_str::<OpEntry>(l).ok().and_then(|e| e.id.parse::<u128>().ok());
+    let first = std::io::BufReader::new(fs::File::open(path).map_err(io)?).lines().next().and_then(Result::ok);
+    if first.as_deref().and_then(id).is_some_and(|t| t >= cutoff) {
+        return Ok(());
+    }
+    let text = fs::read_to_string(path).map_err(io)?;
+    let kept: String = text.lines().filter(|l| id(l).is_some_and(|t| t >= cutoff)).map(|l| format!("{l}\n")).collect();
+    // Write then rename, so a crash mid-write can't truncate the log.
+    let tmp = path.with_extension("jsonl.tmp");
+    fs::write(&tmp, kept).map_err(io)?;
+    fs::rename(&tmp, path).map_err(io)?;
+    let refs = git(repo, &["for-each-ref", "--format=%(refname)", "refs/git-ai/backup/", "refs/git-ai/kept/"])?;
+    let old: String = refs
+        .lines()
+        .filter(|r| r.rsplit('/').next().and_then(|t| t.parse::<u128>().ok()).is_some_and(|t| t < cutoff))
+        .map(|r| format!("delete {r}\n"))
+        .collect();
+    if !old.is_empty() {
+        git_input(repo, &["update-ref", "--stdin"], &old)?;
+    }
+    Ok(())
 }
 
 /// Newest first, without entries that were already undone.
@@ -545,6 +580,31 @@ On main: one
         for d in [&src, &dest] {
             let _ = fs::remove_dir_all(d);
         }
+    }
+
+    /// Entries older than KEEP_MS leave the log on the next op, along with their backup/kept refs.
+    #[test]
+    fn prune_old_entries() {
+        let dir = temp_repo("prune");
+        let p = dir.as_path();
+        fs::write(dir.join("a.txt"), "a\n").unwrap();
+        cli::stage(p, &["a.txt".into()]).unwrap();
+        cli::commit(p, "c", false).unwrap();
+        let head = cli::rev(p, "HEAD").unwrap();
+        for r in ["refs/git-ai/backup/1000", "refs/git-ai/kept/1000"] {
+            git(p, &["update-ref", r, &head]).unwrap();
+        }
+        let mut old = super::OpEntry::new("discard", None, None);
+        old.id = "1000".into();
+        super::record(p, old).unwrap();
+        assert_eq!(super::entries(p, 20).unwrap().len(), 1);
+        let new = super::OpEntry::new("discard", None, None);
+        let id = new.id.clone();
+        super::record(p, new).unwrap();
+        let ids: Vec<_> = super::entries(p, 20).unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(ids, [id]);
+        assert_eq!(git(p, &["for-each-ref", "refs/git-ai/"]).unwrap(), "");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Stage, unstage, commit, discard (with backup) on a throwaway repo.

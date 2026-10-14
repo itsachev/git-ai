@@ -97,6 +97,7 @@ pub fn run() {
             commands::ssh_key_set,
             commands::ssh_detect,
             commands::git_setup,
+            commands::git_identity,
             commands::git_setup_set,
             commands::setup_done,
             commands::setup_finish,

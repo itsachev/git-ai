@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, toolVersions, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, gitIdentity, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, toolVersions, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -366,12 +366,16 @@ const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+S
 const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pull: "git pull --no-rebase", Push: "git push" };
 const PULL_REBASE_GIT = "git pull --rebase --autostash";
 
-/** Installed git and Node versions, read once per app run. */
-function Versions() {
+/** Installed git and Node versions, read once per app run, plus who commits in this repo. */
+function Versions({ path }: { path: string }) {
   const [git, node] = useQuery({ queryKey: ["tool-versions"], queryFn: toolVersions, staleTime: Infinity }).data ?? [];
+  // Under "git-setup" so saving the identity in Settings refreshes it.
+  const id = useQuery({ queryKey: ["git-setup", path], queryFn: () => gitIdentity(path) }).data;
   const g = git?.replace(/^git version /, "").replace(/\.windows.*$/, "");
   const n = node?.replace(/^v/, "");
-  return <span className="versions" title={[git, node && `node ${node}`].filter(Boolean).join("\n")}>{g && `Git ${g}`}{g && n && " · "}{n && `Node ${n}`}</span>;
+  const who = id && (id[0] || id[1] ? <><b>Committing as</b> {[id[0], id[1] && `<${id[1]}>`].filter(Boolean).join(" ")}</> : "No commit name or email set");
+  const parts = [g && <><b>Git</b> {g}</>, n && <><b>Node</b> {n}</>, who].filter(Boolean);
+  return <span className="versions" title={[git, node && `node ${node}`].filter(Boolean).join("\n")}>{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</span>;
 }
 
 type RepoProps = { repo: RepoInfo; onHome: () => void; tabCommands: Command[]; theme: Theme; setTheme: (t: Theme) => void };
@@ -503,7 +507,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
         {/* No shortcuts or palette commands while busy. */}
-        <footer className="statusbar"><Versions /><Palette commands={busy ? [] : commands} /></footer>
+        <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : commands} /></footer>
         </fieldset>
       </main>
     </div>

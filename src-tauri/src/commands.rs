@@ -572,6 +572,11 @@ pub fn git_setup() -> cli::GitSetup {
 }
 
 #[tauri::command(async)]
+pub fn git_identity(path: String) -> (Option<String>, Option<String>) {
+    cli::identity(Path::new(&path))
+}
+
+#[tauri::command(async)]
 pub fn git_setup_set(name: String, email: String, helper: bool) -> Result<(), AppError> {
     cli::set_global(&name, &email, helper)
 }
