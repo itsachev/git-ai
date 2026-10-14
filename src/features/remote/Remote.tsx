@@ -10,7 +10,7 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { RefMenu, refsQuery, remotesQuery, showMenu } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
-import { Brand, ModalHead, choose, type Choice } from "../../lib/modal";
+import { Brand, ModalHead, choose, confirm, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
 
 export type Sync = ReturnType<typeof useSync>;
@@ -58,6 +58,7 @@ export function useSync(path: string, run: Run) {
           const i = await choose("Push rejected", errorText(e), choices);
           if (i < 0) return;
           if (choices[i] === force) {
+            if (!(await confirm(`Force push ${target}?`, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
             await push(path, true);
             pushed = `Force pushed ${target}`;
           } else {

@@ -6,8 +6,8 @@ import { openNewBranch } from "../refs/NewBranch";
 import type { GraphRow } from "../../bindings/GraphRow";
 import type { GraphOpts } from "../../bindings/GraphOpts";
 import { errorText, useRun } from "../status/Changes";
-import { RefMenu, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
-import { choose } from "../../lib/modal";
+import { RefMenu, confirmMerge, confirmRebase, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
+import { choose, confirm } from "../../lib/modal";
 import type { ResetMode } from "../../bindings/ResetMode";
 import { Icon } from "../../lib/icons";
 
@@ -143,7 +143,10 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
         ? `${target} already points at “${r.summary}”, so only your uncommitted changes are affected. What should happen to them?`
         : `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
         RESETS.map(([label, hint, tone]) => ({ label, hint, tone })), "branch");
-      if (i >= 0) run(() => resetTo(path, r.oid, RESETS[i][3]), `Reset ${target} to ${at} (${RESETS[i][3].toLowerCase()})`);
+      if (i < 0) return;
+      const [label, hint, tone, mode] = RESETS[i];
+      if (await confirm(`${label} reset ${target} to ${at}?`, `${hint} Undo history (sidebar) can reverse it.`, `${label} reset`, tone === "danger" ? "danger" : "warn"))
+        run(() => resetTo(path, r.oid, mode), `Reset ${target} to ${at} (${mode.toLowerCase()})`);
     }];
   }
 
@@ -158,8 +161,8 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
     const done = inHead ? `${branch} already has ${at}` : undefined;
     // Unlabeled commit: the same actions, by commit id.
     const own: Action[] = [["New branch from here", () => openNewBranch(r.oid)], ...(branch && !r.head ? [
-      [`Merge ${at} into ${branch}`, () => run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`), done],
-      [`Rebase ${branch} onto ${at}`, () => run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`), done],
+      [`Merge ${at} into ${branch}`, async () => (await confirmMerge(at, branch)) && run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`), done],
+      [`Rebase ${branch} onto ${at}`, async () => (await confirmRebase(branch, at)) && run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`), done],
     ] as Action[] : [])];
     flushSync(() => setMenu([...(ref ? refActions(ref) : own), resetAction(r)]));
     showMenu(menuPop.current, e);

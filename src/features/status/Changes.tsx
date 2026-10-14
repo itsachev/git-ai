@@ -741,6 +741,10 @@ export function opLabel(e: OpEntry): string {
   return (labels[e.op] ?? e.op).trimEnd();
 }
 
+/** Asks before undoing `e`: it moves branches back, so commits made since can leave the branch. */
+export const confirmUndo = (e: OpEntry) =>
+  confirm(`${opLabel({ ...e, op: `undo ${e.op}` })}?`, "Branches go back to where they were before it. Undoing again puts them back.", "Undo");
+
 /** Roughly what undoing `e` runs, for the palette's terminal hint. */
 export function undoHint(e: OpEntry): string | undefined {
   const short = (oid: string) => oid.slice(0, 7);

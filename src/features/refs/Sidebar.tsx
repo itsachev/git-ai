@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
-import { errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
+import { confirmUndo, errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
@@ -33,6 +33,11 @@ export async function switchTo(path: string, name: string, track: boolean) {
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
 export const remotesQuery = (path: string) => ({ queryKey: ["remotes", path], queryFn: () => remotes(path) });
 
+export const confirmMerge = (from: string, into: string) =>
+  confirm("Merge", `Merge ${from} into ${into}? Undo history (sidebar) can reverse it.`, "Merge");
+export const confirmRebase = (branch: string, onto: string) =>
+  confirm("Rebase", `Rebase ${branch} onto ${onto}? Its commits are rewritten on top of ${onto}; if it was pushed, the next push needs Force push. Undo history (sidebar) can reverse it.`, "Rebase");
+
 /** [label, handler, why it is disabled (absent = enabled)] */
 export type Action = [string, () => void, string?];
 
@@ -49,8 +54,8 @@ export function useRefActions(path: string) {
     // Merge/rebase need a current branch that isn't this one, and do nothing when it already has all of this one.
     const done = merged?.includes(name) ? `${head} already has everything in ${name}` : undefined;
     const onto: Action[] = head && head !== name ? [
-      [`Merge ${name} into ${head}`, () => run(() => merge(path, name, false), `Merged ${name} into ${head}`), done],
-      [`Rebase ${head} onto ${name}`, () => run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`), done],
+      [`Merge ${name} into ${head}`, async () => (await confirmMerge(name, head)) && run(() => merge(path, name, false), `Merged ${name} into ${head}`), done],
+      [`Rebase ${head} onto ${name}`, async () => (await confirmRebase(head, name)) && run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`), done],
     ] : [];
     if (ontoOnly) return onto;
     /** Checkout of a remote branch: its local namesake, created (tracking) if missing; asks what to do when the remote has commits the local lacks. */
@@ -76,6 +81,7 @@ export function useRefActions(path: string) {
         ], "branch");
         if (pick === 3) return openNewBranch(name);
         if (pick < 0) return;
+        if (pick === 1 && own && !(await confirm(`Recreate ${short}?`, `${short} is reset to ${name}, dropping ${lose}. Undo history (sidebar) can reverse it.`, "Recreate", "danger"))) return;
         run(async () => {
           if (head !== short) await switchTo(path, short, false);
           if (pick === 0) await merge(path, name, false);
@@ -310,7 +316,7 @@ export function Sidebar({ path }: { path: string }) {
                   <span>{opLabel(e)}</span>
                   <small>{new Date(Number(e.id)).toLocaleString()}</small>
                 </span>
-                <button className="small" onClick={() => run(() => undo(path, e.id))}>Undo</button>
+                <button className="small" onClick={async () => (await confirmUndo(e)) && run(() => undo(path, e.id))}>Undo</button>
               </li>
             ))}
           </ul>
