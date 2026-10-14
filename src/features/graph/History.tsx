@@ -16,6 +16,13 @@ import { confirm } from "../../lib/modal";
 
 const inHead = "The current branch already has this commit";
 
+/** "Merge branch 'x' into y": the merged branch in a gradient, the target branch in the accent. Other subjects pass through. */
+function mergeSubject(s = "") {
+  const m = /^(Merge (?:remote-tracking )?branch )'([^']+)'(.*?)(?:( into )(\S+))?$/.exec(s);
+  if (!m) return s;
+  return <>{m[1]}'<span className="merge-from">{m[2]}</span>'{m[3]}{m[5] && <>{m[4]}<span className="merge-into">{m[5]}</span></>}</>;
+}
+
 /** Commit graph on top; the picked commit's details, files and file diff below. */
 export function History({ path }: { path: string }) {
   const [sel, setSel] = useState<Picked | null>(null);
@@ -81,7 +88,7 @@ export function History({ path }: { path: string }) {
                 {d.parents.length > 1 && <span className="ci-tag">Merge</span>}
                 {d.in_head && <span className="ci-tag on">On {refs?.head ?? "HEAD"}</span>}
               </div>
-              <h2 className="subject">{subject}</h2>
+              <h2 className="subject">{mergeSubject(subject)}</h2>
               <div className="ci-author">
                 <Avatar name={who.name} />
                 <span><strong>{who.name}</strong>{who.email && <small>{who.email}</small>}</span>

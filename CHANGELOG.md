@@ -7,6 +7,9 @@ What's new in each git-ai release. Newest first.
 ### Added
 - **Open tabs come back:** repositories you had open in tabs reopen the next time you start git-ai, on the tab you were last using.
 
+### Changed
+- **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.
+
 ## [0.1.1] - 2026-10-13
 
 First release. Windows only for now: macOS and Linux installers will follow once the macOS app is code-signed and the Linux build is tested.

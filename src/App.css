@@ -970,6 +970,13 @@ button.sha .icon { width: 0.9rem; height: 0.9rem; opacity: 0.75; }
 .ci-tag { padding: 0.1rem 0.5rem; border-radius: 999px; font: 700 0.66rem/1.5 var(--sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--pick); }
 .ci-tag.on { color: var(--add); background: color-mix(in srgb, var(--add) 13%, transparent); }
 .commit-info .subject { font: 700 clamp(1.15rem, 0.85rem + 1.6cqi, 1.65rem)/1.18 var(--display); letter-spacing: -0.032em; overflow-wrap: anywhere; text-wrap: balance; }
+/* Merge subjects: the merged branch borrows the brand gradient (static), the target branch the accent. */
+.merge-from {
+  background: linear-gradient(100deg, var(--accent-fg), color-mix(in oklab, #14b8a6 80%, var(--fg)) 45%, color-mix(in oklab, #d4a017 80%, var(--fg)) 80%, color-mix(in oklab, #e0703a 78%, var(--fg)));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.merge-into { color: var(--accent-fg); }
 .commit-info .message { margin: 0.6rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9rem; line-height: 1.6; color: var(--muted); }
 .ci-author { display: flex; align-items: center; gap: 0.65rem; min-width: 0; margin: 0.9rem 0 0.75rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
 .ci-author > span:not(.avatar) { display: grid; min-width: 0; }
