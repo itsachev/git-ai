@@ -9,6 +9,10 @@ What's new in each git-ai release. Newest first.
 
 ### Changed
 - **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.
+- **Roomier Settings, About and File history on big screens:** they open at 80% of the window, and Settings lays its sections out two by two with paired fields side by side. Small windows keep the stacked layout.
+
+### Fixed
+- Scrollbars in dialogs no longer stick out past their rounded corners.
 
 ## [0.1.1] - 2026-10-13
 

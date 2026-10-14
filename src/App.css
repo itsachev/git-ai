@@ -1049,6 +1049,8 @@ dialog.modal {
   border-color: color-mix(in srgb, var(--tone) 24%, var(--line));
   box-shadow: var(--shadow), 0 30px 80px -20px color-mix(in srgb, var(--tone) 22%, transparent);
 }
+/* Keep the scrollbar inside the rounded corners: the track is square, so inset it by the radius. */
+dialog.modal::-webkit-scrollbar-track { margin-block: 20px; }
 dialog.modal.tone-accent { --tone: var(--accent); }
 dialog.modal.tone-warn { --tone: var(--mod); }
 dialog.modal.tone-danger { --tone: var(--danger); }
@@ -1091,7 +1093,6 @@ dialog.modal.tone-danger[open] .modal-badge .icon { animation: nudge 420ms var(-
 
 /* ---------- About (features/about/About.tsx): a field guide. Side nav of every feature (scroll-spied) beside
    a hero, a filter and one card per area. Each area has a hue (--h) for its icon, card edge and highlights. ---------- */
-dialog.modal.about { width: min(90vw, 100vw - 2rem); }
 .about-nav > div, .about-jump .chip, .about-grid section { --hc: color-mix(in oklab, oklch(0.62 0.17 var(--h)) 82%, var(--fg)); }
 .about-layout { display: grid; gap: 2rem; }
 .about-nav { display: none; }
@@ -1175,7 +1176,9 @@ dialog.modal[open] .about-grid section { animation: rise 460ms var(--ease) backw
 /* ---------- Settings (features/settings/Settings.tsx): a status rail beside one hued card per section.
    The rail shows each section's live value and a readiness dot; wide windows keep it sticky on the left,
    narrow ones lay it out as a strip above the cards. ---------- */
-dialog.modal.settings { width: min(60rem, 100vw - 2rem); }
+/* Big modals (Settings, About, File history): 80% of a large window, never under their comfortable
+   width (or the full width minus a gutter on phones), capped on ultrawides. */
+dialog.modal.settings, dialog.modal.about { width: clamp(min(60rem, 100vw - 2rem), 80vw, 120rem); }
 .settings-nav button, .settings-card { --hc: color-mix(in oklab, oklch(0.62 0.17 var(--h)) 82%, var(--fg)); }
 .settings-layout { display: grid; gap: 1rem; }
 .settings-nav { display: grid; gap: 0.4rem; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); }
@@ -1198,8 +1201,16 @@ dialog.modal.settings { width: min(60rem, 100vw - 2rem); }
 .settings-nav button.settings-go:hover { border-color: transparent; }
 .settings-go .settings-nav-text small { white-space: normal; }
 dialog.modal[open] .settings-nav button { animation: rise 420ms var(--ease) backwards; animation-delay: calc(120ms + var(--i) * 60ms); }
-.settings-cards { display: grid; gap: 0.9rem; min-width: 0; }
-.settings-card { border-radius: 14px; }
+/* Cards flow into as many ~30rem columns as fit: one on narrow windows, a 2×2 board at 80% of a large one.
+   Cards in a row share a height so the board reads as one grid. */
+.settings-cards { display: grid; gap: 0.9rem; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(min(30rem, 100%), 1fr)); }
+.settings-card { border-radius: 14px; container-type: inline-size; }
+.settings-card > .setting { height: 100%; box-sizing: border-box; }
+/* A roomy card puts paired fields (Name | Email, Provider | Model) side by side; notes and buttons span both. */
+@container (min-width: 34rem) {
+  .settings-card .identity { grid-template-columns: 1fr 1fr; column-gap: 1rem; }
+  .settings-card .identity > :not(label:not(.check)) { grid-column: 1 / -1; }
+}
 dialog.settings .settings-card .setting {
   background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, color-mix(in srgb, var(--sunken) 55%, var(--panel));
   transition: box-shadow 200ms var(--ease);
@@ -1497,7 +1508,7 @@ button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--ac
 .rb-list textarea { min-height: 5rem; resize: vertical; font: 0.88rem/1.5 var(--mono); letter-spacing: 0; }
 
 /* File history + blame: wide, tall modal; commit list beside the diff, stacked when narrow. */
-dialog.file-history { width: min(72rem, calc(100vw - 2rem)); height: min(52rem, calc(100dvh - 2rem)); }
+dialog.file-history { width: clamp(min(72rem, 100vw - 2rem), 80vw, 120rem); height: min(52rem, calc(100dvh - 2rem)); }
 .fh { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 0.9rem; }
 .fh .modal-head { margin-bottom: 0; }
 .fh .dialog-actions { margin-top: 0; }
