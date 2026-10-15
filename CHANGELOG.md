@@ -10,6 +10,7 @@ What's new in each git-ai release. Newest first.
 - **Auto fetch:** git-ai checks the remote for new commits on your current branch when you open a repository, every 5 minutes, and when you come back to the window. Pull counts stay up to date without pressing Fetch. It only fetches your branch, so big repositories stay fast. It never asks for a password, and failures (offline, signed out) stay silent.
 
 ### Changed
+- **New app icon:** a dark tile with a teal branch-and-merge glyph replaces the default Tauri logo in the taskbar, Start menu, Dock and installer.
 - **Redesigned commit box:** the message and its tools (Generate, Amend, Push) now sit in one field. Amend and Push are toggle chips. A full-width Commit button names exactly what will happen and shows the keyboard shortcut.
 - **Easier-to-read status bar:** the Git and Node versions, your commit identity and the Commands button use larger, darker text. "Commands" is now bold.
 
