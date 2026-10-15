@@ -24,6 +24,8 @@ import type { GhRepo } from "../bindings/GhRepo";
 import type { Lfs } from "../bindings/Lfs";
 import type { Remote } from "../bindings/Remote";
 import type { ResetMode } from "../bindings/ResetMode";
+import type { ReflogEntry } from "../bindings/ReflogEntry";
+import type { Submodule } from "../bindings/Submodule";
 
 // Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +64,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   open_file: (a) => `Failed to open ${a.file}`,
   lfs_track: (a) => (a.track ? `Failed to track ${a.pattern} with LFS` : `Failed to untrack ${a.pattern}`),
   lfs_pull: () => "Failed to download LFS files",
+  submodule_update: (a) => (a.sub ? `Failed to update submodule ${a.sub}` : "Failed to update the submodules"),
   forget_repo: () => "Failed to remove the repository",
   trash_repo: () => "Failed to delete the repository",
   ai_set_key: () => "Failed to save the API key",
@@ -109,9 +112,9 @@ export const applyLines = (path: string, file: string, op: LineOp, lines: number
 /** Newest first, already-undone entries left out. */
 export const opLog = (path: string) => invoke<OpEntry[]>("op_log", { path });
 export const undo = (path: string, id: string) => invoke<void>("undo", { path, id });
-/** null = binary or over 1 MB. */
-export const fileDiff = (path: string, file: string, staged: boolean) =>
-  invoke<string | null>("file_diff", { path, file, staged });
+/** null = binary or over 1 MB. `ws`: ignore whitespace changes (then the lines don't match what `applyLines` takes). */
+export const fileDiff = (path: string, file: string, staged: boolean, ws = false) =>
+  invoke<string | null>("file_diff", { path, file, staged, ws });
 /** Graph rows `offset..offset + limit`, newest first. */
 export const graphRows = (path: string, opts: GraphOpts, offset: number, limit: number) =>
   invoke<GraphPage>("graph_rows", { path, opts, offset, limit });
@@ -122,11 +125,21 @@ export const graphSearch = (path: string, opts: GraphOpts, field: SearchIn, quer
 export const trackedFiles = (path: string) => invoke<string[]>("tracked_files", { path });
 export const commitDetails = (path: string, oid: string) => invoke<CommitDetails>("commit_details", { path, oid });
 /** null = binary or over 1 MB. */
-export const commitFileDiff = (path: string, oid: string, file: string) =>
-  invoke<string | null>("commit_file_diff", { path, oid, file });
-/** `file` from revision `from` to `to`; null side = working tree. "" = same on both, null = binary or over 1 MB. */
-export const compareFile = (path: string, from: string | null, to: string | null, file: string) =>
-  invoke<string | null>("compare_file", { path, from, to, file });
+export const commitFileDiff = (path: string, oid: string, file: string, ws = false) =>
+  invoke<string | null>("commit_file_diff", { path, oid, file, ws });
+/** `file` from revision `from` to `to`; null side = working tree. `orig`: its `from`-side path when renamed.
+ *  "" = same on both, null = binary or over 1 MB. */
+export const compareFile = (path: string, from: string | null, to: string | null, file: string, ws = false, orig: string | null = null) =>
+  invoke<string | null>("compare_file", { path, from, to, file, orig, ws });
+/** Files that differ from `from` to `to` (null = working tree), renames found. */
+export const compareFiles = (path: string, from: string | null, to: string | null) => invoke<FileChange[]>("compare_files", { path, from, to });
+/** Where `a` and `b` split (an oid). Code "no_base" when they share no history. */
+export const mergeBase = (path: string, a: string, b: string) => invoke<string>("merge_base", { path, a, b });
+/** HEAD's last 1000 moves, newest first; `lost` = no branch or tag has that commit anymore. */
+export const reflog = (path: string) => invoke<ReflogEntry[]>("reflog", { path });
+export const submodules = (path: string) => invoke<Submodule[]>("submodules", { path });
+/** Clones missing submodules and checks them out at the recorded commits (`sub`: just that one; null = all). */
+export const submoduleUpdate = (path: string, sub: string | null) => invoke<void>("submodule_update", { path, sub });
 export const refs = (path: string) => invoke<Refs>("refs", { path });
 /** Names of the refs already part of HEAD. Slow on long histories, so apart from `refs`. */
 export const mergedRefs = (path: string) => invoke<string[]>("merged_refs", { path });
@@ -185,7 +198,7 @@ export const stashBranch = (path: string, index: number, oid: string, branch: st
 /** A stash's files: tracked changes plus untracked files. */
 export const stashFiles = (path: string, oid: string) => invoke<FileChange[]>("stash_files", { path, oid });
 /** null = binary or over 1 MB. */
-export const stashFileDiff = (path: string, oid: string, file: string) => invoke<string | null>("stash_file_diff", { path, oid, file });
+export const stashFileDiff = (path: string, oid: string, file: string, ws = false) => invoke<string | null>("stash_file_diff", { path, oid, file, ws });
 // Network ops. git may ask for credentials meanwhile through the "askpass" event (see AskpassDialog).
 export const fetchAll = (path: string) => invoke<void>("fetch", { path });
 /** Background fetch of the current branch's upstream only; never prompts (fails instead). No upstream: no-op. */

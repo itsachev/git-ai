@@ -446,7 +446,7 @@ pub fn clone(url: &str, dest: &Path, mut progress: impl FnMut(&str)) -> Result<(
     let env = crate::askpass::env();
     let env: Vec<(&str, &OsStr)> = env.iter().map(|(k, v)| (*k, v.as_os_str())).collect();
     let dest_s = dest.to_string_lossy();
-    let mut cmd = command(None, &["clone", "--progress", "--", url, &dest_s], &env);
+    let mut cmd = command(None, &["clone", "--progress", "--recurse-submodules", "--", url, &dest_s], &env);
     let mut child = cmd.stdout(Stdio::null()).stderr(Stdio::piped()).spawn().map_err(missing)?;
     let mut stderr = child.stderr.take().unwrap();
     let (mut all, mut line, mut buf) = (String::new(), Vec::new(), [0u8; 4096]);
@@ -632,6 +632,14 @@ pub fn lfs_track(repo: &Path, pattern: &str, track: bool) -> Result<(), AppError
 /// Downloads the LFS content of the checked-out files (after a clone without git-lfs, or skipped smudge).
 pub fn lfs_pull(repo: &Path) -> Result<(), AppError> {
     git_net(repo, &["lfs", "pull"]).map(drop)
+}
+
+/// Clones missing submodules and checks each out at the commit this repo records, nested ones too.
+/// `path`: just that submodule; None = all. git refuses (and changes nothing) where local edits would be overwritten.
+pub fn submodule_update(repo: &Path, path: Option<&str>) -> Result<(), AppError> {
+    let mut args = vec!["submodule", "update", "--init", "--recursive", "--"];
+    args.extend(path);
+    git_net(repo, &args).map(drop)
 }
 
 /// Deletes remote branch `name` ("origin/feat") on the remote. The tip is logged, and kept under
@@ -1106,7 +1114,7 @@ pub enum LineOp {
 
 /// Stages, unstages or discards some lines of one file. `lines` index into the lines of `read::file_diff`.
 pub fn apply_lines(repo: &Path, file: &str, op: LineOp, lines: &[usize]) -> Result<(), AppError> {
-    let diff = crate::git::read::file_diff(repo, file, matches!(op, LineOp::Unstage))?
+    let diff = crate::git::read::file_diff(repo, file, matches!(op, LineOp::Unstage), false)?
         .ok_or_else(|| AppError::new("binary", "Binary files can only be staged as a whole."))?;
     let reverse = !matches!(op, LineOp::Stage);
     let patch = select_lines(&diff, lines, reverse)

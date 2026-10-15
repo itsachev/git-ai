@@ -18,6 +18,7 @@ const IN_PLACE: Omit<Area, "hue">[] = [
   { icon: "history", title: "History", note: "Graph and commit search.", rows: [
     ["↑ / ↓", "Previous or next commit"],
     ["Page Up / Page Down", "Jump a screen of commits"],
+    ["Ctrl+Click", "Compare another commit with the picked one"],
     ["Enter / Shift+Enter", "Next or previous search match"],
     ["Esc", "Clear the commit search"],
   ] },

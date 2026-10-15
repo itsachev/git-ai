@@ -65,14 +65,22 @@ pub fn op_step(repo: &Path, op: &str) -> Option<String> {
     }
 }
 
-/// Unified diff of one file: staged (HEAD → index) or unstaged (index → working tree, untracked included).
-/// None when the file is binary or over 1 MB (libgit2 treats blobs above `max_size` as binary).
-pub fn file_diff(repo: &Path, file: &str, staged: bool) -> Result<Option<String>, AppError> {
-    let repo = git2::Repository::open(repo)?;
+/// Diff options every diff here shares: files over 1 MB count as binary (libgit2 treats blobs above
+/// `max_size` as binary); `ws` ignores whitespace changes (`git diff -w`).
+fn diff_opts(ws: bool) -> git2::DiffOptions {
     let mut opts = git2::DiffOptions::new();
+    opts.max_size(1 << 20).ignore_whitespace(ws);
+    opts
+}
+
+/// Unified diff of one file: staged (HEAD → index) or unstaged (index → working tree, untracked included).
+/// None when the file is binary or over 1 MB. `ws`: ignore whitespace (the lines then don't match what
+/// `cli::apply_lines` stages, so the UI turns line picking off).
+pub fn file_diff(repo: &Path, file: &str, staged: bool, ws: bool) -> Result<Option<String>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let mut opts = diff_opts(ws);
     opts.pathspec(file)
         .disable_pathspec_match(true)
-        .max_size(1 << 20)
         .include_untracked(true)
         .recurse_untracked_dirs(true)
         .show_untracked_content(true);
@@ -120,7 +128,7 @@ pub fn work_patch(repo: &Path) -> Result<String, AppError> {
 pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError> {
     let repo = git2::Repository::open(repo)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let patch = patch_text(&commit_diff_all(&repo, &c)?)?;
+    let patch = patch_text(&commit_diff_all(&repo, &c, false)?)?;
     Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
 }
 
@@ -128,7 +136,7 @@ pub fn commit_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError
 pub fn stash_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError> {
     let repo = git2::Repository::open(repo)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let patch = patch_text(&stash_diff(&repo, &c)?)?;
+    let patch = patch_text(&stash_diff(&repo, &c, false)?)?;
     Ok((String::from_utf8_lossy(c.message_bytes()).trim_end().to_string(), patch))
 }
 
@@ -136,25 +144,24 @@ pub fn stash_patch(repo: &Path, oid: &str) -> Result<(String, String), AppError>
 pub fn stash_files(repo: &Path, oid: &str) -> Result<Vec<FileChange>, AppError> {
     let repo = git2::Repository::open(repo)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let files = diff_files(&stash_diff(&repo, &c)?);
+    let files = diff_files(&stash_diff(&repo, &c, false)?);
     Ok(files)
 }
 
 /// Unified diff of one file of a stash. None when binary or over 1 MB.
-pub fn stash_file_diff(repo: &Path, oid: &str, file: &str) -> Result<Option<String>, AppError> {
+pub fn stash_file_diff(repo: &Path, oid: &str, file: &str, ws: bool) -> Result<Option<String>, AppError> {
     let repo = git2::Repository::open(repo)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let text = file_patch(&stash_diff(&repo, &c)?, file)?;
+    let text = file_patch(&stash_diff(&repo, &c, ws)?, file)?;
     Ok(text)
 }
 
 /// A stash's changes: tracked ones (vs. the commit it was made on) plus untracked files
 /// (`stash -u` keeps them in a third parent), as one diff.
-fn stash_diff<'r>(repo: &'r git2::Repository, c: &git2::Commit) -> Result<git2::Diff<'r>, AppError> {
-    let mut diff = commit_diff_all(repo, c)?;
+fn stash_diff<'r>(repo: &'r git2::Repository, c: &git2::Commit, ws: bool) -> Result<git2::Diff<'r>, AppError> {
+    let mut diff = commit_diff_all(repo, c, ws)?;
     if let Ok(untracked) = c.parent(2) {
-        let mut opts = git2::DiffOptions::new();
-        opts.max_size(1 << 20);
+        let mut opts = diff_opts(ws);
         diff.merge(&repo.diff_tree_to_tree(None, Some(&untracked.tree()?), Some(&mut opts))?)?;
     }
     Ok(diff)
@@ -281,7 +288,7 @@ pub fn file_log(repo: &Path, rev: &str, file: &str, max: usize) -> Result<Vec<Fi
         }
         // Added here: if it was renamed from another path, keep following the old one.
         if !parents.is_empty() && parents.iter().all(Option::is_none) {
-            let diff = commit_diff_all(&repo, &c)?;
+            let diff = commit_diff_all(&repo, &c, false)?;
             let old = diff.deltas().find(|d| {
                 d.status() == git2::Delta::Renamed && d.new_file().path().is_some_and(|p| p.to_string_lossy().replace('\\', "/") == path)
             });
@@ -408,7 +415,7 @@ fn in_head(path: &Path, oid: git2::Oid) -> bool {
 pub fn commit_details(path: &Path, oid: &str) -> Result<CommitDetails, AppError> {
     let repo = git2::Repository::open(path)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let files = diff_files(&commit_diff_all(&repo, &c)?);
+    let files = diff_files(&commit_diff_all(&repo, &c, false)?);
     let sig = |s: git2::Signature| format!("{} <{}>", String::from_utf8_lossy(s.name_bytes()), String::from_utf8_lossy(s.email_bytes()));
     let author = c.author();
     Ok(CommitDetails {
@@ -424,27 +431,132 @@ pub fn commit_details(path: &Path, oid: &str) -> Result<CommitDetails, AppError>
 }
 
 /// Unified diff of one file of a commit (the new path for renames). None when binary or over 1 MB.
-pub fn commit_file_diff(repo: &Path, oid: &str, file: &str) -> Result<Option<String>, AppError> {
+pub fn commit_file_diff(repo: &Path, oid: &str, file: &str, ws: bool) -> Result<Option<String>, AppError> {
     let repo = git2::Repository::open(repo)?;
     let c = repo.find_commit(git2::Oid::from_str(oid)?)?;
-    let text = file_patch(&commit_diff_all(&repo, &c)?, file)?;
+    let text = file_patch(&commit_diff_all(&repo, &c, ws)?, file)?;
     Ok(text)
 }
 
 /// Unified diff of `file` from one revision to another (branch, tag, oid); `None` = the working tree.
-/// Empty when both sides match, None when binary or over 1 MB.
-pub fn compare_file(repo: &Path, from: Option<&str>, to: Option<&str>, file: &str) -> Result<Option<String>, AppError> {
+/// `orig`: its path on the `from` side when renamed. Empty when both sides match, None when binary or over 1 MB.
+pub fn compare_file(repo: &Path, from: Option<&str>, to: Option<&str>, file: &str, orig: Option<&str>, ws: bool) -> Result<Option<String>, AppError> {
     let repo = git2::Repository::open(repo)?;
+    let paths: Vec<&str> = std::iter::once(file).chain(orig).collect();
+    let text = file_patch(&compare_diff(&repo, from, to, &paths, ws)?, file)?;
+    Ok(text)
+}
+
+/// Files that differ between two revisions (`None` = the working tree), renames found.
+pub fn compare_files(repo: &Path, from: Option<&str>, to: Option<&str>) -> Result<Vec<FileChange>, AppError> {
+    let repo = git2::Repository::open(repo)?;
+    let files = diff_files(&compare_diff(&repo, from, to, &[], false)?);
+    Ok(files)
+}
+
+/// `from` → `to` (`None` = the working tree, untracked files included), limited to `paths` when given.
+fn compare_diff<'r>(repo: &'r git2::Repository, from: Option<&str>, to: Option<&str>, paths: &[&str], ws: bool) -> Result<git2::Diff<'r>, AppError> {
     let tree = |rev: &str| repo.revparse_single(rev).and_then(|o| o.peel_to_tree());
-    let mut opts = git2::DiffOptions::new();
-    opts.pathspec(file).disable_pathspec_match(true).max_size(1 << 20).include_untracked(true).show_untracked_content(true);
-    let diff = match (from, to) {
+    let mut opts = diff_opts(ws);
+    opts.include_untracked(true).recurse_untracked_dirs(true).show_untracked_content(true);
+    for p in paths {
+        opts.pathspec(p).disable_pathspec_match(true);
+    }
+    let mut diff = match (from, to) {
         (Some(a), Some(b)) => repo.diff_tree_to_tree(Some(&tree(a)?), Some(&tree(b)?), Some(&mut opts))?,
         (Some(a), None) => repo.diff_tree_to_workdir(Some(&tree(a)?), Some(&mut opts))?,
         (None, Some(b)) => repo.diff_tree_to_workdir(Some(&tree(b)?), Some(opts.reverse(true)))?,
-        (None, None) => return Ok(Some(String::new())),
+        (None, None) => repo.diff_tree_to_tree(None, None, Some(&mut opts))?,
     };
-    file_patch(&diff, file)
+    diff.find_similar(Some(git2::DiffFindOptions::new().renames(true).for_untracked(true)))?;
+    Ok(diff)
+}
+
+/// The newest commit both `a` and `b` have (where they split), via `git merge-base` (commit-graph aware,
+/// like `in_head`). Code "no_base" when they share no history.
+pub fn merge_base(path: &Path, a: &str, b: &str) -> Result<String, AppError> {
+    for r in [a, b] {
+        if r.is_empty() || r.starts_with('-') {
+            return Err(AppError::new("bad_name", format!("'{r}' is not a valid revision.")));
+        }
+    }
+    match crate::git::cli::git(path, &["merge-base", a, b]) {
+        Ok(out) => Ok(out.trim().to_string()),
+        // Exit 1 with no output: unrelated histories.
+        Err(e) if e.message.trim().is_empty() => Err(AppError::new("no_base", format!("{a} and {b} have no commit in common."))),
+        Err(e) => Err(e),
+    }
+}
+
+/// One move of HEAD, from the reflog.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ReflogEntry {
+    /// Where HEAD went.
+    pub oid: String,
+    /// git's note on the move: "commit: …", "reset: moving to HEAD~2", "rebase (finish): …".
+    pub action: String,
+    /// That commit's subject.
+    pub subject: String,
+    #[ts(type = "number")]
+    pub time: i64,
+    /// On no branch, tag or remote branch and not HEAD: only the reflog still knows it.
+    pub lost: bool,
+}
+
+/// HEAD's last `max` moves, newest first. Commits git already pruned are left out.
+/// The lost check runs `git rev-list` (commit-graph aware, like the graph walk).
+pub fn reflog(path: &Path, max: usize) -> Result<Vec<ReflogEntry>, AppError> {
+    let repo = git2::Repository::open(path)?;
+    let Ok(log) = repo.reflog("HEAD") else { return Ok(vec![]) };
+    let mut out = vec![];
+    for e in log.iter().take(max) {
+        let Ok(c) = repo.find_commit(e.id_new()) else { continue };
+        out.push(ReflogEntry {
+            oid: c.id().to_string(),
+            action: e.message_bytes().map(|m| String::from_utf8_lossy(m).into_owned()).unwrap_or_default(),
+            subject: c.summary_bytes().map(|s| String::from_utf8_lossy(s).into_owned()).unwrap_or_default(),
+            time: e.committer().when().seconds(),
+            lost: false,
+        });
+    }
+    let mut oids: Vec<&str> = out.iter().map(|e| e.oid.as_str()).collect();
+    oids.sort_unstable();
+    oids.dedup();
+    if oids.is_empty() {
+        return Ok(out);
+    }
+    // Commits reachable from these but from no ref: `--not` before `--stdin` leaves the stdin ones positive.
+    let lost = crate::git::cli::git_input(path, &["rev-list", "--not", "--branches", "--tags", "--remotes", "HEAD", "--stdin"], &(oids.join("\n") + "\n"))?;
+    let lost: std::collections::HashSet<&str> = lost.lines().collect();
+    for e in &mut out {
+        e.lost = lost.contains(e.oid.as_str());
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct Submodule {
+    pub path: String,
+    pub url: Option<String>,
+    /// "new": not checked out yet. "moved": checked out at another commit than this repo records. "ok".
+    pub state: String,
+}
+
+/// Submodules from .gitmodules and the index. Their own working trees aren't scanned (dirty state left out),
+/// so this stays cheap with big submodules.
+pub fn submodules(path: &Path) -> Result<Vec<Submodule>, AppError> {
+    use git2::SubmoduleStatus as S;
+    let repo = git2::Repository::open(path)?;
+    let mut out = vec![];
+    for sm in repo.submodules()? {
+        let st = repo.submodule_status(sm.name().unwrap_or_default(), git2::SubmoduleIgnore::Dirty)?;
+        let state = if st.contains(S::WD_UNINITIALIZED) { "new" } else if st.contains(S::WD_MODIFIED) { "moved" } else { "ok" };
+        out.push(Submodule { path: sm.path().to_string_lossy().replace('\\', "/"), url: sm.url().ok().flatten().map(String::from), state: state.into() });
+    }
+    out.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(out)
 }
 
 fn diff_files(diff: &git2::Diff) -> Vec<FileChange> {
@@ -452,7 +564,7 @@ fn diff_files(diff: &git2::Diff) -> Vec<FileChange> {
         .map(|d| {
             use git2::Delta::*;
             let path = |f: git2::DiffFile| f.path().map(|p| p.to_string_lossy().replace('\\', "/"));
-            let kind = match d.status() { Added => "A", Deleted => "D", Renamed => "R", Copied => "C", Typechange => "T", _ => "M" };
+            let kind = match d.status() { Added | Untracked => "A", Deleted => "D", Renamed => "R", Copied => "C", Typechange => "T", _ => "M" };
             let renamed = matches!(d.status(), Renamed | Copied);
             FileChange {
                 path: path(d.new_file()).or_else(|| path(d.old_file())).unwrap_or_default(),
@@ -478,10 +590,9 @@ fn file_patch(diff: &git2::Diff, file: &str) -> Result<Option<String>, AppError>
 }
 
 /// First parent → commit, with rename detection.
-fn commit_diff_all<'r>(repo: &'r git2::Repository, c: &git2::Commit) -> Result<git2::Diff<'r>, AppError> {
+fn commit_diff_all<'r>(repo: &'r git2::Repository, c: &git2::Commit, ws: bool) -> Result<git2::Diff<'r>, AppError> {
     let parent = c.parent(0).ok().map(|p| p.tree()).transpose()?;
-    let mut opts = git2::DiffOptions::new();
-    opts.max_size(1 << 20);
+    let mut opts = diff_opts(ws);
     let mut diff = repo.diff_tree_to_tree(parent.as_ref(), Some(&c.tree()?), Some(&mut opts))?;
     diff.find_similar(None)?;
     Ok(diff)
@@ -603,7 +714,7 @@ mod tests {
         for b in ["old", "side"] {
             repo.find_branch(b, git2::BranchType::Local).unwrap().delete().unwrap();
         }
-        assert!(super::commit_file_diff(&dir, &first.id().to_string(), "a.txt").unwrap().unwrap().ends_with("+one\n+two\n+three\n"));
+        assert!(super::commit_file_diff(&dir, &first.id().to_string(), "a.txt", false).unwrap().unwrap().ends_with("+one\n+two\n+three\n"));
 
         let (msg, patch) = super::commit_patch(&dir, &first.id().to_string()).unwrap();
         assert!(msg == "msg\n\nbody" && patch.contains("+++ b/a.txt") && patch.ends_with("+three\n"), "{patch}");
@@ -627,10 +738,10 @@ mod tests {
         assert!(patch.contains("+four\n") && patch.contains("Binary files"), "{patch}");
         // Compare one file across revisions and against the working tree, either way round.
         let first_oid = first.id().to_string();
-        assert!(super::compare_file(&dir, Some(&first_oid), Some("HEAD"), "a.txt").unwrap().unwrap().contains("-one\n"));
-        assert_eq!(super::compare_file(&dir, Some("HEAD"), Some("HEAD"), "b.txt").unwrap().unwrap(), "");
-        assert!(super::compare_file(&dir, Some("HEAD"), None, "b.txt").unwrap().unwrap().ends_with("+four\n"));
-        assert!(super::compare_file(&dir, None, Some("HEAD"), "b.txt").unwrap().unwrap().ends_with("-four\n"));
+        assert!(super::compare_file(&dir, Some(&first_oid), Some("HEAD"), "a.txt", None, false).unwrap().unwrap().contains("-one\n"));
+        assert_eq!(super::compare_file(&dir, Some("HEAD"), Some("HEAD"), "b.txt", None, false).unwrap().unwrap(), "");
+        assert!(super::compare_file(&dir, Some("HEAD"), None, "b.txt", None, false).unwrap().unwrap().ends_with("+four\n"));
+        assert!(super::compare_file(&dir, None, Some("HEAD"), "b.txt", None, false).unwrap().unwrap().ends_with("-four\n"));
 
         use crate::git::graph::{rows, GraphOpts};
         let all = GraphOpts { all: true, own: false, remotes: true, by_date: true };
@@ -696,7 +807,53 @@ mod tests {
         assert!(msg.ends_with("wip") && patch.contains("+ONE") && patch.contains("+fresh"), "{patch}");
         let files: Vec<_> = super::stash_files(&dir, oid.trim()).unwrap().into_iter().map(|f| (f.path, f.kind)).collect();
         assert_eq!(files, [("a.txt".into(), "M".into()), ("new.txt".into(), "A".into())]);
-        assert!(super::stash_file_diff(&dir, oid.trim(), "new.txt").unwrap().unwrap().contains("+fresh"));
+        assert!(super::stash_file_diff(&dir, oid.trim(), "new.txt", false).unwrap().unwrap().contains("+fresh"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn compare_reflog_whitespace() {
+        let dir = std::env::temp_dir().join(format!("git-ai-compare-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| crate::git::cli::git(&dir, args).unwrap();
+        let commit = |msg: &str| git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-am", msg]);
+        git(&["init", "-q", "-b", "main"]);
+        std::fs::write(dir.join("a.txt"), "one\ntwo\n").unwrap();
+        git(&["add", "--", "a.txt"]);
+        commit("init");
+        git(&["switch", "-q", "-c", "feat"]);
+        std::fs::write(dir.join("a.txt"), "one\n  two\n").unwrap(); // whitespace only
+        git(&["mv", "a.txt", "b.txt"]);
+        commit("feat");
+        git(&["switch", "-q", "main"]);
+        std::fs::write(dir.join("c.txt"), "c\n").unwrap();
+        git(&["add", "--", "c.txt"]);
+        commit("main");
+
+        // Since they split: only feat's rename; main's c.txt isn't part of it.
+        let base = super::merge_base(&dir, "main", "feat").unwrap();
+        let files: Vec<_> = super::compare_files(&dir, Some(&base), Some("feat")).unwrap().into_iter().map(|f| (f.path, f.orig_path, f.kind)).collect();
+        assert_eq!(files, [("b.txt".into(), Some("a.txt".into()), "R".into())]);
+        assert_eq!(super::compare_files(&dir, Some("main"), Some("feat")).unwrap().len(), 2);
+        // The rename's diff, with and without whitespace changes.
+        assert!(super::compare_file(&dir, Some(&base), Some("feat"), "b.txt", Some("a.txt"), false).unwrap().unwrap().contains("+  two"));
+        assert!(!super::compare_file(&dir, Some(&base), Some("feat"), "b.txt", Some("a.txt"), true).unwrap().unwrap().contains("@@"));
+        // Working tree side: an untracked file is an add.
+        std::fs::write(dir.join("new.txt"), "n\n").unwrap();
+        let files = super::compare_files(&dir, Some("HEAD"), None).unwrap();
+        assert!(files.iter().any(|f| f.path == "new.txt" && f.kind == "A"), "{files:?}");
+        assert_eq!(super::merge_base(&dir, "main", "-x").unwrap_err().code, "bad_name");
+
+        // A commit dropped by a reset is lost; the ones still on branches aren't.
+        let dropped = git(&["rev-parse", "HEAD"]).trim().to_string();
+        git(&["reset", "-q", "--hard", "HEAD~1"]);
+        let log = super::reflog(&dir, 100).unwrap();
+        assert!(log[0].action.starts_with("reset:"), "{:?}", log[0]);
+        let lost: Vec<_> = log.iter().filter(|e| e.lost).map(|e| e.oid.as_str()).collect();
+        assert_eq!(lost, [dropped.as_str()]);
+        assert!(log.iter().any(|e| e.subject == "feat" && !e.lost));
+        assert!(super::submodules(&dir).unwrap().is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -704,8 +861,8 @@ mod tests {
     fn diffs_own_files() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         // Clean or not, a known text file must give a text (possibly empty) diff, never "binary".
-        assert!(super::file_diff(root, "progress.md", false).unwrap().is_some());
-        assert!(super::file_diff(root, "progress.md", true).unwrap().is_some());
+        assert!(super::file_diff(root, "progress.md", false, false).unwrap().is_some());
+        assert!(super::file_diff(root, "progress.md", true, false).unwrap().is_some());
     }
 
     /// Times what opening a repo runs, on a real repo: `GITAI_REPO=<path> cargo test --release

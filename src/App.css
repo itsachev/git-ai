@@ -837,7 +837,19 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff pre > div { padding: 0 0.9rem 0 0; white-space: pre; min-width: max-content; }
 /* Top-aligned: an empty number span would otherwise set the baseline and make the row taller. */
 .diff .ln { display: inline-flex; vertical-align: top; position: sticky; left: 0; margin-right: 0.75rem; background: inherit; user-select: none; }
-.diff pre > div:not(.add):not(.del) .ln { background: var(--panel); }
+.diff pre > div:not(.add, .del, .split) .ln { background: var(--panel); }
+/* Side by side: old | new, each half cut at the pane's middle (no sideways scroll; the line is in its tooltip). */
+.diff pre > div.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; padding: 0; }
+.diff .split > span { overflow: hidden; text-overflow: ellipsis; padding-right: 0.5rem; }
+.diff .split > span + span { box-shadow: inset 1px 0 var(--line); }
+.diff .split > span + span.pick:hover { box-shadow: inset 1px 0 var(--line), inset 4px 0 var(--faint); }
+.diff .split > span + span.pick.on { box-shadow: inset 1px 0 var(--line), inset 4px 0 var(--accent); }
+.diff .split > .blank { background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--line) 55%, transparent) 6px 7px), var(--sunken); }
+.diff .split .ln { margin-right: 0.5rem; }
+/* Split / Ignore whitespace: on every diff header, pressed = on. */
+.diff-opts { flex: none; display: flex; gap: 2px; margin-left: auto; }
+.diff-opts button[aria-pressed="true"] { color: var(--accent-fg); background: var(--active); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+@container pane (max-width: 34rem) { .diff-opts .wide { display: none; } }
 .diff .ln span { width: 4.5ch; padding-right: 0.6ch; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .diff .ln span:last-child { border-right: 1px solid var(--line); }
 /* highlight.js tokens (src/lib/highlight.tsx). */
@@ -1707,6 +1719,17 @@ dialog.file-history { width: clamp(min(72rem, 100vw - 2rem), 80vw, 120rem); heig
 .fh-list .row[aria-pressed="true"] strong { color: var(--accent-fg); }
 .fh-list strong, .fh-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fh-list small { color: var(--faint); font-size: 0.8rem; }
+.fh-list .ci-tag { margin-right: 0.4rem; vertical-align: 1px; }
+.ci-tag.lost { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+/* Compare: From ⇄ To and the "only what To added" switch. */
+.cmp-opts { display: grid; gap: 0.6rem; }
+/* Reflog: the picked commit (subject + Branch from here), its files, the picked file's diff. */
+.rl-pick { min-height: 0; display: grid; gap: 0.6rem; grid-template-rows: auto minmax(0, max-content) minmax(0, 1fr); }
+.rl-pick > .files { max-height: 9rem; overflow-y: auto; }
+.rl-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.rl-head > span { flex: 1 1 14rem; min-width: 0; display: grid; }
+.rl-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-head small { font-size: 0.8rem; }
 /* Blame rows: who (on the first line of each run), line number, text. Runs alternate shading. */
 .fh-blame .ln { position: static; }
 .fh-blame .alt, .fh-blame .alt .ln { background: var(--sunken); }

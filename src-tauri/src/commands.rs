@@ -206,13 +206,47 @@ pub async fn commit_details(path: String, oid: String) -> Result<read::CommitDet
 }
 
 #[tauri::command]
-pub async fn commit_file_diff(path: String, oid: String, file: String) -> Result<Option<String>, AppError> {
-    read::commit_file_diff(Path::new(&path), &oid, &file)
+pub async fn commit_file_diff(path: String, oid: String, file: String, ws: bool) -> Result<Option<String>, AppError> {
+    read::commit_file_diff(Path::new(&path), &oid, &file, ws)
 }
 
 #[tauri::command]
-pub async fn compare_file(path: String, from: Option<String>, to: Option<String>, file: String) -> Result<Option<String>, AppError> {
-    read::compare_file(Path::new(&path), from.as_deref(), to.as_deref(), &file)
+pub async fn compare_file(
+    path: String,
+    from: Option<String>,
+    to: Option<String>,
+    file: String,
+    orig: Option<String>,
+    ws: bool,
+) -> Result<Option<String>, AppError> {
+    read::compare_file(Path::new(&path), from.as_deref(), to.as_deref(), &file, orig.as_deref(), ws)
+}
+
+#[tauri::command]
+pub async fn compare_files(path: String, from: Option<String>, to: Option<String>) -> Result<Vec<cli::FileChange>, AppError> {
+    read::compare_files(Path::new(&path), from.as_deref(), to.as_deref())
+}
+
+#[tauri::command]
+pub async fn merge_base(path: String, a: String, b: String) -> Result<String, AppError> {
+    read::merge_base(Path::new(&path), &a, &b)
+}
+
+/// HEAD's recent moves, for recovering commits no branch has anymore.
+#[tauri::command]
+pub async fn reflog(path: String) -> Result<Vec<read::ReflogEntry>, AppError> {
+    read::reflog(Path::new(&path), 1000)
+}
+
+#[tauri::command(async)]
+pub fn submodules(path: String) -> Result<Vec<read::Submodule>, AppError> {
+    read::submodules(Path::new(&path))
+}
+
+/// Network: clones missing submodules.
+#[tauri::command]
+pub async fn submodule_update(path: String, sub: Option<String>) -> Result<(), AppError> {
+    cli::submodule_update(Path::new(&path), sub.as_deref())
 }
 
 #[tauri::command]
@@ -221,8 +255,8 @@ pub async fn stash_files(path: String, oid: String) -> Result<Vec<cli::FileChang
 }
 
 #[tauri::command]
-pub async fn stash_file_diff(path: String, oid: String, file: String) -> Result<Option<String>, AppError> {
-    read::stash_file_diff(Path::new(&path), &oid, &file)
+pub async fn stash_file_diff(path: String, oid: String, file: String, ws: bool) -> Result<Option<String>, AppError> {
+    read::stash_file_diff(Path::new(&path), &oid, &file, ws)
 }
 
 #[tauri::command(async)]
@@ -254,8 +288,8 @@ pub fn delete_branch(path: String, name: String, force: bool) -> Result<(), AppE
 }
 
 #[tauri::command(async)]
-pub fn file_diff(path: String, file: String, staged: bool) -> Result<Option<String>, AppError> {
-    read::file_diff(Path::new(&path), &file, staged)
+pub fn file_diff(path: String, file: String, staged: bool, ws: bool) -> Result<Option<String>, AppError> {
+    read::file_diff(Path::new(&path), &file, staged, ws)
 }
 
 #[tauri::command(async)]

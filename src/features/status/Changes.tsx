@@ -591,10 +591,25 @@ export function FileLabel({ f }: { f: FileChange }) {
   );
 }
 
-/** Diff pane header: kind, folder/name, +added −removed. `lines`: the diff from its first "@@". */
+// How every diff pane shows diffs: side by side (`split`) and/or ignoring whitespace (`ws`, `git diff -w`).
+// One choice for all panes, kept across restarts.
+type DiffView = { split: boolean; ws: boolean };
+const VIEW_KEY = "diff-view";
+let diffView: DiffView = { split: false, ws: false };
+try { diffView = { ...diffView, ...JSON.parse(localStorage.getItem(VIEW_KEY) ?? "{}") }; } catch { /* storage blocked or corrupt */ }
+const viewSubs = new Set<() => void>();
+export const useDiffView = () => useSyncExternalStore((f) => { viewSubs.add(f); return () => { viewSubs.delete(f); }; }, () => diffView);
+function setDiffView(v: Partial<DiffView>) {
+  diffView = { ...diffView, ...v };
+  try { localStorage.setItem(VIEW_KEY, JSON.stringify(diffView)); } catch { /* storage blocked */ }
+  viewSubs.forEach((f) => f());
+}
+
+/** Diff pane header: kind, folder/name, +added −removed, then the view toggles. `lines`: the diff from its first "@@". */
 export function DiffHead({ file, kind, lines, children }: { file: string; kind?: string; lines?: string[]; children?: React.ReactNode }) {
   const slash = file.lastIndexOf("/");
   const count = (c: string) => lines?.reduce((n, l) => n + +(l[0] === c), 0) ?? 0;
+  const { split, ws } = useDiffView();
   return (
     <header className="diff-head">
       {kind && <span className={`kind ${kindClass(kind)}`}>{kind}</span>}
@@ -603,7 +618,52 @@ export function DiffHead({ file, kind, lines, children }: { file: string; kind?:
       </span>
       {lines && <span className="stat" aria-label={`${count("+")} lines added, ${count("-")} removed`}><b className="plus">+{count("+")}</b><b className="minus">−{count("-")}</b></span>}
       {children}
+      <span className="diff-opts" role="group" aria-label="Diff view">
+        <button type="button" className="small ghost" aria-pressed={split} onClick={() => setDiffView({ split: !split })}
+          title="Old version on the left, new on the right">Split</button>
+        <button type="button" className="small ghost" aria-pressed={ws} onClick={() => setDiffView({ ws: !ws })} aria-label="Ignore whitespace"
+          title="Hide changes that only add or remove spaces and tabs (git diff -w)">Ignore<span className="wide"> whitespace</span></button>
+      </span>
     </header>
+  );
+}
+
+/** What a diff with no "@@" left means. */
+export const noContentNote = (ws: boolean) => ws
+  ? <PaneNote icon="info" title="Only whitespace changes"><p>Or only the mode or name changed. Turn off Ignore whitespace to see them.</p></PaneNote>
+  : <PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote>;
+
+/** Side-by-side rows of a diff's `lines` (from its first "@@"): [old, new] indices into `lines`, -1 = blank.
+ *  A hunk header or context line is [i, i]; a run of − lines pairs up with the + run right after it. */
+export function splitRows(lines: string[]) {
+  const rows: [number, number][] = [];
+  // Collects the run of `c` lines from `i` ("\ No newline" notes inside it are skipped); returns where it ends.
+  const run = (i: number, c: string, out: number[]) => {
+    for (; i < lines.length && (lines[i][0] === c || lines[i][0] === "\\"); i++) if (lines[i][0] === c) out.push(i);
+    return i;
+  };
+  for (let i = 0; i < lines.length;) {
+    if (lines[i][0] === "-" || lines[i][0] === "+") {
+      const del: number[] = [], add: number[] = [];
+      i = run(run(i, "-", del), "+", add);
+      for (let k = 0; k < Math.max(del.length, add.length); k++) rows.push([del[k] ?? -1, add[k] ?? -1]);
+    } else {
+      if (lines[i][0] !== "\\") rows.push([i, i]);
+      i++;
+    }
+  }
+  return rows;
+}
+
+/** One side of a split row: diff line `l` with its line number; no `l` = the blank side of an add or delete. */
+// ponytail: each side is cut at the pane's middle (no sideways scroll); the full line is in its tooltip. Unified view shows it whole.
+export function Half({ l, num, hl, className, ...rest }: { l?: string; num: number | ""; hl: string | null } & React.HTMLAttributes<HTMLSpanElement>) {
+  if (l === undefined) return <span className="blank" />;
+  const kind = l[0] === "+" ? "add" : l[0] === "-" ? "del" : "";
+  return (
+    <span className={[kind, className].filter(Boolean).join(" ") || undefined} title={l.length > 60 ? l.slice(1) : undefined} {...rest}>
+      <span className="ln" aria-hidden="true"><span>{num}</span></span><DiffLine line={l} lang={hl} />
+    </span>
   );
 }
 
@@ -624,9 +684,10 @@ function Clean({ branch }: { branch: string | null }) {
 }
 
 function Diff({ path, sel, kind, run }: DiffProps) {
+  const { split, ws } = useDiffView();
   const { data, error } = useQuery({
-    queryKey: ["diff", path, sel?.file, sel?.staged],
-    queryFn: () => fileDiff(path, sel!.file, sel!.staged),
+    queryKey: ["diff", path, sel?.file, sel?.staged, ws],
+    queryFn: () => fileDiff(path, sel!.file, sel!.staged, ws),
     enabled: !!sel,
   });
   // Picked +/- lines, as indices into the diff text's lines (what `applyLines` expects).
@@ -657,11 +718,12 @@ function Diff({ path, sel, kind, run }: DiffProps) {
   const all = data.replace(/\n$/, "").split("\n");
   // Skip the "diff --git / index / --- / +++" header; hunks start at the first "@@".
   const start = all.findIndex((l) => l.startsWith("@@"));
-  if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
+  if (start < 0) return <section className="diff">{head}{noContentNote(ws)}</section>;
 
   const file = sel.file;
   const isChange = (i: number) => all[i][0] === "+" || all[i][0] === "-";
-  const ops: [LineOp, string][] = sel.staged ? [["Unstage", "Unstage"]] : [["Stage", "Stage"], ["Discard", "Discard"]];
+  // Ignoring whitespace, the lines shown aren't the ones git would stage: no line or hunk picking then.
+  const ops: [LineOp, string][] = ws ? [] : sel.staged ? [["Unstage", "Unstage"]] : [["Stage", "Stage"], ["Discard", "Discard"]];
   async function apply(op: LineOp, lines: number[], what: string) {
     if (op === "Discard" && !(await confirmDiscard(`${what} in ${file}`))) return;
     run(() => applyLines(path, file, op, lines));
@@ -681,10 +743,33 @@ function Diff({ path, sel, kind, run }: DiffProps) {
   }
 
   const nums = lineNumbers(all, start);
+  // Split: [old, new] indices into `all`.
+  const rows = split ? splitRows(all.slice(start)).map(([a, b]) => [a < 0 ? a : start + a, b < 0 ? b : start + b]) : null;
+  const hunkRow = (i: number) => (
+    <div key={i} className="hunk">
+      {ops.map(([op, label]) => (
+        <button key={op} className="small" data-op={op} onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
+      ))}
+      <span>{all[i]}</span>
+    </div>
+  );
+  // A +/- line as a pickable row (unified) or cell (split).
+  const pick = (i: number, cls: string) => {
+    const on = picked.has(i);
+    return {
+      role: "checkbox", "aria-checked": on, className: `${cls} pick${on ? " on" : ""}`.trim(),
+      onMouseDown: (e: React.MouseEvent) => e.shiftKey && e.preventDefault(), // no text selection on Shift+click
+      onClick: (e: React.MouseEvent) => toggle(i, e.shiftKey),
+    };
+  };
+  const half = (i: number, side: 0 | 1) => i < 0 ? <Half num="" hl={lang} />
+    : <Half l={all[i]} num={nums[i - start][side]} hl={lang} {...(ops.length && isChange(i) ? pick(i, "") : {})} />;
   return (
     <section className="diff">
       <DiffHead file={file} kind={kind} lines={all.slice(start)}>
-        {picked.size ? (
+        {ws ? (
+          <span className="hint">Turn off Ignore whitespace to stage lines</span>
+        ) : picked.size ? (
           <span className="picked" role="status">
             <span>{picked.size} line{picked.size > 1 ? "s" : ""}</span>
             {ops.map(([op, label]) => (
@@ -696,27 +781,20 @@ function Diff({ path, sel, kind, run }: DiffProps) {
           <span className="hint">Click lines to pick them, Shift+click for a range</span>
         )}
       </DiffHead>
-      <Lines key={file} label={`Diff of ${file}`} n={all.length - start} width={widest(all)} hunk={(k) => all[start + k].startsWith("@@")}
+      <Lines key={file + split} label={`Diff of ${file}`} n={rows ? rows.length : all.length - start} width={rows ? 0 : widest(all)}
+        hunk={(k) => !!all[rows ? rows[k][0] : start + k]?.startsWith("@@")}
         row={(k) => {
+          if (rows) {
+            const [a, b] = rows[k];
+            return all[a]?.startsWith("@@") ? hunkRow(a) : <div key={k} className="split">{half(a, 0)}{half(b, 1)}</div>;
+          }
           const i = start + k;
           const l = all[i];
           const [o, n] = nums[k];
-          if (l.startsWith("@@"))
-            return (
-              <div key={i} className="hunk">
-                {ops.map(([op, label]) => (
-                  <button key={op} className="small" data-op={op} onClick={() => apply(op, hunkLines(i), "this hunk")}>{label} hunk</button>
-                ))}
-                <span>{l}</span>
-              </div>
-            );
-          if (!isChange(i)) return <div key={i}><Gutter o={o} n={n} /><DiffLine line={l} lang={lang} /></div>;
-          const on = picked.has(i);
+          if (l.startsWith("@@")) return hunkRow(i);
+          const cls = l[0] === "+" ? "add" : l[0] === "-" ? "del" : "";
           return (
-            <div key={i} role="checkbox" aria-checked={on}
-              className={`${l[0] === "+" ? "add" : "del"} pick${on ? " on" : ""}`}
-              onMouseDown={(e) => e.shiftKey && e.preventDefault()} // no text selection on Shift+click
-              onClick={(e) => toggle(i, e.shiftKey)}>
+            <div key={i} {...(ops.length && isChange(i) ? pick(i, cls) : { className: cls || undefined })}>
               <Gutter o={o} n={n} /><DiffLine line={l} lang={lang} />
             </div>
           );

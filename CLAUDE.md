@@ -32,7 +32,7 @@ git-ai is a cross-platform desktop Git GUI (Sourcetree-like). It is local-first 
 
 - **Hybrid git access.**
   - Reads (log, diff, blame, refs, graph) use `git2` in `src-tauri/src/git/read.rs`.
-  - Exception for speed: history walks over the whole repo run the `git` binary, because it reads the commit-graph file and libgit2 doesn't. These are the graph walk (`rev-list`), `merged_refs` (`for-each-ref --merged`) and `in_head` (`merge-base --is-ancestor`).
+  - Exception for speed: history walks over the whole repo run the `git` binary, because it reads the commit-graph file and libgit2 doesn't. These are the graph walk (`rev-list`), `merged_refs` (`for-each-ref --merged`), `in_head` (`merge-base --is-ancestor`), `merge_base` and the reflog's lost-commit check (`rev-list --not --branches …`).
   - Writes and network operations (commit, merge, rebase, push, fetch, clone, LFS) run the system `git` binary from `src-tauri/src/git/cli.rs`:
     - Use `Command::new("git").args([...])` and never a shell.
     - Put `--` before paths.

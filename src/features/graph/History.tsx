@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, revert, stashFileDiff } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
-import { DiffHead, FileLabel, Gutter, PaneNote, errorText, lineNumbers, useRun } from "../status/Changes";
+import { DiffHead, FileLabel, Gutter, Half, PaneNote, errorText, lineNumbers, noContentNote, splitRows, useDiffView, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { DiffLine, useLang } from "../../lib/highlight";
 import { Lines, widest } from "../../lib/Lines";
@@ -13,6 +13,7 @@ import { Avatar, CommitGraph, CommitSearch, GraphOptions, savedOpts, type Picked
 import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
 import { openFileHistory } from "./FileHistory";
+import { openCompare } from "./Compare";
 import { confirm } from "../../lib/modal";
 
 const inHead = "The current branch already has this commit";
@@ -74,7 +75,9 @@ export function History({ path }: { path: string }) {
           <GraphOptions opts={opts} onChange={(o) => { setOpts(o); setSel(null); }} />
           <CommitSearch path={path} opts={opts} sel={sel} onSelect={setSel} onHits={setHits} />
         </div>
-        <CommitGraph path={path} opts={opts} sel={sel} onSelect={setSel} hits={hits} />
+        {/* Ctrl+click a second commit: compare the two, older → newer (rows run newest first). */}
+        <CommitGraph path={path} opts={opts} sel={sel} onSelect={setSel} hits={hits}
+          onCompare={(p) => { const [old, neu] = sel && p.i < sel.i ? [sel, p] : [p, sel!]; openCompare(old.oid, neu.oid, false); }} />
       </div>
       <Splitter name="graph-h" axis="y" label="Resize commit list" />
       <div className="history-bottom">
@@ -101,6 +104,8 @@ export function History({ path }: { path: string }) {
                 <button className="small ghost" title="Add a commit that undoes this one"
                   onClick={async () => (await confirm("Revert commit", `Add a commit on ${refs?.head ?? "the current branch"} that undoes ${d.oid.slice(0, 7)}? Undo history (sidebar) can reverse it.`, "Revert")) && run(() => revert(path, d.oid), `Reverted ${d.oid.slice(0, 7)}`)}><Icon name="undo" />Revert</button>
                 <button className="small ghost" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}><Icon name="tag" />Tag…</button>
+                <button className="small ghost" onClick={() => openCompare(d.oid, refs?.head ?? "HEAD", false)}
+                  title={`Every file that differs between this commit and ${refs?.head ?? "HEAD"} (or anything else you pick). Tip: Ctrl+click another commit to compare the two.`}><Icon name="changes" />Compare…</button>
                 <button className="small ghost" disabled={!!noRebase} onClick={() => openRebase(d.oid)} title={noRebase ?? "Reorder, edit, squash or drop the commits after this one"}><Icon name="restart" />Rebase…</button>
                 <button className="small ghost ai" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
                   title={d.oid in explained ? "Already explained below" : hasKey ? "Explain this commit in plain words (message and diff sent to your AI provider)" : "Set up AI in Settings first"}>
@@ -151,14 +156,16 @@ export function History({ path }: { path: string }) {
 
 /** `stash`: `oid` is a stash, whose untracked files count too. */
 export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid: string; file: string; kind?: string; stash?: boolean }) {
+  const { ws } = useDiffView();
   // A commit never changes, so its diffs never need a refetch.
-  const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file, !!stash], queryFn: () => (stash ? stashFileDiff : commitFileDiff)(path, oid, file) });
+  const { data, error } = useQuery({ queryKey: ["commit-diff", path, oid, file, !!stash, ws], queryFn: () => (stash ? stashFileDiff : commitFileDiff)(path, oid, file, ws) });
   return <ReadDiff file={file} kind={kind} data={data} error={error} />;
 }
 
 /** Read-only diff of one file. `data`: undefined = loading, null = binary or over 1 MB, "" = no difference. */
 export function ReadDiff({ file, kind, data, error }: { file: string; kind?: string; data: string | null | undefined; error: unknown }) {
   const lang = useLang(file, data);
+  const { split, ws } = useDiffView();
   const head = <DiffHead file={file} kind={kind} />;
   if (error) return <section className="diff">{head}<p className="pane-note error" role="alert">{errorText(error)}</p></section>;
   if (data === undefined) return <section className="diff">{head}</section>;
@@ -166,14 +173,21 @@ export function ReadDiff({ file, kind, data, error }: { file: string; kind?: str
   if (data === "") return <section className="diff">{head}<PaneNote icon="check" title="No differences"><p>The file is the same on both sides.</p></PaneNote></section>;
   const all = data.replace(/\n$/, "").split("\n");
   const start = all.findIndex((l) => l.startsWith("@@"));
-  if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
+  if (start < 0) return <section className="diff">{head}{noContentNote(ws)}</section>;
   const lines = all.slice(start);
   const nums = lineNumbers(all, start);
+  const rows = split ? splitRows(lines) : null;
   return (
     <section className="diff">
       <DiffHead file={file} kind={kind} lines={lines} />
-      <Lines key={file} label={`Diff of ${file}`} n={lines.length} width={widest(lines)} hunk={(k) => lines[k].startsWith("@@")}
+      <Lines key={file + split} label={`Diff of ${file}`} n={rows ? rows.length : lines.length} width={rows ? 0 : widest(lines)}
+        hunk={(k) => !!lines[rows ? rows[k][0] : k]?.startsWith("@@")}
         row={(k) => {
+          if (rows) {
+            const [a, b] = rows[k];
+            if (lines[a]?.startsWith("@@")) return <div key={k} className="hunk"><span>{lines[a]}</span></div>;
+            return <div key={k} className="split"><Half l={lines[a]} num={nums[a]?.[0] ?? ""} hl={lang} /><Half l={lines[b]} num={nums[b]?.[1] ?? ""} hl={lang} /></div>;
+          }
           const l = lines[k];
           if (l.startsWith("@@")) return <div key={k} className="hunk"><span>{l}</span></div>;
           const [o, n] = nums[k];

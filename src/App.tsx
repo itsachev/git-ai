@@ -16,6 +16,8 @@ import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs
 import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { RebaseDialog } from "./features/graph/Rebase";
 import { FileHistoryDialog } from "./features/graph/FileHistory";
+import { CompareDialog, openCompare } from "./features/graph/Compare";
+import { ReflogDialog, openReflog } from "./features/refs/Reflog";
 import { StashDialog, StashSaveDialog, openStashSave } from "./features/refs/Stash";
 import { AskpassDialog, CloneDialog, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
@@ -245,6 +247,15 @@ function App() {
 
   const drop = (path: string) => setTabs((ts) => ts.filter((t) => t.path !== path));
 
+  // A submodule's "Open in new tab" (sidebar). Through a ref: the listener is added once, `load` changes every render.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    const open = (e: Event) => loadRef.current((e as CustomEvent<string>).detail);
+    addEventListener("gitai-open-repo", open);
+    return () => removeEventListener("gitai-open-repo", open);
+  }, []);
+
   // Closing the active tab shows its right neighbour, else its left one, else the repository list.
   function close(path: string) {
     const i = tabs.findIndex((t) => t.path === path);
@@ -449,6 +460,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
     { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
+    { label: "Compare branches…", git: "git diff <branch>...<other>", run: () => openCompare(refs?.head ?? "HEAD", refs?.local.find((b) => b.name !== refs.head)?.name ?? "") },
+    { label: "Recover lost commits…", git: "git reflog", run: openReflog },
     { label: "Git LFS…", git: "git lfs track", run: () => openLfs() },
     { label: "Open in terminal", run: () => run(() => openTerminal(path)) },
     // The textarea mounts after the tab switch renders.
@@ -517,6 +530,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <WriteUpDialog path={path} />
         <RebaseDialog path={path} />
         <FileHistoryDialog path={path} />
+        <CompareDialog path={path} />
+        <ReflogDialog path={path} />
         <StashDialog path={path} />
         <StashSaveDialog path={path} />
         <LfsDialog path={path} />

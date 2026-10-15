@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { blame, compareFile, fileLog } from "../../lib/ipc";
 import { ModalHead } from "../../lib/modal";
-import { errorText } from "../status/Changes";
+import { errorText, useDiffView } from "../status/Changes";
 import { ago } from "../refs/NewBranch";
 import { CommitDiff, ReadDiff } from "./History";
 import { refsQuery } from "../refs/Sidebar";
@@ -97,9 +97,10 @@ function CompareView({ path, rev, file }: { path: string; rev: string; file: str
   const [from, setFrom] = useState<string | null>(null);
   const [to, setTo] = useState(rev === "HEAD" ? "" : rev);
   const a = from ?? (refs && (refs.local.find((b) => b.name !== refs.head)?.name ?? refs.head ?? "HEAD"));
+  const { ws } = useDiffView();
   const diff = useQuery({
-    queryKey: ["compare", path, a, to, file],
-    queryFn: () => compareFile(path, a || null, to || null, file),
+    queryKey: ["compare", path, a, to, file, ws],
+    queryFn: () => compareFile(path, a || null, to || null, file, ws),
     enabled: a != null,
   });
   const name = (v: string) => (v === "" ? "working copy" : v === rev ? rev.slice(0, 7) : v);

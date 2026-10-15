@@ -55,12 +55,15 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - **Syntax colours** in diffs for about 190 languages, plus Vue, Svelte and Astro components
 - Binary files and files over 1 MB get no inline diff
 - Long diffs and blame (thousands of lines, such as lock files) open instantly and scroll smoothly
+- **Side-by-side diffs** and an **ignore whitespace** toggle on every diff
 
 ### 🕸️ History
 - Commit graph with all-branches or current-branch view and date or topological sort
 - Hover a graph dot to see its branch
 - **Search commits** by message, author or id (Ctrl+F)
 - Commit details and diffs, **AI explanations**, file history and blame
+- **Compare** any two commits, branches, tags or the working copy: full file list and diffs (Ctrl+click a second commit)
+- **Recover lost commits** from the reflog, even after resets and rebases done in a terminal
 - Right-click any commit to branch, merge, rebase, revert or reset (soft, mixed, keep or hard, all undoable)
 
 </td><td valign="top" width="50%">
@@ -72,6 +75,8 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - Tags and stashes. Stash everything, tracked files only, staged only or just the files you pick, under a name you choose, or save a checkpoint that keeps your files
 - Rename a stash, or turn it into a branch; Apply and Pop restore what was staged
 - AI explanations for branches and stashes
+- "What does this branch have that main doesn't?": compare from where they split
+- **Submodules**: see which need cloning or updating, update them, open one in its own tab
 
 ### ☁️ Remotes & hosting
 - Fetch, pull (merge or rebase) and push, with ahead/behind counts. Push and Commit grey out when they can't run, and say why on hover

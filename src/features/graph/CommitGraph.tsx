@@ -33,7 +33,8 @@ const x = (lane: number) => LANE / 2 + 3 + lane * LANE;
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export type Picked = { i: number; oid: string };
-type Props = { path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void; hits?: Set<string> };
+/** `onCompare`: Ctrl+click (Cmd+click) on a row other than the picked one. */
+type Props = { path: string; opts: GraphOpts; sel: Picked | null; onSelect: (p: Picked) => void; onCompare?: (p: Picked) => void; hits?: Set<string> };
 
 const OPTS_KEY = "graph-opts";
 /** Last-used history options, kept in localStorage (a per-window convenience). */
@@ -140,7 +141,7 @@ export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
 }
 
 /** Virtualized commit table: only the visible rows are in the DOM, their graph on one canvas. */
-export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
+export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState({ top: 0, height: 0 });
@@ -324,7 +325,7 @@ export function CommitGraph({ path, opts, sel, onSelect, hits }: Props) {
           {visible.map(([i, r]) => (
             <div key={i} id={`c-${r.oid}`} role="option" aria-selected={sel?.oid === r.oid}
               className={`grow${sel?.oid === r.oid ? " sel" : ""}${r.head ? " head" : ""}${hits?.has(r.oid) ? " hit" : ""}`}
-              style={{ ...cols, top: i * ROW, height: ROW }} onClick={() => onSelect({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}
+              style={{ ...cols, top: i * ROW, height: ROW }} onClick={(e) => ((e.ctrlKey || e.metaKey) && onCompare && sel && sel.oid !== r.oid ? onCompare : onSelect)({ i, oid: r.oid })} onContextMenu={(e) => rowMenu(e, i, r)}
               onMouseMove={(e) => hoverDot(e, i, r)} onMouseLeave={() => tip && setTip(null)}>
               <span />
               <span className="desc">

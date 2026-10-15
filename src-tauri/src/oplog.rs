@@ -659,7 +659,7 @@ On main: one
 
         // Line ops. Diff of a.txt ("one" to "x, two, y") has lines: 4 header, @@, -one, +x, +two, +y.
         fs::write(dir.join("a.txt"), "x\ntwo\ny\n").unwrap();
-        let diff = crate::git::read::file_diff(p, "a.txt", false).unwrap().unwrap();
+        let diff = crate::git::read::file_diff(p, "a.txt", false, false).unwrap().unwrap();
         let lines: Vec<&str> = diff.lines().collect();
         assert_eq!(&lines[5..], ["-one", "+x", "+two", "+y"]);
         cli::apply_lines(p, "a.txt", cli::LineOp::Stage, &[5, 7]).unwrap();

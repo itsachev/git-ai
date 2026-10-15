@@ -1,7 +1,7 @@
 ﻿import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, undo } from "../../lib/ipc";
+import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, submoduleUpdate, submodules, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { confirmUndo, errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
@@ -9,6 +9,11 @@ import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
 import { openStash, openStashSave } from "./Stash";
+import { openCompare } from "../graph/Compare";
+import { openReflog } from "./Reflog";
+
+/** Opens `dir` (a repo) in a new tab; App listens. */
+export const openRepoTab = (dir: string) => dispatchEvent(new CustomEvent("gitai-open-repo", { detail: dir }));
 import { choose, confirm, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
@@ -58,6 +63,10 @@ export function useRefActions(path: string) {
       [`Rebase ${head} onto ${name}`, async () => (await confirmRebase(head, name)) && run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`), done],
     ] : [];
     if (ontoOnly) return onto;
+    // A branch: what it has that the current one doesn't. A tag: what the current branch added since it.
+    const isTag = data.tags.some((t) => t.name === name) && !data.local.some((b) => b.name === name);
+    const compare: Action[] = head && head !== name
+      ? [[`Compare with ${head}`, () => (isTag ? openCompare(name, head) : openCompare(head, name))]] : [];
     /** Checkout of a remote branch: its local namesake, created (tracking) if missing; asks what to do when the remote has commits the local lacks. */
     const checkoutRemote = (name: string) => {
       const short = name.slice(name.indexOf("/") + 1);
@@ -112,7 +121,7 @@ export function useRefActions(path: string) {
         run(() => setUpstream(path, name, to), to ? `${name} now tracks ${to}` : `${name} no longer tracks ${up.upstream}`);
       }, candidates.length || up.upstream ? undefined : "No remote branches yet. Fetch or push first."];
       if (name === head) return [...sync, branchOff, pr, explain, rename, track];
-      return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, pr, explain, ...onto, rename, track, ["Delete", async () => {
+      return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
         if (!(await confirm("Delete branch", `Delete branch ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))) return;
         run(async () => {
           try {
@@ -125,12 +134,12 @@ export function useRefActions(path: string) {
       }]];
     }
     if (data.remote.some((r) => r.name === name)) {
-      return [["Checkout", checkoutRemote(name)], branchOff, ...onto, ["Delete", async () => {
+      return [["Checkout", checkoutRemote(name)], branchOff, ...compare, ...onto, ["Delete", async () => {
         if (await confirm("Delete remote branch", `Delete branch ${name} on the remote? Undo history (sidebar) can push it back.`, "Delete", "danger"))
           run(() => deleteRemoteBranch(path, name), `Deleted ${name} on the remote`);
       }]];
     }
-    return [branchOff, ["Changelog since this tag (AI)", () => openWriteUp("changelog", name)], ["Push", () => run(() => pushTag(path, name), `Pushed tag ${name}`)], ["Delete", async () => {
+    return [branchOff, ...compare, ["Changelog since this tag (AI)", () => openWriteUp("changelog", name)], ["Push", () => run(() => pushTag(path, name), `Pushed tag ${name}`)], ["Delete", async () => {
       if (await confirm("Delete tag", `Delete tag ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))
         run(() => deleteTag(path, name));
     }]];
@@ -162,8 +171,12 @@ export function Sidebar({ path }: { path: string }) {
   const { data, error } = useQuery(refsQuery(path));
   const remoteList = useQuery(remotesQuery(path)).data;
   const log = useQuery(opLogQuery(path)).data;
+  const subsList = useQuery({ queryKey: ["submodules", path], queryFn: () => submodules(path) }).data;
   const run = useRun();
   const actions = useRefActions(path);
+  // Network: may clone. `sub` null = all of them.
+  const updateSub = (sub: string | null) =>
+    run(() => submoduleUpdate(path, sub), sub ? `Updated ${sub}` : "Updated the submodules", sub ? `Updating ${sub}…` : "Updating submodules…");
   const [filter, setFilter] = useState("");
   // Branch drag and drop: one end must be the current branch; the drop menu offers merge/rebase with the other.
   const [dragging, setDragging] = useState<string | null>(null);
@@ -306,9 +319,36 @@ export function Sidebar({ path }: { path: string }) {
           ))}
         </ul>
       </details>
-      {log && log.length > 0 && (
-        <details>
-          <summary><Icon name="undo" />Undo history <span className="count">{log.length}</span></summary>
+      {subsList && subsList.length > 0 && (
+        <details open>
+          <summary>
+            <Icon name="folder" />Submodules <span className="count">{subsList.length}</span>
+            <button className="icon-btn" onClick={(e) => { e.preventDefault(); updateSub(null); }} aria-label="Update all submodules"
+              title="Update all: clone missing submodules and check each out at the commit this repo records"><Icon name="fetch" /></button>
+          </summary>
+          <ul className="refs">
+            {subsList.filter((s) => s.path.toLowerCase().includes(f)).map((s) => {
+              const missing = s.state === "new";
+              const open = () => openRepoTab(`${path}/${s.path}`);
+              return (
+                <Row key={s.path} item={{ name: s.path, oid: "", upstream: null, ahead: 0, behind: 0 }}
+                  label={missing ? `${s.path} · not cloned` : s.state === "moved" ? `${s.path} · needs update` : s.path}
+                  onOpen={missing ? undefined : open} actions={[
+                    ["Update", () => updateSub(s.path)],
+                    ["Open in new tab", open, missing ? "Not cloned yet: Update first" : undefined],
+                  ]} />
+              );
+            })}
+          </ul>
+        </details>
+      )}
+      <details>
+        <summary>
+          <Icon name="undo" />Undo history <span className="count">{log?.length ?? 0}</span>
+          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openReflog(); }} aria-label="Recover lost commits…"
+            title="Recover lost commits: every place HEAD has been, also resets and rebases done outside the app"><Icon name="history" /></button>
+        </summary>
+        {log && (
           <ul className="refs ops">
             {log.filter((e) => opLabel(e).toLowerCase().includes(f)).map((e) => (
               <li key={e.id}>
@@ -320,8 +360,8 @@ export function Sidebar({ path }: { path: string }) {
               </li>
             ))}
           </ul>
-        </details>
-      )}
+        )}
+      </details>
       <RefMenu pop={dropPop} label="Drop branch" actions={dropActions} />
     </section>
   );
