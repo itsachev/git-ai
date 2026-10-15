@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
 ### Added
 - **Push after commit:** a Push toggle under the commit message pushes your branch as soon as the commit lands. git-ai remembers your choice. The Commit button says so, for example "Commit 3 files & push". A rejected push offers the same choices as the toolbar's Push button.
 - **Push and pull counts on repository tabs:** each tab shows how many commits its current branch has to push (↑) and pull (↓). The open tab updates live. Other tabs keep the counts from when you last viewed them.
@@ -81,6 +83,7 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - **Auto-update**, first-run setup, an About guide to every feature, SSH key choice, and Git and Node versions in the status bar.
 - **Portable Windows app:** `git-ai_<version>_x64-portable.exe` runs from any folder without installing.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/itsachev/git-ai/releases/tag/v0.1.1
