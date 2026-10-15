@@ -5,6 +5,7 @@ import type { AppError } from "../../bindings/AppError";
 import { DiffHead, FileLabel, Gutter, PaneNote, errorText, lineNumbers, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { DiffLine, useLang } from "../../lib/highlight";
+import { Lines, widest } from "../../lib/Lines";
 import { ago } from "../refs/NewBranch";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { NameForm, refsQuery } from "../refs/Sidebar";
@@ -166,17 +167,18 @@ export function ReadDiff({ file, kind, data, error }: { file: string; kind?: str
   const all = data.replace(/\n$/, "").split("\n");
   const start = all.findIndex((l) => l.startsWith("@@"));
   if (start < 0) return <section className="diff">{head}<PaneNote icon="info" title="No content changes"><p>Only the mode or name changed.</p></PaneNote></section>;
-  // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
+  const lines = all.slice(start);
+  const nums = lineNumbers(all, start);
   return (
     <section className="diff">
-      <DiffHead file={file} kind={kind} lines={all.slice(start)} />
-      <pre key={file} aria-label={`Diff of ${file}`}>
-        {lineNumbers(all, start).map(([o, n], k) => {
-          const l = all[start + k];
+      <DiffHead file={file} kind={kind} lines={lines} />
+      <Lines key={file} label={`Diff of ${file}`} n={lines.length} width={widest(lines)} hunk={(k) => lines[k].startsWith("@@")}
+        row={(k) => {
+          const l = lines[k];
           if (l.startsWith("@@")) return <div key={k} className="hunk"><span>{l}</span></div>;
+          const [o, n] = nums[k];
           return <div key={k} className={l[0] === "+" ? "add" : l[0] === "-" ? "del" : undefined}><Gutter o={o} n={n} /><DiffLine line={l} lang={lang} /></div>;
-        })}
-      </pre>
+        }} />
     </section>
   );
 }

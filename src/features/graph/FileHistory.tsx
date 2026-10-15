@@ -8,6 +8,7 @@ import { CommitDiff, ReadDiff } from "./History";
 import { refsQuery } from "../refs/Sidebar";
 import { RefOptions } from "../refs/WriteUp";
 import { Icon } from "../../lib/icons";
+import { Lines, widest } from "../../lib/Lines";
 
 // History, blame and branch compare of one file as of `rev` (an oid, or "HEAD" from File Status).
 // Opened from a file in a commit's file list, or by right-clicking a file in File Status.
@@ -132,36 +133,33 @@ function CompareView({ path, rev, file }: { path: string; rev: string; file: str
 /** `focus`: the commit picked in History; its first lines scroll to the top. */
 function BlameView({ path, rev, file, onPick, focus }: { path: string; rev: string; file: string; onPick: (oid: string) => void; focus?: string }) {
   const { data, error } = useQuery({ queryKey: ["blame", path, rev, file], queryFn: () => blame(path, rev, file), staleTime: Infinity });
-  const target = useRef<HTMLDivElement>(null);
-  useEffect(() => { target.current?.scrollIntoView({ block: "start" }); }, [data]);
   if (error) return <section className="diff error" role="alert">{errorText(error)}</section>;
   if (!data) return <p className="nb-hint">Blaming… (long-lived files can take a few seconds)</p>;
   if (data.text === null) return <section className="diff muted">Binary file or larger than 1 MB, no blame.</section>;
   const lines = data.text.replace(/\n$/, "").split("\n");
-  const at = data.hunks.findIndex((h) => h.oid === focus);
-  // ponytail: renders every line (≤ 1 MB file), like the diff view; virtualize if big files feel slow.
+  // Hunk of each line (line n is index n - 1).
+  const of = new Int32Array(lines.length);
+  data.hunks.forEach((h, k) => of.fill(k, h.start - 1, h.start - 1 + h.lines));
+  const focused = data.hunks.find((h) => h.oid === focus);
   return (
     <section className="diff">
-      <pre className="fh-blame" aria-label={`Blame of ${file}`}>
-        {data.hunks.flatMap((h, k) =>
-          Array.from({ length: h.lines }, (_, i) => {
-            const n = h.start + i;
-            return (
-              <div key={n} ref={k === at && i === 0 ? target : undefined} className={`${k % 2 ? "alt" : ""}${i === 0 ? " first" : ""}`}>
-                <span className="who">
-                  {i === 0 && (
-                    <button type="button" className="link" title={`${h.subject}\nShow this commit's change`} onClick={() => onPick(h.oid)}>
-                      <span className="mono">{h.oid.slice(0, 7)}</span> {h.author} · {ago(h.time)}
-                    </button>
-                  )}
-                </span>
-                <span className="ln" aria-hidden="true"><span>{n}</span></span>
-                {lines[n - 1] || " "}
-              </div>
-            );
-          }),
-        )}
-      </pre>
+      <Lines key={file} className="fh-blame" label={`Blame of ${file}`} n={lines.length} width={widest(lines) + 30} at={focused && focused.start - 1}
+        row={(j) => {
+          const k = of[j], h = data.hunks[k], first = j === h.start - 1;
+          return (
+            <div key={j} className={`${k % 2 ? "alt" : ""}${first ? " first" : ""}`}>
+              <span className="who">
+                {first && (
+                  <button type="button" className="link" title={`${h.subject}\nShow this commit's change`} onClick={() => onPick(h.oid)}>
+                    <span className="mono">{h.oid.slice(0, 7)}</span> {h.author} · {ago(h.time)}
+                  </button>
+                )}
+              </span>
+              <span className="ln" aria-hidden="true"><span>{j + 1}</span></span>
+              {lines[j] || " "}
+            </div>
+          );
+        }} />
     </section>
   );
 }

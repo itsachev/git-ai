@@ -28,6 +28,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Ignore files", "Ignore on an untracked file", "Adds that file, every file with its extension, or its folder to .gitignore, so git stops listing them. Commit .gitignore like any file."],
     ["Syntax colours", "Automatic, in every diff", "Code is coloured by language: about 190 of them, from C, C++, Python and TypeScript to Elixir and Haskell, plus Vue, Svelte and Astro components."],
     ["Large and binary files", "Automatic", "No inline diff for binary files or files over 1 MB, and LFS pointer files show as files, so big repositories stay fast."],
+    ["Long diffs", "Automatic", "Diffs, file history and blame with thousands of lines, such as lock files, open instantly and scroll smoothly."],
     ["Git LFS", "Ctrl+K → Git LFS… · or Track *.ext with Git LFS… under a big file", "Stores large files on the LFS server and keeps small pointers in the repository. Track or untrack file patterns, and download LFS files that still show as pointers."],
   ]],
   ["history", "History", [

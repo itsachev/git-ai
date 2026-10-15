@@ -54,6 +54,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - **Git LFS**: track or untrack patterns, download LFS files
 - **Syntax colours** in diffs for about 190 languages, plus Vue, Svelte and Astro components
 - Binary files and files over 1 MB get no inline diff
+- Long diffs and blame (thousands of lines, such as lock files) open instantly and scroll smoothly
 
 ### 🕸️ History
 - Commit graph with all-branches or current-branch view and date or topological sort

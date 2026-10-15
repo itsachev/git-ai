@@ -13,6 +13,7 @@ What's new in each git-ai release. Newest first.
 - **New app icon:** a dark tile with a teal branch-and-merge glyph replaces the default Tauri logo in the taskbar, Start menu, Dock and installer.
 - **Redesigned commit box:** the message and its tools (Generate, Amend, Push) now sit in one field. Amend and Push are toggle chips. A full-width Commit button names exactly what will happen and shows the keyboard shortcut.
 - **Easier-to-read status bar:** the Git and Node versions, your commit identity and the Commands button use larger, darker text. "Commands" is now bold.
+- **Big diffs open instantly:** diffs, file history and blame of long files (thousands of lines, such as lock files) show at once and scroll smoothly. Before, a 25,000-line diff froze the window for over a second.
 
 ## [0.2.0] - 2026-10-14
 

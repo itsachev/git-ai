@@ -11,6 +11,7 @@ import { Icon, type IconName } from "../../lib/icons";
 import { FileIcon } from "../../lib/fileIcon";
 import { Splitter } from "../../lib/splitter";
 import { DiffLine, useLang } from "../../lib/highlight";
+import { Lines, widest } from "../../lib/Lines";
 import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
@@ -679,7 +680,7 @@ function Diff({ path, sel, kind, run }: DiffProps) {
     setAnchor(i);
   }
 
-  // ponytail: renders every line (≤ 1 MB file); virtualize if big diffs feel slow.
+  const nums = lineNumbers(all, start);
   return (
     <section className="diff">
       <DiffHead file={file} kind={kind} lines={all.slice(start)}>
@@ -695,10 +696,11 @@ function Diff({ path, sel, kind, run }: DiffProps) {
           <span className="hint">Click lines to pick them, Shift+click for a range</span>
         )}
       </DiffHead>
-      <pre key={file} aria-label={`Diff of ${file}`}>
-        {lineNumbers(all, start).map(([o, n], k) => {
+      <Lines key={file} label={`Diff of ${file}`} n={all.length - start} width={widest(all)} hunk={(k) => all[start + k].startsWith("@@")}
+        row={(k) => {
           const i = start + k;
           const l = all[i];
+          const [o, n] = nums[k];
           if (l.startsWith("@@"))
             return (
               <div key={i} className="hunk">
@@ -718,8 +720,7 @@ function Diff({ path, sel, kind, run }: DiffProps) {
               <Gutter o={o} n={n} /><DiffLine line={l} lang={lang} />
             </div>
           );
-        })}
-      </pre>
+        }} />
     </section>
   );
 }

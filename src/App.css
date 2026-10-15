@@ -832,6 +832,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff pre {
   margin: 0; overflow: auto; max-height: 70vh; padding: 0 0 0.5rem; background: var(--panel);
   font: 0.82rem/1.7 var(--mono); tab-size: 4; animation: fade 240ms var(--ease);
+  --hunk-gap: 1.4rem; /* rem: Lines (src/lib/Lines.tsx) reads it to place rows */
 }
 .diff pre > div { padding: 0 0.9rem 0 0; white-space: pre; min-width: max-content; }
 /* Top-aligned: an empty number span would otherwise set the baseline and make the row taller. */
@@ -853,11 +854,11 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff .del .ln span { color: var(--danger); }
 /* Hunk headers stick to the top while their lines scroll by. */
 .diff .hunk {
-  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 2px; margin: 1.4rem 0 0.25rem; padding: 0.5rem 0.6rem;
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 2px; margin: var(--hunk-gap) 0 0.25rem; padding: 0.5rem 0.6rem;
   font-size: 0.76rem; color: var(--info); background: color-mix(in srgb, var(--info) 7%, var(--panel));
   border-block: 1px solid color-mix(in srgb, var(--info) 14%, transparent);
 }
-.diff .hunk:first-child { margin-top: 0; border-top: 0; }
+.diff .hunk:first-child { margin-top: 0; }
 /* Breathing room after each hunk's last line, before the next header or the end of the diff. */
 .diff pre > div:has(+ .hunk), .diff pre > div:last-child { margin-bottom: 0.75rem; }
 .diff .hunk > span { padding: 0.15rem 0.3rem; opacity: 0.85; }
