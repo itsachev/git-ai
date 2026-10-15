@@ -4,6 +4,9 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Changed
+- **Feature search in About:** the "Find a feature" box now sits in the dialog's header, so it is visible right away and stays in reach while you scroll.
+
 ## [0.3.0] - 2026-10-15
 
 ### Added

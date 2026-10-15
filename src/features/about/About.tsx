@@ -197,7 +197,11 @@ export function AboutButton() {
         <span>About &amp; features</span>
       </button>
       <dialog ref={dialog} className="modal about" aria-labelledby="about-title" onClose={() => { setQ(""); setActive(null); }}>
-        <ModalHead id="about-title" icon="info" title={<>About <Brand /></>} sub="A free desktop Git client. Open source under Apache-2.0." />
+        <ModalHead id="about-title" icon="info" title={<>About <Brand /></>} sub="A free desktop Git client. Open source under Apache-2.0.">
+          <label className="search about-search"><Icon name="search" />
+            <input type="search" placeholder="Find a feature, e.g. cherry-pick" aria-label="Find a feature" value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+        </ModalHead>
         <div className="about-layout">
           <nav ref={nav} className="about-nav" aria-label="All features">
             {groups.map((g) => (
@@ -235,9 +239,6 @@ export function AboutButton() {
               </dl>
             </header>
             <div className="about-tools">
-              <label className="search about-search"><Icon name="search" />
-                <input type="search" placeholder="Find a feature, e.g. cherry-pick" aria-label="Find a feature" value={q} onChange={(e) => setQ(e.target.value)} />
-              </label>
               {/* Narrow windows hide the side nav; these chips jump to an area instead. */}
               <div className="about-jump" role="group" aria-label="Feature areas">
                 {groups.map((g) => (

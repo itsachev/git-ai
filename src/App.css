@@ -1252,6 +1252,10 @@ dialog.modal[open] .about-stats div { animation: rise 500ms var(--ease) backward
 .about-stats div:nth-child(2) { --i: 1; } .about-stats div:nth-child(3) { --i: 2; } .about-stats div:nth-child(4) { --i: 3; }
 
 .about-tools { display: grid; gap: 0.7rem; margin-bottom: 1rem; }
+/* Search sits at the right of the sticky header; wraps under the title when the window is narrow. */
+.about .modal-head { flex-wrap: wrap; }
+.about-search { flex: 1 1 16rem; max-width: 22rem; margin-left: auto; }
+@media (max-width: 40rem) { .about-search { max-width: none; } }
 .about-search input { min-height: calc(var(--ctl) + 0.6rem); padding-left: 2.1rem; font-size: 1rem; border-radius: 10px; }
 .about-search .icon { left: 0.7rem; }
 .about-jump { display: flex; flex-wrap: wrap; gap: 0.4rem; }

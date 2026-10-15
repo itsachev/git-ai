@@ -5,7 +5,7 @@ import { Icon, type IconName } from "./icons";
 export type Tone = "accent" | "ok" | "warn" | "danger";
 
 /** The header every modal shares: tinted icon badge, title, optional one-line subtitle. */
-export function ModalHead({ id, icon, tone = "accent", title, sub }: { id: string; icon: IconName; tone?: Tone; title: React.ReactNode; sub?: React.ReactNode }) {
+export function ModalHead({ id, icon, tone = "accent", title, sub, children }: { id: string; icon: IconName; tone?: Tone; title: React.ReactNode; sub?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <header className="modal-head">
       <span className={`modal-badge tone-${tone}`}><Icon name={icon} /></span>
@@ -13,6 +13,7 @@ export function ModalHead({ id, icon, tone = "accent", title, sub }: { id: strin
         <h2 id={id}>{title}</h2>
         {sub && <p className="muted">{sub}</p>}
       </div>
+      {children}
     </header>
   );
 }
