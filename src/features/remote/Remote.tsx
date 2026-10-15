@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { askpassReply, cloneRepo, fetchAll, githubRepos, gitlabRepos, pull, push, remoteSet } from "../../lib/ipc";
+import { askpassReply, cloneRepo, fetchAll, fetchUpstream, githubRepos, gitlabRepos, pull, push, remoteSet } from "../../lib/ipc";
 import { gitlabUserQuery, userQuery } from "../github/GitHub";
 import type { GhRepo } from "../../bindings/GhRepo";
 import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
@@ -28,12 +28,15 @@ export function useSync(path: string, run: Run) {
     setRebase(r);
     try { localStorage.setItem(PULL_KEY, r ? "rebase" : "merge"); } catch { /* storage blocked */ }
   };
+  useAutoFetch(path, !!cur?.upstream, busy);
   // `doing` fits the button; `notice` is the longer line for the toast ("Pushing main to origin/main…").
   const op = (label: string, doing: string, notice: string, done: string | (() => string | undefined), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
     label, doing, badge, hint, off: "",
     go: async () => {
       if (busy) return;
       setBusy(doing);
+      // A background fetch holds the remote-tracking ref lock; let it finish first.
+      await autoFetching.get(path);
       await run(fn, done, notice);
       setBusy(null);
     },
@@ -101,6 +104,34 @@ export function useSync(path: string, run: Run) {
       { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushOp.go() },
     ],
   };
+}
+
+const AUTO_FETCH_EVERY = 5 * 60_000;
+const AUTO_FETCH_GAP = 60_000;
+// Per repo, across tab switches (RepoView remounts): when it last ran, and the run in flight.
+const autoFetched = new Map<string, number>();
+const autoFetching = new Map<string, Promise<void>>();
+
+/** Keeps behind/ahead current: fetches the branch's upstream on open, every 5 min, and on window focus,
+ *  at most once a minute. Silent: skipped while hidden or busy, failures (offline, sign-in) ignored. */
+function useAutoFetch(path: string, tracked: boolean, busy: string | null) {
+  const qc = useQueryClient();
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  useEffect(() => {
+    if (!tracked) return;
+    const tick = () => {
+      if (document.hidden || busyRef.current || autoFetching.has(path) || Date.now() - (autoFetched.get(path) ?? 0) < AUTO_FETCH_GAP) return;
+      autoFetched.set(path, Date.now());
+      autoFetching.set(path, fetchUpstream(path)
+        .then(() => qc.invalidateQueries({ queryKey: ["refs", path] }), () => {})
+        .finally(() => autoFetching.delete(path)));
+    };
+    tick();
+    const t = setInterval(tick, AUTO_FETCH_EVERY);
+    window.addEventListener("focus", tick);
+    return () => { clearInterval(t); window.removeEventListener("focus", tick); };
+  }, [path, tracked, qc]);
 }
 
 /** Sourcetree's toolbar buttons for `useSync`. */

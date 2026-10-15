@@ -374,6 +374,11 @@ pub async fn fetch(path: String) -> Result<(), AppError> {
 }
 
 #[tauri::command]
+pub async fn fetch_upstream(path: String) -> Result<(), AppError> {
+    cli::fetch_upstream(Path::new(&path))
+}
+
+#[tauri::command]
 pub async fn pull(path: String, rebase: bool) -> Result<(), AppError> {
     cli::pull(Path::new(&path), rebase)
 }

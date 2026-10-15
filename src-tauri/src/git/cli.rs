@@ -478,6 +478,18 @@ pub fn fetch(repo: &Path) -> Result<(), AppError> {
     git_net(repo, &["fetch", "-q", "--all", "--prune"]).map(drop)
 }
 
+/// Background fetch: only the current branch's upstream (cheap on big repos with many branches), and no
+/// credential prompts (`askpass::quiet_env`). Detached HEAD or no upstream: does nothing.
+pub fn fetch_upstream(repo: &Path) -> Result<(), AppError> {
+    let Ok(head) = git(repo, &["symbolic-ref", "-q", "HEAD"]) else { return Ok(()) };
+    let up = git(repo, &["for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", "--", head.trim()])?;
+    let Some((remote, branch)) = up.trim().split_once('\0').filter(|(r, b)| !r.is_empty() && !b.is_empty()) else { return Ok(()) };
+    let env = crate::askpass::quiet_env();
+    let env: Vec<(&str, &OsStr)> = env.iter().map(|(k, v)| (*k, v.as_os_str())).collect();
+    // git updates refs/remotes/<remote>/<branch> from a single-branch fetch too (its configured refspec).
+    git_env(repo, &["fetch", "-q", "--", remote, branch], &env).map(drop).map_err(net_error)
+}
+
 /// Brings the upstream into the current branch: merges it, or with `rebase` replays local commits on top
 /// (changed files carried with `--autostash`). Logged, so undo moves HEAD back; conflicts leave it in progress.
 pub fn pull(repo: &Path, rebase: bool) -> Result<(), AppError> {

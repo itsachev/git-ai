@@ -188,6 +188,8 @@ export const stashFiles = (path: string, oid: string) => invoke<FileChange[]>("s
 export const stashFileDiff = (path: string, oid: string, file: string) => invoke<string | null>("stash_file_diff", { path, oid, file });
 // Network ops. git may ask for credentials meanwhile through the "askpass" event (see AskpassDialog).
 export const fetchAll = (path: string) => invoke<void>("fetch", { path });
+/** Background fetch of the current branch's upstream only; never prompts (fails instead). No upstream: no-op. */
+export const fetchUpstream = (path: string) => invoke<void>("fetch_upstream", { path });
 /** Merges the upstream, or with `rebase` replays local commits on it; code "conflicts" = stopped halfway. Undoable. */
 export const pull = (path: string, rebase = false) => invoke<void>("pull", { path, rebase });
 /** Pushes the current branch; without an upstream it goes to origin and becomes the upstream. Code "rejected" = pull first.

@@ -62,6 +62,14 @@ pub fn env() -> Vec<(&'static str, OsString)> {
     env
 }
 
+/// `env` for background git: a prompt only gets a stored GitHub/GitLab token, never a dialog, and Git
+/// Credential Manager doesn't open its sign-in window. Unanswered prompts fail the command.
+pub fn quiet_env() -> Vec<(&'static str, OsString)> {
+    let mut env = env();
+    env.extend([("GITAI_ASKPASS_QUIET", "1".into()), ("GCM_INTERACTIVE", "never".into())]);
+    env
+}
+
 /// git runs GIT_SSH_COMMAND through sh: forward slashes and single quotes keep Windows paths intact.
 /// `ssh_key_set` rejects paths containing a quote.
 fn ssh_command(key: &str) -> String {
@@ -76,8 +84,16 @@ pub fn reply(id: u32, answer: Option<String>) {
 }
 
 fn ask(app: &AppHandle, prompt: String) -> Option<String> {
+    // Quiet requests (see `quiet_env`) arrive with QUIET in front of the prompt.
+    let (quiet, prompt) = match prompt.strip_prefix(QUIET) {
+        Some(p) => (true, p.to_string()),
+        None => (false, prompt),
+    };
     if let Some(answer) = crate::github::askpass_answer(&prompt).or_else(|| crate::gitlab::askpass_answer(&prompt)) {
         return Some(answer);
+    }
+    if quiet {
+        return None;
     }
     static NEXT: AtomicU32 = AtomicU32::new(0);
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -92,9 +108,15 @@ fn ask(app: &AppHandle, prompt: String) -> Option<String> {
     answer
 }
 
+/// Marks a prompt from `quiet_env` git. A control character, so no real prompt starts with it.
+const QUIET: char = '\u{1}';
+
 /// The askpass process: prints the answer for git. Returns the exit code.
 pub fn client() -> i32 {
-    let prompt = std::env::args().nth(1).unwrap_or_default();
+    let mut prompt = std::env::args().nth(1).unwrap_or_default();
+    if std::env::var_os("GITAI_ASKPASS_QUIET").is_some() {
+        prompt.insert(0, QUIET);
+    }
     match std::env::var("GITAI_ASKPASS").ok().and_then(|env| request(&env, &prompt)) {
         Some(answer) => {
             println!("{answer}");

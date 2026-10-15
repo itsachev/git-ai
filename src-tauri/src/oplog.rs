@@ -461,8 +461,10 @@ On main: one
         commit(a, "c.txt", "from a");
         let before = cli::rev(a, "HEAD").unwrap();
         assert_eq!(cli::push(a, false).unwrap_err().code, "rejected");
-        cli::fetch(a).unwrap();
+        // Upstream-only fetch (auto fetch) moves origin/main like a full fetch.
+        cli::fetch_upstream(a).unwrap();
         assert_eq!(cli::rev(a, "origin/main").unwrap(), cli::rev(&b, "HEAD").unwrap());
+        cli::fetch(a).unwrap();
         cli::pull(a, false).unwrap();
         assert_eq!(fs::read_to_string(a.join("b.txt")).unwrap(), "from b");
         assert_eq!(top().op, "pull");

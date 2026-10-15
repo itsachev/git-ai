@@ -70,6 +70,7 @@ pub fn run() {
             commands::stash_rename,
             commands::stash_branch,
             commands::fetch,
+            commands::fetch_upstream,
             commands::pull,
             commands::push,
             commands::push_tag,
