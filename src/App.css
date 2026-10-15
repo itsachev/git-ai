@@ -425,6 +425,12 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .tab-name span { overflow: hidden; text-overflow: ellipsis; }
 .tab-name .icon { color: var(--faint); }
 .tab[aria-current] .tab-name { font-weight: 700; }
+/* Push/pull counters: one capsule split into ↑ and ↓ halves; a changed count pops in. */
+.tab-sync { flex: none; display: inline-flex; margin-left: auto; border-radius: 999px; overflow: hidden; font-size: 0.72rem; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.tab-sync b { padding: 0 0.4em; color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 14%, transparent); animation: pop 380ms var(--spring); }
+.tab-sync b + b { box-shadow: inset 1px 0 0 color-mix(in srgb, currentColor 30%, transparent); }
+.tab-sync .behind { color: var(--fg); }
+.tab[aria-current] .tab-sync b { color: var(--accent-ink); background: rgb(255 255 255 / 0.2); }
 .tab[aria-current] :is(.tab-name .icon, .icon-btn) { color: var(--accent-ink); }
 .tab[aria-current] .icon-btn:hover:not(:disabled) { color: var(--accent-ink); background: rgb(255 255 255 / 0.18); }
 /* Close: on hover/focus and on the active tab where there is a mouse, always on touch. */
@@ -523,8 +529,8 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 }
 /* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
 .statusbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
-.versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--muted); }
-.palette-trigger { min-height: 1.75rem; padding: 0 0.5rem; font-size: 0.8rem; color: var(--muted); background: none; box-shadow: none; }
+.versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; color: var(--fg); }
+.palette-trigger { min-height: 1.75rem; padding: 0 0.5rem; font-size: 0.875rem; color: var(--muted); background: none; box-shadow: none; }
 .palette-trigger:hover { color: var(--fg); background: var(--pick); }
 .palette-trigger kbd { margin-left: 0.25rem; }
 
@@ -1835,7 +1841,7 @@ button.link:hover { text-decoration-color: currentColor; text-underline-offset: 
 button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 /* Labels: one bold weight for every heading, column header, field and term label. */
 .graph-head, .section-head h2, .list-head h2, .commit-info h3, .commit-info dt,
-.sidebar summary, .clone label, .setting h3, .versions b { font-weight: 700; }
+.sidebar summary, .clone label, .setting h3, .versions b, .palette-trigger .btn-label { font-weight: 700; }
 /* Type details. Last, because `font` shorthands above reset font-variant. Mono runs: no negative
    tracking. Tabular figures so hashes, dates, counts and line numbers line up. */
 .mono, kbd, pre, .refs .name, .ref, .c-oid, .branch-chip, .recent small, .path small { letter-spacing: 0; }

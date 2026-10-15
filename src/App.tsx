@@ -110,12 +110,27 @@ function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]
       {tabs.map((t) => (
         <div key={t.path} className="tab" aria-current={t.path === active ? "page" : undefined}
           onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }} onAuxClick={(e) => { if (e.button === 1) onClose(t.path); }}>
-          <button className="tab-name" onClick={() => onSelect(t.path)} title={t.path}><Icon name="folder" /><span>{t.name}</span></button>
+          <button className="tab-name" onClick={() => onSelect(t.path)} title={t.path}><Icon name="folder" /><span>{t.name}</span><TabSync path={t.path} live={t.path === active} /></button>
           <button className="icon-btn" onClick={() => onClose(t.path)} title="Close tab (Ctrl+W)" aria-label={`Close ${t.name}`}><Icon name="close" /></button>
         </div>
       ))}
       <button className="icon-btn tab-new" onClick={onNew} title="Open another repository (Ctrl+T)" aria-label="Open another repository"><Icon name="add" /></button>
     </nav>
+  );
+}
+
+/** Commits to push/pull on the tab's current branch. Inactive tabs show their last cached refs, so no extra git work. */
+function TabSync({ path, live }: { path: string; live: boolean }) {
+  const refs = useQuery({ ...refsQuery(path), enabled: live }).data;
+  const cur = refs?.local.find((b) => b.name === refs.head);
+  if (!cur || !(cur.ahead || cur.behind)) return null;
+  const label = [cur.ahead && `${cur.ahead} to push`, cur.behind && `${cur.behind} to pull`].filter(Boolean).join(", ");
+  // key on the count: a changed number replays the pop-in.
+  return (
+    <span className="tab-sync" title={label} aria-label={label}>
+      {cur.ahead > 0 && <b key={`a${cur.ahead}`} aria-hidden>↑{cur.ahead}</b>}
+      {cur.behind > 0 && <b key={`b${cur.behind}`} aria-hidden className="behind">↓{cur.behind}</b>}
+    </span>
   );
 }
 
