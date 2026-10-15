@@ -728,30 +728,57 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .branch-tag .icon { flex: none; width: 0.85rem; height: 0.85rem; }
 .subject-len { flex: none; font: 600 0.72rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; transition: color 160ms; }
 .subject-len.over { color: var(--danger); }
-.commit textarea {
-  resize: vertical; min-height: 5rem; padding: 0.55rem 0.65rem; line-height: 1.5; border-radius: 9px;
-  background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong);
+/* The field: message + docked toolbar share one frame, one focus ring. */
+.composer {
+  display: grid; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition: box-shadow 180ms var(--ease);
 }
-.commit textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
-.commit-row { display: flex; align-items: center; gap: 0.35rem 0.5rem; flex-wrap: wrap; }
-/* Beats the global label.check (top-aligned, for multi-line setting labels). */
-.commit-row label.check { align-items: center; gap: 0.45rem; margin-right: auto; min-height: 2.1rem; padding: 0 0.55rem; border-radius: 8px; font-size: 0.85rem; line-height: 1; transition: background-color 160ms, color 160ms; }
-.commit-row label.check:hover { color: var(--fg); background: var(--pick); }
-.commit-row label.check input { margin: 0; }
-.commit-row label.check:has(input:checked) { color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.commit-row label.check:has(input:disabled) { opacity: 0.5; cursor: default; background: none; }
+.composer:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 24%, transparent); }
+.composer:focus-within { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.composer textarea {
+  resize: vertical; min-height: 4.75rem; padding: 0.65rem 0.75rem 0.4rem; line-height: 1.5;
+  background: none; box-shadow: none; border-radius: 10px 10px 0 0; outline: none;
+}
+.composer textarea:focus-visible { outline: none; box-shadow: none; }
+.composer-bar {
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; padding: 0.3rem 0.35rem 0.35rem;
+  border-top: 1px dashed var(--line);
+}
+.opts { display: inline-flex; gap: 0.25rem; margin-left: auto; }
 /* AI action: tinted pill, so it reads as a feature and not as disabled text. */
-.commit-row button.ai-gen {
-  min-height: 2.1rem; padding: 0 0.7rem; gap: 0.4rem; border-radius: 8px; font-weight: 600; color: var(--accent-fg);
+.composer-bar button.ai-gen {
+  min-height: 1.9rem; padding: 0 0.65rem; gap: 0.4rem; border-radius: 7px; font-weight: 600; font-size: 0.84rem; color: var(--accent-fg);
   background: color-mix(in srgb, var(--accent) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
-.commit-row button.ai-gen:hover:not(:disabled) { color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent); }
-.commit-row button.ai-gen .icon { color: inherit; transition: rotate 400ms var(--spring); }
-.commit-row button.ai-gen:hover:not(:disabled) .icon { rotate: 20deg; }
-.commit-row button.ai-gen[aria-busy="true"] .icon { animation: spin 1.2s linear infinite; }
-.commit-row .primary { min-width: 8.5rem; min-height: 2.1rem; }
-@media (pointer: coarse) { .commit-row button.ai-gen, .commit-row label.check, .commit-row .primary { min-height: 2.75rem; } }
-@media (prefers-reduced-motion: reduce) { .commit-row button.ai-gen .icon { animation: none; transition: none; } }
+.composer-bar button.ai-gen:hover:not(:disabled) { color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent); }
+.composer-bar button.ai-gen .icon { color: inherit; transition: rotate 400ms var(--spring); }
+.composer-bar button.ai-gen:hover:not(:disabled) .icon { rotate: 20deg; }
+.composer-bar button.ai-gen[aria-busy="true"] .icon { animation: spin 1.2s linear infinite; }
+/* Option chips: a real checkbox (keyboard, screen readers), drawn as a toggle pill. */
+.opt {
+  position: relative; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 1.9rem; padding: 0 0.6rem;
+  border-radius: 999px; font-size: 0.82rem; font-weight: 700; line-height: 1; color: var(--muted); cursor: pointer; user-select: none;
+  box-shadow: inset 0 0 0 1px var(--line-strong); transition: color 160ms, background-color 160ms, box-shadow 160ms;
+}
+.opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.opt .icon { width: 0.95rem; height: 0.95rem; transition: translate 320ms var(--spring); }
+.opt:hover { color: var(--fg); background: var(--pick); }
+.opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.opt:has(input:checked) {
+  color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.opt:has(input:checked) .icon { translate: 0 -1px; }
+.opt:has(input:disabled) { opacity: 0.45; cursor: default; background: none; }
+/* The action names the whole outcome ("Commit 3 files & push"); the shortcut sits at its far edge. */
+.commit-go { display: flex; align-items: center; justify-content: center; position: relative; min-height: 2.35rem; font-weight: 700; }
+.commit-go kbd {
+  position: absolute; right: 0.6rem; padding: 0.05rem 0.35rem; border-radius: 4px; font: 600 0.68rem var(--mono);
+  background: rgb(255 255 255 / 0.16); color: inherit; opacity: 0.8;
+}
+.commit-go:disabled kbd { display: none; }
+@media (pointer: coarse) { .composer-bar button.ai-gen, .opt { min-height: 2.75rem; } .commit-go { min-height: 2.9rem; } .commit-go kbd { display: none; } }
+@media (prefers-reduced-motion: reduce) { .composer, .opt, .opt .icon, .composer-bar button.ai-gen .icon { animation: none; transition: none; } }
 .banner {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding: 0.6rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--mod) 45%, transparent); border-radius: 10px;
@@ -761,7 +788,9 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .banner span { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
 @container side (max-width: 17rem) {
   .banner { padding: 0.5rem 0.6rem; font-size: 0.9rem; }
-  .banner > button, .commit-row > * { flex: 1 1 100%; }
+  .banner > button { flex: 1 1 100%; }
+  .opts { margin-left: 0; }
+  .commit-go kbd { display: none; }
   /* Row actions drop under the file name instead of squeezing it to nothing. */
   .files li { flex-wrap: wrap; padding-bottom: 0.15rem; }
   .files .row { flex-basis: 100%; }

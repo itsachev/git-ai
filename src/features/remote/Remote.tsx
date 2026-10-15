@@ -91,6 +91,8 @@ export function useSync(path: string, run: Run) {
   };
   return {
     busy, rebase, pickPull,
+    // For "Push after commit": skips `pushOff`, whose refs predate the commit just made.
+    pushNow: () => remoteList?.length === 0 ? firstPush() : pushOp.go(),
     pullMerge: pullMerge.go,
     pullRebase: pullRebase.go,
     ops: [

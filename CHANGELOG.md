@@ -4,6 +4,12 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+- **Push after commit:** a Push toggle under the commit message pushes your branch as soon as the commit lands. git-ai remembers your choice. The Commit button says so, for example "Commit 3 files & push". A rejected push offers the same choices as the toolbar's Push button.
+
+### Changed
+- **Redesigned commit box:** the message and its tools (Generate, Amend, Push) now sit in one field. Amend and Push are toggle chips. A full-width Commit button names exactly what will happen and shows the keyboard shortcut.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added

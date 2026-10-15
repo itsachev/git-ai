@@ -169,7 +169,7 @@ export function Notice() {
   );
 }
 
-export function Changes({ path }: { path: string }) {
+export function Changes({ path, push }: { path: string; push: () => Promise<unknown> }) {
   const { data, error } = useQuery(statusQuery(path));
   const [sel, setSel] = useState<Selection | null>(null);
   const run = useRun();
@@ -230,7 +230,7 @@ export function Changes({ path }: { path: string }) {
           </>
         )}
         </div>
-        <CommitBox path={path} branch={data.branch} staged={data.staged.length} finishing={data.operation} conflicts={data.conflicted.length} run={run}
+        <CommitBox path={path} branch={data.branch} staged={data.staged.length} finishing={data.operation} conflicts={data.conflicted.length} run={run} push={push}
           onCommit={(msg, amend) => {
             // Committing during a merge/rebase may finish it; say so once nothing is left in progress.
             const op = amend ? null : data.operation;
@@ -255,16 +255,25 @@ export function Changes({ path }: { path: string }) {
 
 /** `finishing`: the merge/rebase/... in progress; committing finishes (or continues) it, an empty message uses git's.
  *  `conflicts`: unresolved files, which block that. */
-type CommitProps = { path: string; branch: string | null; staged: number; finishing: string | null; conflicts: number; run: Run; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+type CommitProps = { path: string; branch: string | null; staged: number; finishing: string | null; conflicts: number; run: Run; push: () => Promise<unknown>; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+const PUSH_KEY = "push-after-commit";
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 /** What the Commit button does while `op` is in progress. */
 const finishLabel = (op: string) => op === "rebase" ? "continue the rebase" : `finish the ${op}`;
 
-function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }: CommitProps) {
+function CommitBox({ path, branch, staged, finishing, conflicts, run, push, onCommit }: CommitProps) {
   const canCommit = staged > 0;
   const [msg, setMsg] = useState("");
   const [amend, setAmend] = useState(false);
+  // Kept in localStorage like the Pull mode.
+  const [pushAfter, setPushAfter] = useState(() => { try { return localStorage.getItem(PUSH_KEY) === "1"; } catch { return false; } });
+  const togglePush = (on: boolean) => {
+    setPushAfter(on);
+    try { localStorage.setItem(PUSH_KEY, on ? "1" : ""); } catch { /* storage blocked */ }
+  };
+  // Mid-merge/rebase or detached, there's no branch tip to push yet.
+  const pushOff = !branch ? "Check out a branch to push it" : finishing ? `Finish the ${finishing} first` : "";
   const [busy, setBusy] = useState(false);
   const [writing, setWriting] = useState(false);
   const hasKey = useQuery(aiKeyQuery).data;
@@ -299,11 +308,13 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
   async function submit() {
     if (!ok) return;
     setBusy(true);
-    if (await onCommit(msg, amend)) {
+    const done = await onCommit(msg, amend);
+    if (done) {
       setMsg("");
       setAmend(false);
     }
     setBusy(false);
+    if (done && pushAfter && !pushOff) await push();
   }
   return (
     <form className="commit" onSubmit={(e) => { e.preventDefault(); submit(); }}>
@@ -312,31 +323,41 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, onCommit }
         {/* Git convention: a subject line of 72 characters at most. */}
         {subject > 0 && <span className={`subject-len${subject > 72 ? " over" : ""}`} title="Subject line length (72 max by convention)">{subject}/72</span>}
       </div>
-      <textarea
-        id="commit-msg"
-        aria-label="Commit message"
-        placeholder={finishing ? "Leave empty to use git's message (Ctrl+Enter to commit)" : "Commit message (Ctrl+Enter to commit)"}
-        value={msg}
-        rows={3}
-        onChange={(e) => setMsg(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
-      />
-      <div className="commit-row">
-        {/* Nothing staged: the backend describes all changes instead. */}
-        <button type="button" className="small ghost ai-gen" disabled={amend || !!finishing || writing} aria-busy={writing} onClick={generate}
-          title={amend ? "Not available while amending: the last commit's message is kept" : finishing ? `Not available while finishing the ${finishing}`
-            : hasKey ? `Write a message from the ${canCommit ? "staged" : "changed"} files (sent to your AI provider)` : "Set up AI in Settings first"}>
-          <Icon name="sparkle" />{writing ? "Writing…" : "Generate"}
-        </button>
-        <label className="check" title={!head ? "No commits to amend yet" : finishing ? `Finish the ${finishing} first` : undefined}>
-          <input type="checkbox" checked={amend} disabled={!head || !!finishing} onChange={(e) => toggleAmend(e.target.checked)} />
-          Amend last commit
-        </label>
-        <button className="primary" disabled={!ok} title={why || undefined}>
-          {busy ? (amend ? "Amending…" : "Committing…") : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
-            : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}
-        </button>
+      {/* One field: the message on top, its tools docked inside the same frame. */}
+      <div className="composer">
+        <textarea
+          id="commit-msg"
+          aria-label="Commit message"
+          placeholder={finishing ? "Leave empty to use git's message" : "Describe what changed and why"}
+          value={msg}
+          rows={3}
+          onChange={(e) => setMsg(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }}
+        />
+        <div className="composer-bar">
+          {/* Nothing staged: the backend describes all changes instead. */}
+          <button type="button" className="small ghost ai-gen" disabled={amend || !!finishing || writing} aria-busy={writing} onClick={generate}
+            title={amend ? "Not available while amending: the last commit's message is kept" : finishing ? `Not available while finishing the ${finishing}`
+              : hasKey ? `Write a message from the ${canCommit ? "staged" : "changed"} files (sent to your AI provider)` : "Set up AI in Settings first"}>
+            <Icon name="sparkle" />{writing ? "Writing…" : "Generate"}
+          </button>
+          <span className="opts">
+            <label className="opt" title={!head ? "No commits to amend yet" : finishing ? `Finish the ${finishing} first` : "Fold the staged changes into the last commit"}>
+              <input type="checkbox" checked={amend} disabled={!head || !!finishing} onChange={(e) => toggleAmend(e.target.checked)} />
+              <Icon name="undo" />Amend
+            </label>
+            <label className="opt" title={pushOff || "Push this branch once the commit succeeds"}>
+              <input type="checkbox" checked={pushAfter && !pushOff} disabled={!!pushOff} onChange={(e) => togglePush(e.target.checked)} />
+              <Icon name="push" />Push
+            </label>
+          </span>
+        </div>
       </div>
+      <button className="primary commit-go" disabled={!ok} title={why || undefined}>
+        <span>{busy ? (amend ? "Amending…" : "Committing…") : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
+          : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}{!busy && pushAfter && !pushOff && " & push"}</span>
+        <kbd aria-hidden="true">{navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"} ↵</kbd>
+      </button>
     </form>
   );
 }
