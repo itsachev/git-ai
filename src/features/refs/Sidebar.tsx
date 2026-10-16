@@ -14,7 +14,7 @@ import { openReflog } from "./Reflog";
 
 /** Opens `dir` (a repo) in a new tab; App listens. */
 export const openRepoTab = (dir: string) => dispatchEvent(new CustomEvent("gitai-open-repo", { detail: dir }));
-import { choose, confirm, prompt } from "../../lib/modal";
+import { choose, confirm, confirmCheck, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
 /** Checkout that offers to bring conflicting local changes along, or stash them, instead of just failing. */
@@ -42,6 +42,18 @@ export const confirmMerge = (from: string, into: string) =>
   confirm("Merge", `Merge ${from} into ${into}? Undo history (sidebar) can reverse it.`, "Merge");
 export const confirmRebase = (branch: string, onto: string) =>
   confirm("Rebase", `Rebase ${branch} onto ${onto}? Its commits are rewritten on top of ${onto}; if it was pushed, the next push needs Force push. Undo history (sidebar) can reverse it.`, "Rebase");
+
+/** Deletes local branch `name`, asking before force-deleting an unmerged one. False when the user backs out. */
+async function deleteLocal(path: string, name: string) {
+  try {
+    await deleteBranch(path, name, false);
+  } catch (e) {
+    if ((e as AppError).code !== "not_merged") throw e;
+    if (!(await confirm("Delete unmerged branch", `${errorText(e)} Delete it anyway?`, "Delete anyway", "danger"))) return false;
+    await deleteBranch(path, name, true);
+  }
+  return true;
+}
 
 /** [label, handler, why it is disabled (absent = enabled)] */
 export type Action = [string, () => void, string?];
@@ -121,22 +133,36 @@ export function useRefActions(path: string) {
         run(() => setUpstream(path, name, to), to ? `${name} now tracks ${to}` : `${name} no longer tracks ${up.upstream}`);
       }, candidates.length || up.upstream ? undefined : "No remote branches yet. Fetch or push first."];
       if (name === head) return [...sync, branchOff, pr, explain, rename, track];
+      // The remote copy to offer deleting too: its upstream, else a same-named remote branch.
+      const remote = up.upstream ?? data.remote.find((r) => short(r.name) === name)?.name;
       return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
-        if (!(await confirm("Delete branch", `Delete branch ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))) return;
+        const msg = <>Delete branch <b className="name-local">{name}</b>? Undo history (sidebar) can restore it.</>;
+        const alsoRemote = remote ? await confirmCheck("Delete branch", msg, "Delete", <span>Also delete <b className="name-remote">{remote}</b> on the remote</span>, "danger")
+          : (await confirm("Delete branch", msg, "Delete", "danger")) ? false : null;
+        if (alsoRemote === null) return;
+        let deleted = false;
         run(async () => {
-          try {
-            await deleteBranch(path, name, false);
-          } catch (e) {
-            if ((e as AppError).code !== "not_merged") throw e;
-            if (await confirm("Delete unmerged branch", `${errorText(e)} Delete it anyway?`, "Delete anyway", "danger")) await deleteBranch(path, name, true);
-          }
-        });
+          if (!(await deleteLocal(path, name))) return;
+          if (alsoRemote) await deleteRemoteBranch(path, remote!);
+          deleted = true;
+        }, () => (alsoRemote && deleted ? `Deleted ${name} and ${remote} on the remote` : undefined));
       }]];
     }
     if (data.remote.some((r) => r.name === name)) {
+      // The local copy to offer deleting too: the branch tracking it, else a same-named one. Never the current branch (git refuses).
+      const short = name.slice(name.indexOf("/") + 1);
+      const local = (data.local.find((b) => b.upstream === name) ?? data.local.find((b) => b.name === short))?.name;
+      const offerLocal = local && local !== head ? local : undefined;
       return [["Checkout", checkoutRemote(name)], branchOff, ...compare, ...onto, ["Delete", async () => {
-        if (await confirm("Delete remote branch", `Delete branch ${name} on the remote? Undo history (sidebar) can push it back.`, "Delete", "danger"))
-          run(() => deleteRemoteBranch(path, name), `Deleted ${name} on the remote`);
+        const msg = <>Delete branch <b className="name-remote">{name}</b> on the remote? Undo history (sidebar) can push it back.</>;
+        const alsoLocal = offerLocal ? await confirmCheck("Delete remote branch", msg, "Delete", <span>Also delete local branch <b className="name-local">{offerLocal}</b></span>, "danger")
+          : (await confirm("Delete remote branch", msg, "Delete", "danger")) ? false : null;
+        if (alsoLocal === null) return;
+        let both = false;
+        run(async () => {
+          await deleteRemoteBranch(path, name);
+          both = !!alsoLocal && (await deleteLocal(path, offerLocal!));
+        }, () => (both ? `Deleted ${name} on the remote and ${offerLocal}` : `Deleted ${name} on the remote`));
       }]];
     }
     return [branchOff, ...compare, ["Changelog since this tag (AI)", () => openWriteUp("changelog", name)], ["Push", () => run(() => pushTag(path, name), `Pushed tag ${name}`)], ["Delete", async () => {

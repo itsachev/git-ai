@@ -63,7 +63,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Rebase onto a branch","Right-click a branch → Rebase <current> onto it", "Replays your commits on top of the other branch, for a straight history without a merge commit."],
     ["Rename a branch", "Right-click a local branch → Rename…", "Gives the branch a new name. What it tracks on the remote stays the same."],
     ["Track a remote branch", "Right-click a local branch → Track remote branch…", "Picks which remote branch Pull and Push use for it, or stops tracking."],
-    ["Delete a branch", "Right-click a branch → Delete", "Removes a local branch (asks again if its work is not merged anywhere) or a branch on the remote. Both can be undone."],
+    ["Delete a branch", "Right-click a branch → Delete", "Removes a local branch (asks again if its work is not merged anywhere) or a branch on the remote. A checkbox in the confirm box deletes the matching branch on the other side too. Both can be undone."],
     ["Tags", "Sidebar → Tags, right-click a tag", "Push a tag to the remote, delete it, branch from it, or write an AI changelog since it."],
     ["Stashes", "Stash button in the toolbar, Sidebar → Stashes → +, or Ctrl+K → Stash changes…", "Parks your uncommitted changes so you get a clean folder, e.g. to switch branches. Name the stash, pick everything, tracked files only or staged only, or keep your files as they are to save a checkpoint. A notice confirms what was stashed. Apply brings them back and keeps the stash, Pop brings them back and removes it, Drop deletes it. Apply and Pop also bring back what was staged."],
     ["Stash some files", "File Status → right-click a file (or a selection) → Stash", "Stashes only the files you picked. Your other changes stay."],

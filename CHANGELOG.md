@@ -4,6 +4,10 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+- **Delete the remote branch too:** when you delete a local branch that also exists on the remote, the confirm box has an "Also delete … on the remote" checkbox, so both go in one step. Deleting a remote branch works the same way: an "Also delete local branch …" checkbox removes your local copy with it (not offered for the branch you're on).
+- Branch names in delete confirmations are bold and colored: local in teal, remote in blue.
+
 ### Fixed
 
 - Buttons with a keyboard shortcut now show it on hover: Fetch, Pull, Push, File Status, History, the branches menu, Stage all, Commit, commit search and Keyboard shortcuts in Settings.

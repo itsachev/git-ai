@@ -26,13 +26,13 @@ export const Brand = () => <span className="brand-name">git-ai</span>;
 export type Choice = { label: string; hint?: string; tone?: Tone; suggested?: boolean };
 /** A text field of `prompt`. */
 export type Field = { label: string; value?: string; placeholder?: string };
-type Ask = { title: string; message: string; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; resolve: (i: number, values: string[]) => void };
+type Ask = { title: string; message: React.ReactNode; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; check?: React.ReactNode; resolve: (i: number, values: string[], checked?: boolean) => void };
 let asking: Ask | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 
 /** Resolves the index of the picked choice, -1 on Cancel or Esc. */
-export function choose(title: string, message: string, choices: Choice[], icon: IconName = "warn", tone: Tone = "accent") {
+export function choose(title: string, message: React.ReactNode, choices: Choice[], icon: IconName = "warn", tone: Tone = "accent") {
   asking?.resolve(-1, []);
   return new Promise<number>((resolve) => { asking = { title, message, icon, tone, choices, resolve }; emit(); });
 }
@@ -47,8 +47,17 @@ export function prompt(title: string, message: string, fields: Field[], ok: stri
 }
 
 /** Resolves true on the OK button, false on Cancel or Esc. */
-export const confirm = (title: string, message: string, ok = "OK", tone: Tone = "warn") =>
+export const confirm = (title: string, message: React.ReactNode, ok = "OK", tone: Tone = "warn") =>
   choose(title, message, [{ label: ok, tone }], "warn", tone).then((i) => i === 0);
+
+/** `confirm` with an unchecked checkbox labeled `check`: resolves its state on OK, null on Cancel or Esc. */
+export function confirmCheck(title: string, message: React.ReactNode, ok: string, check: React.ReactNode, tone: Tone = "warn") {
+  asking?.resolve(-1, []);
+  return new Promise<boolean | null>((resolve) => {
+    asking = { title, message, icon: "warn", tone, choices: [{ label: ok, tone }], check, resolve: (i, _, c) => resolve(i === 0 ? !!c : null) };
+    emit();
+  });
+}
 
 export function ConfirmDialog() {
   const cur = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => asking);
@@ -57,12 +66,14 @@ export function ConfirmDialog() {
   const last = useRef(cur);
   if (cur) last.current = cur;
   const [values, setValues] = useState<string[]>([]);
+  const [checked, setChecked] = useState(false);
   useEffect(() => {
     setValues(cur?.fields?.map((f) => f.value ?? "") ?? []);
+    setChecked(false);
     if (cur) dialog.current?.showModal();
     else dialog.current?.close();
   }, [cur]);
-  const answer = (i: number) => { asking?.resolve(i, values.map((v) => v.trim())); asking = null; emit(); };
+  const answer = (i: number) => { asking?.resolve(i, values.map((v) => v.trim()), checked); asking = null; emit(); };
   const a = last.current;
   const one = a?.choices.length === 1 ? a.choices[0] : null;
   return (
@@ -78,6 +89,7 @@ export function ConfirmDialog() {
                 onChange={(e) => setValues((v) => v.map((x, k) => (k === i ? e.target.value : x)))} />
             </label>
           ))}
+          {a.check && <label className="check modal-check"><input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />{a.check}</label>}
           {!one && (
             <div className="choices">
               {a.choices.map((c, i) => (

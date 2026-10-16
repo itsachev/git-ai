@@ -1564,6 +1564,9 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 .nb-field { display: grid; gap: 0.4rem; }
 .prompt-field { margin-bottom: 0.9rem; font-size: 0.85rem; font-weight: 700; }
 .prompt-field input { font-weight: 400; }
+.name-local { font-weight: 700; color: var(--accent-fg); }
+.name-remote { font-weight: 700; color: var(--info); }
+.modal-check { display: flex; margin-bottom: 0.75rem; color: var(--fg); overflow-wrap: anywhere; }
 .nb-field > label, .nb-field > .label { font-size: 0.85rem; font-weight: 700; }
 .nb-field input, .select select { min-height: calc(var(--ctl) + 0.4rem); font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0; }
 .nb-field input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }

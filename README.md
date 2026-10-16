@@ -69,7 +69,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 </td><td valign="top" width="50%">
 
 ### 🌿 Branches, tags & stashes
-- Create, switch (carrying your changes), rename, track, delete
+- Create, switch (carrying your changes), rename, track, delete (local and remote in one step)
 - Merge, cherry-pick and **interactive rebase**
 - **Drag and drop** a branch onto another to merge or rebase
 - Tags and stashes. Stash everything, tracked files only, staged only or just the files you pick, under a name you choose, or save a checkpoint that keeps your files
