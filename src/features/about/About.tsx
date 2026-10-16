@@ -111,6 +111,10 @@ const FEATURES: [IconName, string, Feature[]][] = [
 // One hue per area, used for its icon and card accent (oklch keeps them equally bright).
 const HUES = [265, 150, 205, 300, 230, 40, 15, 180];
 const ALL = FEATURES.flatMap(([, , items]) => items);
+export const aboutStats = { features: ALL.length, areas: FEATURES.length };
+// The mounted AboutButton's opener, so first-run setup can hand over to the feature tour.
+let opener: (() => void) | null = null;
+export const openAbout = () => opener?.();
 const SHORTCUTS = new Set(ALL.flatMap(([, how]) => how.match(/Ctrl\+(?:Shift\+)?\w+/g) ?? [])).size;
 const TITLE = ["Everything", null, "can", "do."];
 
@@ -182,6 +186,7 @@ export function AboutButton() {
     // The nav sticks just under the sticky header, whatever height the header wraps to.
     requestAnimationFrame(() => d?.style.setProperty("--head", `${d.querySelector<HTMLElement>(".modal-head")?.offsetHeight ?? 80}px`));
   }
+  useEffect(() => { opener = open; return () => { opener = null; }; }, []);
   function go(id: string) {
     picked.current = id.startsWith("feat-") ? id : null;
     document.getElementById(id)?.scrollIntoView({ block: "start", behavior: smooth() });

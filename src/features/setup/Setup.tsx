@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { setupDone, setupFinish, sshKey } from "../../lib/ipc";
 import { Icon, type IconName } from "../../lib/icons";
 import { Brand } from "../../lib/modal";
+import { aboutStats, openAbout } from "../about/About";
 import { ThemeButton, type Theme } from "../../lib/theme";
 import { AiKey, GitIdentity, SshKey, aiKeyQuery, gitSetupQuery, helperName } from "../settings/Settings";
 
@@ -68,6 +69,22 @@ function Summary() {
   );
 }
 
+/** The invite to the feature tour, under the summary on the last first-run step. */
+function Unlock() {
+  return (
+    <aside className="setup-unlock" aria-labelledby="unlock-title">
+      <span className="setup-unlock-mark"><Icon name="sparkle" /></span>
+      <div>
+        <h3 id="unlock-title">Unlock the superpowers</h3>
+        <p>
+          <strong>{aboutStats.features} features</strong> across {aboutStats.areas} areas, from AI commit messages to undoing a bad rebase.
+          A quick look at the tour shows where each one lives. It's always one click away under About &amp; features.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 export function SetupWizard({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void }) {
   const qc = useQueryClient();
   const isForced = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => forced);
@@ -96,6 +113,9 @@ export function SetupWizard({ theme, setTheme }: { theme: Theme; setTheme: (t: T
     subs.forEach((f) => f());
     dialog.current?.close();
   }
+  // First run only: hand over to the feature tour once setup closes.
+  const tour = !isForced && step === STEPS.length - 1;
+  const startTour = () => finish().then(openAbout);
 
   const s = STEPS[step];
   const last = step === STEPS.length - 1;
@@ -116,10 +136,13 @@ export function SetupWizard({ theme, setTheme }: { theme: Theme; setTheme: (t: T
         {step === 1 && <SshKey />}
         {step === 2 && <AiKey />}
         {step === 3 && <Summary />}
+        {tour && <Unlock />}
       </div>
       <footer className="dialog-actions setup-actions">
         {step === 0 ? (
           <button type="button" className="ghost" onClick={finish}>Skip setup</button>
+        ) : tour ? (
+          <button type="button" className="ghost" onClick={finish}>Skip the tour</button>
         ) : !last && (
           <button type="button" className="ghost" onClick={() => go(step - 1)}><Icon name="back" /> Back</button>
         )}
@@ -128,7 +151,8 @@ export function SetupWizard({ theme, setTheme }: { theme: Theme; setTheme: (t: T
         {(step === 1 || step === 2) && (
           <button className="primary" onClick={() => go(step + 1)}>{skippable ? "Skip for now" : "Continue"}</button>
         )}
-        {last && <button className="primary" autoFocus onClick={finish}>Start using git-ai</button>}
+        {tour && <button className="primary" autoFocus onClick={startTour}><Icon name="sparkle" /> Show me the superpowers</button>}
+        {last && !tour && <button className="primary" autoFocus onClick={finish}>Start using git-ai</button>}
       </footer>
     </dialog>
   );
