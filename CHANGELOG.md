@@ -7,6 +7,11 @@ What's new in each git-ai release. Newest first.
 ### Added
 - **Delete the remote branch too:** when you delete a local branch that also exists on the remote, the confirm box has an "Also delete … on the remote" checkbox, so both go in one step. Deleting a remote branch works the same way: an "Also delete local branch …" checkbox removes your local copy with it (not offered for the branch you're on).
 - Branch names in delete confirmations are bold and colored: local in teal, remote in blue.
+- **Refreshed repository view:** File Status and History get a cleaner look.
+  - The toolbar says where you stand, for example "4 changes on main · 2 to push", and Push lights up when you have commits to push.
+  - After a discard, branch delete or other risky step, a strip under the toolbar keeps it one click from undone for 30 minutes.
+  - The commit box shows the exact git command it will run.
+  - The selected file is highlighted without hiding its colors, and the diff header shows how big the change is.
 
 ### Fixed
 

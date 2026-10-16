@@ -9,6 +9,7 @@ import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
 import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
+import type { OpEntry } from "./bindings/OpEntry";
 import { Changes, Notice, OpErrorDialog, confirmUndo, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useOpBusy, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
@@ -391,6 +392,21 @@ function App() {
 const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pull: "git pull --no-rebase", Push: "git push" };
 const PULL_REBASE_GIT = "git pull --rebase --autostash";
 
+/** The last recorded destructive step, for 30 minutes after it, with its undo one click away. */
+function UndoRibbon({ entry, onUndo }: { entry: OpEntry; onUndo: () => void }) {
+  const [hidden, setHidden] = useState(false);
+  const mins = Math.floor((Date.now() - Number(entry.id)) / 60_000);
+  if (hidden || mins > 30) return null;
+  return (
+    <div className="undo-ribbon" role="status">
+      <Icon name="undo" />
+      <span><strong>{opLabel(entry)}</strong> <small>{mins < 1 ? "just now" : `${mins} min ago`}{entry.backup && ". A snapshot of the files is kept"}</small></span>
+      <button className="small" onClick={onUndo}>{opLabel({ ...entry, op: `undo ${entry.op}` }).split(":")[0]}</button>
+      <button className="icon-btn" aria-label="Hide" title="Hide" onClick={() => setHidden(true)}><Icon name="close" /></button>
+    </div>
+  );
+}
+
 /** Installed git and Node versions, read once per app run, plus who commits in this repo. */
 function Versions({ path }: { path: string }) {
   const [git, node] = useQuery({ queryKey: ["tool-versions"], queryFn: toolVersions, staleTime: Infinity }).data ?? [];
@@ -476,6 +492,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   if (log?.[0]) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: async () => (await confirmUndo(log[0])) && run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
     if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, git: `git switch ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
+  const undoLast = (e: OpEntry) => async () => (await confirmUndo(e)) && run(() => undo(path, e.id));
+  const cur = refs?.local.find((b) => b.name === refs.head);
   commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, ...tabCommands);
 
   return (
@@ -510,7 +528,13 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <fieldset className="lock" disabled={busy}>
         <header className="toolbar">
           <button className="icon-btn menu" aria-label="Branches and views" title="Branches and views (Ctrl+B)" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
-          <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
+          <div className="toolbar-title">
+            <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
+            <p className="toolbar-sub">
+              {changed ? `${changed} change${changed === 1 ? "" : "s"} on ` : "Nothing to commit on "}<b>{branch ?? "detached HEAD"}</b>
+              {cur?.ahead ? ` · ${cur.ahead} to push` : ""}{cur?.behind ? ` · ${cur.behind} to pull` : ""}
+            </p>
+          </div>
           <SyncButtons sync={sync}>
             <button disabled={!changed} onClick={() => openStashSave()} title={changed ? "Stash changes: name it, pick which ones" : "No changes to stash"}>
               <Icon name="stash" /><span className="btn-label">Stash</span>
@@ -523,6 +547,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>
+        {log?.[0] && <UndoRibbon key={log[0].id} entry={log[0]} onUndo={undoLast(log[0])} />}
         <Notice />
         <OpErrorDialog path={repo.path} />
         <NewBranchDialog path={path} />

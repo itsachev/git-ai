@@ -140,14 +140,7 @@ export const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: 
 export function SyncButtons({ sync, children }: { sync: Sync; children?: React.ReactNode }) {
   const pullPop = useRef<HTMLDivElement>(null);
   return (
-    // The hover light follows the pointer inside whichever button it's over (see `.sync button::before`).
-    <span className="sync" onPointerMove={(e) => {
-      const b = (e.target as Element).closest("button");
-      if (!b) return;
-      const r = b.getBoundingClientRect();
-      b.style.setProperty("--mx", `${e.clientX - r.left}px`);
-      b.style.setProperty("--my", `${e.clientY - r.top}px`);
-    }}>
+    <span className="sync">
       {sync.ops.map((o) => (
         <Fragment key={o.label}>
           <button disabled={!!sync.busy || !!o.off} onClick={o.go} aria-busy={sync.busy === o.doing}

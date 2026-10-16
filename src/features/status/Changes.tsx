@@ -359,6 +359,10 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, push, onCo
           : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}{!busy && pushAfter && !pushOff && " & push"}</span>
         <kbd aria-hidden="true">{navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"} ↵</kbd>
       </button>
+      {/* The git the button runs. Not shown while finishing a merge/rebase, where the command varies. */}
+      {!finishing && (
+        <p className="git-hint">{amend ? "git commit --amend" : `git commit -m "${msg.split("\n")[0].trim() || "…"}"`}{pushAfter && !pushOff && " && git push"}</p>
+      )}
     </form>
   );
 }
@@ -610,13 +614,17 @@ export function DiffHead({ file, kind, lines, children }: { file: string; kind?:
   const slash = file.lastIndexOf("/");
   const count = (c: string) => lines?.reduce((n, l) => n + +(l[0] === c), 0) ?? 0;
   const { split, ws } = useDiffView();
+  const add = count("+"), del = count("-");
+  // Change size: five blocks split by added/removed share (exact counts below 5 lines).
+  const ga = Math.round((5 * add) / Math.max(add + del, 5)), gd = Math.min(5 - ga, Math.round((5 * del) / Math.max(add + del, 5)));
   return (
     <header className="diff-head">
       {kind && <span className={`kind ${kindClass(kind)}`}>{kind}</span>}
       <span className="diff-file" title={file}>
         {slash > 0 && <small>{file.slice(0, slash + 1)}</small>}<strong>{file.slice(slash + 1)}</strong>
       </span>
-      {lines && <span className="stat" aria-label={`${count("+")} lines added, ${count("-")} removed`}><b className="plus">+{count("+")}</b><b className="minus">−{count("-")}</b></span>}
+      {lines && <span className="stat" aria-label={`${add} lines added, ${del} removed`}><b className="plus">+{add}</b><b className="minus">−{del}</b></span>}
+      {lines && <span className="size-bar" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <i key={i} className={i < ga ? "a" : i < ga + gd ? "d" : undefined} />)}</span>}
       {children}
       <span className="diff-opts" role="group" aria-label="Diff view">
         <button type="button" className="small ghost" aria-pressed={split} onClick={() => setDiffView({ split: !split })}

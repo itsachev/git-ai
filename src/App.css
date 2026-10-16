@@ -446,14 +446,15 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   background: var(--rail); border-right: 1px solid var(--line);
 }
-.rail-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 0.6rem 0.5rem; }
+.rail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; padding: 0.9rem 0.75rem 0.6rem; }
 /* Back arrow + repo name: one quiet button; the arrow nudges left on hover. */
 .rail-head .back { min-width: 0; justify-content: flex-start; gap: 0.45rem; padding: 0 0.55rem 0 0.4rem; color: inherit; background: none; box-shadow: none; }
 .rail-head .back:hover { background: var(--pick); }
 .rail-head .back .icon { width: 1.3em; height: 1.3em; color: var(--muted); transition: translate 280ms var(--spring), color 180ms; }
 .rail-head .back:hover .icon { translate: -3px 0; color: var(--fg); }
-.rail-head .back strong { font: 650 1.1rem/1.3 var(--display); letter-spacing: -0.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-head .branch-chip { flex-shrink: 1; }
+.rail-head .back strong { font: 800 1.2rem/1.2 var(--display); letter-spacing: -0.035em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* In the rail head the branch is a quiet tint; the toolbar subtitle and the commit box repeat it. */
+.rail-head .branch-chip { flex-shrink: 1; font-weight: 600; color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: none; }
 /* Current branch: a filled signal pill, in the rail head and the toolbar. */
 .branch-chip {
   display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0; max-width: 100%; justify-self: start;
@@ -463,11 +464,11 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   animation: pop 320ms var(--spring);
 }
 .branch-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.views { display: grid; gap: 2px; padding: 0.25rem 0.5rem 0.5rem; border-bottom: 1px solid var(--line); }
+.views { display: grid; gap: 2px; padding: 0.25rem 0.5rem 0.75rem; }
 .views button { justify-content: flex-start; background: none; box-shadow: none; color: var(--muted); gap: 0.6rem; padding: 0 0.6rem; font-weight: 500; }
 .views button span:not(.count) { flex: 1; text-align: left; }
 .views button:hover { background: var(--pick); color: var(--fg); }
-.views button[aria-current="page"] { background: var(--active); box-shadow: var(--active-bar); color: var(--accent-fg); font-weight: 700; }
+.views button[aria-current="page"] { background: var(--active); color: var(--accent-fg); font-weight: 700; }
 .views button[aria-current="page"] .icon { color: var(--accent); }
 /* Unresolved conflicts: File Status turns red, active or not. */
 .views button.conflict, .views button.conflict .icon { color: var(--danger); }
@@ -476,27 +477,27 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 
 .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .toolbar {
-  display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0.4rem 0.75rem;
+  display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.5rem 1rem;
   border-bottom: 1px solid var(--line); background: var(--bg);
 }
-.toolbar h1 { font: 650 1.25rem var(--display); letter-spacing: -0.03em; white-space: nowrap; }
+/* View title over a one-line summary of where the repo stands ("4 changes on main · 2 to push"). */
+.toolbar-title { min-width: 0; display: grid; gap: 0.15rem; }
+.toolbar h1 { font: 800 1.55rem/1 var(--display); letter-spacing: -0.04em; white-space: nowrap; }
+.toolbar-sub { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; color: var(--muted); }
+.toolbar-sub b { font: 600 0.82rem var(--mono); color: var(--accent-fg); }
 .stage-body { flex: 1; min-height: 0; overflow: auto; padding: 0.75rem; animation: rise 260ms var(--ease); }
-.sync { display: flex; gap: 3px; margin-left: auto; }
-.sync button { border-radius: var(--r); box-shadow: var(--tool-edge), var(--tool-lit); }
-.sync button:hover:not(:disabled) { box-shadow: var(--tool-edge), var(--tool-lit), var(--veil); }
+/* Toolbar actions: one flat group. Push fills with the accent while there are commits to push. */
+.sync { display: flex; gap: 2px; margin-left: auto; padding: 3px; border-radius: 11px; background: var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.sync button { border-radius: 8px; background: none; box-shadow: none; font-weight: 700; }
+.sync button:hover:not(:disabled) { background: var(--pick); box-shadow: none; }
 .sync button[aria-busy="true"] .icon { animation: spin 900ms linear infinite; }
-/* Pull's menu half: a narrow chevron segment joined to Pull (no gap) by a faint seam. */
-.sync button:has(+ .split-menu) { border-radius: var(--r) 0 0 var(--r); }
-.sync button.split-menu { margin-left: -3px; width: 1.7rem; padding: 0; border-radius: 0 var(--r) var(--r) 0; border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent); }
-/* Toolbar hover: an accent light that follows the pointer (--mx/--my, set in SyncButtons), a 1px lift with an
-   accent edge, and an icon move that previews the action. Pointer devices only, so touch never sticks in hover. */
-.sync button { position: relative; isolation: isolate; overflow: hidden; }
-.sync button::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(4.5rem circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 24%, transparent), transparent 75%);
-  opacity: 0; transition: opacity 280ms var(--ease);
-}
-.sync button:focus-visible::before { opacity: 1; }
+/* Pull's menu half: a narrow chevron segment joined to Pull. */
+.sync button:has(+ .split-menu) { border-radius: 8px 0 0 8px; }
+.sync button.split-menu { margin-left: -2px; width: 1.7rem; padding: 0; border-radius: 0 8px 8px 0; }
+.sync button:has(> .icon[data-icon="push"]):has(> .count) { background: var(--accent); color: var(--accent-ink); }
+.sync button:has(> .icon[data-icon="push"]):has(> .count):hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, black); }
+.sync button:has(> .icon[data-icon="push"]):has(> .count) .icon { color: inherit; }
+.sync button:has(> .icon[data-icon="push"]) > .count { color: inherit; background: rgb(255 255 255 / 0.2); }
 /* Icon hue says what the action does: incoming (fetch/pull) slate, outgoing (push) the accent, shelve (stash)
    ochre, branch leaf; terminal stays neutral. Labels keep the ink colour. */
 .sync .icon[data-icon="fetch"], .sync .icon[data-icon="pull"] { color: var(--info); }
@@ -505,15 +506,8 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .sync .icon[data-icon="branch"] { color: var(--add); }
 .sync .icon[data-icon="terminal"], .sync .icon[data-icon="chevron"] { color: var(--muted); }
 .sync .icon, .toolbar > .icon-btn .icon { transition: rotate 560ms var(--spring), translate 380ms var(--spring), scale 380ms var(--spring); }
-@media (hover: hover) {
-  .sync button:hover:not(:disabled)::before { opacity: 1; }
-  /* Pull and its chevron rise together so the split button stays one piece. */
-  .sync button:is(:hover, :has(+ .split-menu:hover), :hover + .split-menu):not(:disabled):not(:active) {
-    translate: 0 -1px;
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, var(--line-strong)), 0 6px 14px -6px color-mix(in srgb, var(--accent) 55%, transparent), var(--tool-lit);
-  }
-  .toolbar > .icon-btn:hover { color: var(--fg); }
-}
+/* Hover moves the icon to preview the action. Pointer devices only, so touch never sticks in hover. */
+@media (hover: hover) { .toolbar > .icon-btn:hover { color: var(--fg); } }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .sync button:hover:not(:disabled) .icon[data-icon="fetch"] { rotate: 180deg; }
   .sync button:hover:not(:disabled) .icon[data-icon="pull"] { translate: 0 2px; }
@@ -529,7 +523,20 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 }
 /* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
 .statusbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
-.versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; color: var(--fg); }
+.versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.78rem var(--mono); color: var(--faint); }
+.versions b { color: var(--muted); }
+/* Undo ribbon: the last destructive step stays one click from undone. */
+.undo-ribbon {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.5rem 0.3rem 1rem; font-size: 0.84rem;
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg)); border-bottom: 1px solid var(--line); animation: rise 400ms var(--ease);
+}
+.undo-ribbon > .icon { flex: none; color: var(--accent-fg); }
+.undo-ribbon > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-ribbon strong { color: var(--fg-hi); }
+.undo-ribbon small { font-size: inherit; color: var(--muted); }
+.undo-ribbon button.small { color: var(--accent-fg); font-weight: 700; }
+.undo-ribbon .icon-btn { width: 1.75rem; min-height: 1.75rem; }
+@media (prefers-reduced-motion: reduce) { .undo-ribbon { animation: none; } }
 .palette-trigger { min-height: 1.75rem; padding: 0 0.5rem; font-size: 0.875rem; color: var(--muted); background: none; box-shadow: none; }
 .palette-trigger:hover { color: var(--fg); background: var(--pick); }
 .palette-trigger kbd { margin-left: 0.25rem; }
@@ -558,7 +565,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 /* Stage panes follow the stage's own width: the resizable sidebar takes part of the window. */
 .toolbar { container: toolbar / inline-size; }
 /* Phone width: the branch name matters more than the view title (the drawer shows the view). */
-@container toolbar (max-width: 30rem) { .toolbar h1 { display: none; } }
+@container toolbar (max-width: 30rem) { .toolbar-title { display: none; } }
 .stage-body { container: stage / inline-size; }
 /* Narrow toolbar: labels become screen-reader only; icons carry it. */
 @container toolbar (max-width: 44rem) {
@@ -592,7 +599,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .sidebar summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.45rem;
   min-height: var(--ctl); margin-top: 0.5rem; padding: 0 0.25rem 0 0.4rem; border-radius: var(--r);
-  font-size: 0.82rem; font-weight: 600; color: var(--muted); transition: color 140ms;
+  font: 700 0.7rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); transition: color 140ms;
 }
 .sidebar summary::-webkit-details-marker { display: none; }
 .sidebar summary:hover { color: var(--fg); }
@@ -671,12 +678,8 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
   background: var(--line-strong); transition: opacity 140ms;
 }
 .files li:is(:hover, .sel)::before, .files li:is(:hover, .sel) + li::before { opacity: 0; }
-.files li.sel { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent); }
-.files li.sel .path small, .files li.sel .kind { color: inherit; }
-.files li.sel .path small { opacity: 0.75; }
-.files li.sel .kind { background: rgb(255 255 255 / 0.2); }
-.files li.sel button.ghost { color: var(--accent-ink); }
-.files li.sel button.ghost:hover:not(:disabled) { background: rgb(255 255 255 / 0.18); }
+/* Selected file: tint + bar (the "active" pattern), so the kind and file-type colours stay readable. */
+.files li.sel { background: var(--active); box-shadow: var(--active-bar); }
 .files .row {
   flex: 1; min-width: 0; justify-content: flex-start; gap: 0.6rem;
   color: inherit; background: none; box-shadow: none; text-align: left; padding: 0 0.45rem; min-height: var(--ctl);
@@ -697,7 +700,6 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 }
 .ficon { flex-shrink: 0; width: 1.15rem; height: 1.15rem; margin-right: -0.2rem; color: var(--fc); }
 .ficon-page { fill: color-mix(in srgb, currentColor 14%, transparent); }
-.files li.sel .ficon { color: inherit; }
 .k-M { color: var(--mod); }
 .k-A { color: var(--add); }
 .k-D, .k-X { color: var(--danger); }
@@ -714,14 +716,16 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .lists section + section { animation-delay: 50ms; }
 .lists section + section + section { animation-delay: 100ms; }
 .list-head { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-height: 2.1rem; padding: 0.25rem 0 0.15rem 0.5rem; background: var(--panel); }
-.list-head h2 { display: flex; align-items: center; gap: 0.45rem; margin-right: auto; }
+.list-head h2 { display: flex; align-items: center; gap: 0.45rem; margin-right: auto; font: 700 0.7rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
 .list-head .count { font-size: 0.68rem; }
 .list-head button.small { min-height: 1.6rem; padding: 0 0.5rem; font-size: 0.78rem; }
-/* Composer: docked at the bottom of the card, on a faintly sunken strip. */
+/* Composer: a raised card at the bottom of the list, one focus ring, the git it runs underneath. */
 .commit {
-  display: grid; gap: 0.5rem; margin-top: auto; padding: 0.7rem 0.75rem 0.75rem;
-  background: color-mix(in srgb, var(--sunken) 40%, var(--panel)); border-top: 1px solid var(--line);
+  display: grid; gap: 0.6rem; margin: auto 0.5rem 0.5rem; padding: 0.85rem; border-radius: 14px; background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line-strong), 0 10px 30px rgb(0 0 0 / 0.07); transition: box-shadow 200ms var(--ease);
 }
+.commit:focus-within { box-shadow: 0 0 0 2px var(--accent), 0 10px 30px color-mix(in srgb, var(--accent) 16%, transparent); }
+.git-hint { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.74rem var(--mono); color: var(--faint); }
 .commit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; min-width: 0; }
 .commit-head label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .commit-head label { display: inline-flex; align-items: center; gap: 0.45rem; }
@@ -735,12 +739,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .subject-len { flex: none; font: 600 0.72rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; transition: color 160ms; }
 .subject-len.over { color: var(--danger); }
 /* The field: message + docked toolbar share one frame, one focus ring. */
-.composer {
-  display: grid; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong);
-  transition: box-shadow 180ms var(--ease);
-}
-.composer:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 24%, transparent); }
-.composer:focus-within { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.composer { display: grid; border-radius: 10px; }
 .composer textarea {
   resize: vertical; min-height: 4.75rem; padding: 0.65rem 0.75rem 0.4rem; line-height: 1.5;
   background: none; box-shadow: none; border-radius: 10px 10px 0 0; outline: none;
@@ -777,7 +776,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .opt:has(input:checked) .icon { translate: 0 -1px; }
 .opt:has(input:disabled) { opacity: 0.45; cursor: default; background: none; }
 /* The action names the whole outcome ("Commit 3 files & push"); the shortcut sits at its far edge. */
-.commit-go { display: flex; align-items: center; justify-content: center; position: relative; min-height: 2.35rem; font-weight: 700; }
+.commit-go { display: flex; align-items: center; justify-content: center; position: relative; min-height: 2.75rem; border-radius: 10px; font-weight: 700; }
 .commit-go kbd {
   position: absolute; right: 0.6rem; padding: 0.05rem 0.35rem; border-radius: 4px; font: 600 0.68rem var(--mono);
   background: rgb(255 255 255 / 0.16); color: inherit; opacity: 0.8;
@@ -813,16 +812,22 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 /* ---------- Diff pane ---------- */
 .diff { min-width: 0; display: flex; flex-direction: column; overflow: hidden; container: pane / inline-size; }
 .diff-head {
-  flex: none; display: flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; padding: 0.35rem 0.5rem 0.35rem 0.8rem;
+  flex: none; display: flex; align-items: center; gap: 0.6rem; min-height: 3.1rem; padding: 0.35rem 0.6rem 0.35rem 1rem;
   border-bottom: 1px solid var(--line); transition: background-color 200ms var(--ease);
 }
 .diff-head:has(.picked) { background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
-.diff-file { flex: 1; min-width: 0; display: flex; align-items: baseline; overflow: hidden; white-space: nowrap; font: 0.84rem var(--mono); letter-spacing: 0; }
+.diff-file { flex: 1; min-width: 0; display: flex; align-items: baseline; overflow: hidden; white-space: nowrap; font: 0.9rem var(--mono); letter-spacing: 0; }
 .diff-file small { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: inherit; color: var(--faint); }
 .diff-file strong { flex-shrink: 0; font-weight: 700; color: var(--fg-hi); }
 .stat { flex: none; display: flex; gap: 0.5rem; font: 700 0.78rem var(--mono); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .stat .plus { color: var(--add); }
 .stat .minus { color: var(--danger); }
+/* Change size: five blocks split by the added/removed share. */
+.size-bar { flex: none; display: flex; gap: 2px; }
+.size-bar i { width: 0.5rem; height: 0.5rem; border-radius: 2px; background: var(--line-strong); }
+.size-bar .a { background: var(--add); }
+.size-bar .d { background: var(--danger); }
+@container pane (max-width: 34rem) { .size-bar { display: none; } }
 .diff-head .hint { flex: none; font-size: 0.78rem; color: var(--faint); }
 .picked { flex: none; display: flex; align-items: center; gap: 0.3rem; animation: rise 220ms var(--ease); }
 .picked > span { margin-right: 0.3rem; font-size: 0.82rem; font-weight: 700; color: var(--accent-fg); font-variant-numeric: tabular-nums; }
@@ -847,8 +852,10 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff .split > .blank { background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--line) 55%, transparent) 6px 7px), var(--sunken); }
 .diff .split .ln { margin-right: 0.5rem; }
 /* Split / Ignore whitespace: on every diff header, pressed = on. */
-.diff-opts { flex: none; display: flex; gap: 2px; margin-left: auto; }
-.diff-opts button[aria-pressed="true"] { color: var(--accent-fg); background: var(--active); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+/* Diff view toggles: one segmented control. */
+.diff-opts { flex: none; display: flex; gap: 2px; margin-left: auto; padding: 2px; border-radius: 8px; background: var(--sunken); }
+.diff-opts button { min-height: 1.6rem; border-radius: 6px; font-weight: 700; color: var(--muted); }
+.diff-opts button[aria-pressed="true"] { color: var(--fg-hi); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.14); }
 @container pane (max-width: 34rem) { .diff-opts .wide { display: none; } }
 .diff .ln span { width: 4.5ch; padding-right: 0.6ch; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .diff .ln span:last-child { border-right: 1px solid var(--line); }
