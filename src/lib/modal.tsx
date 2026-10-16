@@ -77,7 +77,7 @@ export function ConfirmDialog() {
   const a = last.current;
   const one = a?.choices.length === 1 ? a.choices[0] : null;
   return (
-    <dialog ref={dialog} className={`modal tone-${a?.tone ?? "warn"}`} role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text"
+    <dialog ref={dialog} className={`modal alert tone-${a?.tone ?? "warn"}`} role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text"
       onCancel={(e) => { e.preventDefault(); answer(-1); }}>
       {a && (
         <form onSubmit={(e) => { e.preventDefault(); answer(0); }}>

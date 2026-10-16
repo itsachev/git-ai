@@ -81,7 +81,7 @@ function RemoveRepoDialog({ path, missing, onClose, onDone }: { path: string | n
   }
   const p = last.current ?? "";
   return (
-    <dialog ref={dialog} className="modal tone-danger" aria-labelledby="remove-title" aria-describedby="remove-text"
+    <dialog ref={dialog} className="modal alert tone-danger" aria-labelledby="remove-title" aria-describedby="remove-text"
       onCancel={(e) => { e.preventDefault(); if (!busy) onClose(); }}>
       <ModalHead id="remove-title" icon="warn" tone="danger" title={missing ? `${p.split(/[\\/]/).pop()} was deleted` : `Remove ${p.split(/[\\/]/).pop()}?`} sub={p} />
       {missing ? (

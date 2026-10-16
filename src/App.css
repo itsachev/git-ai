@@ -1154,8 +1154,8 @@ dialog p { line-height: 1.55; }
    way out never scroll away. Both bleed into the padding (--pad) to cover the full width. */
 dialog.modal {
   --tone: var(--accent); --pad: clamp(1.2rem, 2.5vw, 1.9rem);
-  /* 80% of the window, never under 30rem (or the full width minus a gutter on phones), capped for line length. */
-  width: clamp(min(30rem, 100vw - 2rem), 80vw, 64rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--pad);
+  /* Sized to the content: a form-sized default; long forms and the big modals opt into wider tiers below. */
+  width: min(34rem, 100vw - 2rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--pad);
   border-radius: 20px; scrollbar-gutter: stable; scroll-padding: 6rem 0 5rem;
   /* A soft tone glow behind the header instead of a flat tint. */
   background:
@@ -1169,6 +1169,21 @@ dialog.modal::-webkit-scrollbar-track { margin-block: 20px; }
 dialog.modal.tone-accent { --tone: var(--accent); }
 dialog.modal.tone-warn { --tone: var(--mod); }
 dialog.modal.tone-danger { --tone: var(--danger); }
+/* Long forms: room for a textarea, a commit list or a stepper, still well short of the big modals. */
+dialog.modal:is(.rebase-dialog, .write-up, .setup) { width: min(46rem, 100vw - 2rem); }
+/* Alerts (confirms, errors, prompts): a question, not a page. No header band or divider rules; the body
+   runs flush with the badge's left edge, and the buttons sit on the panel. */
+/* No reserved scrollbar gutter: it made the right padding wider than the left. */
+dialog.modal.alert { width: min(28rem, 100vw - 2rem); scrollbar-gutter: auto; }
+dialog.alert .modal-head { position: static; margin: 0 0 0.6rem; padding: 0; background: none; border: 0; }
+dialog.alert .modal-head h2 { font-size: 1.2rem; line-height: 1.3; }
+/* Options span the full width, two per row when they fit. */
+dialog.alert .choices { grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); margin: 1rem 0 0; }
+dialog.alert .choices .choice { align-content: start; }
+dialog.alert input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; }
+dialog.alert .modal-text { color: var(--muted); line-height: 1.55; text-wrap: pretty; }
+dialog.alert .dialog-actions { position: static; margin: 1.4rem 0 0; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; }
+dialog.modal.alert:has(.choices) { width: min(38rem, 100vw - 2rem); }
 /* choose(): one full-width card per option, label over a muted hint; a danger option tints its edge. */
 .choices { display: grid; gap: 0.5rem; margin-bottom: 1.1rem; }
 .choices .choice {

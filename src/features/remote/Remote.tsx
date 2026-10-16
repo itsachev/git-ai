@@ -272,7 +272,7 @@ export function AskpassDialog() {
   // Usernames and ssh's host-key yes/no question are shown; passwords and passphrases are masked.
   const plain = !!cur && /username|yes\/no/i.test(cur.prompt);
   return (
-    <dialog ref={dialog} className="modal askpass" aria-labelledby="askpass-title" onCancel={(e) => { e.preventDefault(); answer(null); }}>
+    <dialog ref={dialog} className="modal alert askpass" aria-labelledby="askpass-title" onCancel={(e) => { e.preventDefault(); answer(null); }}>
       {cur && (
         <form onSubmit={(e) => { e.preventDefault(); answer(value); }}>
           <ModalHead id="askpass-title" icon="remote" title="Git needs your input" sub={<>Your answer goes straight to git. <Brand /> doesn't store it.</>} />

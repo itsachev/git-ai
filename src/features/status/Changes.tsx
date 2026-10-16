@@ -107,7 +107,7 @@ export function OpErrorDialog({ path }: { path: string }) {
   const e = last.current;
   const fixes = (e?.code && e.retry && FIXES[e.code]?.(path, run, e.retry)) || [];
   return (
-    <dialog ref={dialog} className={`modal tone-${last.current?.warn ? "warn" : "danger"}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
+    <dialog ref={dialog} className={`modal alert tone-${last.current?.warn ? "warn" : "danger"}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
       onCancel={(e) => { e.preventDefault(); close(); }}>
       <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
         <ModalHead id="op-error-title" icon="warn" tone={last.current?.warn ? "warn" : "danger"} title={last.current?.title} />

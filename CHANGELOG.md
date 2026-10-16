@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
 ### Added
 - **Delete the remote branch too:** when you delete a local branch that also exists on the remote, the confirm box has an "Also delete … on the remote" checkbox, so both go in one step. Deleting a remote branch works the same way: an "Also delete local branch …" checkbox removes your local copy with it (not offered for the branch you're on).
 - Branch names in delete confirmations are bold and colored: local in teal, remote in blue.
@@ -12,14 +14,6 @@ What's new in each git-ai release. Newest first.
   - After a discard, branch delete or other risky step, a strip under the toolbar keeps it one click from undone for 30 minutes.
   - The commit box shows the exact git command it will run.
   - The selected file is highlighted without hiding its colors, and the diff header shows how big the change is.
-
-### Fixed
-
-- Buttons with a keyboard shortcut now show it on hover: Fetch, Pull, Push, File Status, History, the branches menu, Stage all, Commit, commit search and Keyboard shortcuts in Settings.
-
-## [0.3.0] - 2026-10-15
-
-### Added
 - **Push after commit:** a Push toggle under the commit message pushes your branch as soon as the commit lands. git-ai remembers your choice. The Commit button says so, for example "Commit 3 files & push". A rejected push offers the same choices as the toolbar's Push button.
 - **Push and pull counts on repository tabs:** each tab shows how many commits its current branch has to push (↑) and pull (↓). The open tab updates live. Other tabs keep the counts from when you last viewed them.
 - **Auto fetch:** git-ai checks the remote for new commits on your current branch when you open a repository, every 5 minutes, and when you come back to the window. Pull counts stay up to date without pressing Fetch. It only fetches your branch, so big repositories stay fast. It never asks for a password, and failures (offline, signed out) stay silent.
@@ -30,11 +24,15 @@ What's new in each git-ai release. Newest first.
 - **Submodules:** repositories with submodules list them in the sidebar, marked when one isn't cloned yet or needs an update. Update one or all of them, or open one in its own tab. Cloning now brings submodules along.
 
 ### Changed
+- Dialogs fit their content. Confirmations, errors and password prompts are small, focused boxes instead of stretching across most of the window. Settings, About, file history and other big views keep their large size.
 - **Feature search in About:** the "Find a feature" box now sits in the dialog's header, so it is visible right away and stays in reach while you scroll.
 - **New app icon:** a dark tile with a teal branch-and-merge glyph replaces the default Tauri logo in the taskbar, Start menu, Dock and installer.
 - **Redesigned commit box:** the message and its tools (Generate, Amend, Push) now sit in one field. Amend and Push are toggle chips. A full-width Commit button names exactly what will happen and shows the keyboard shortcut.
 - **Easier-to-read status bar:** the Git and Node versions, your commit identity and the Commands button use larger, darker text. "Commands" is now bold.
 - **Big diffs open instantly:** diffs, file history and blame of long files (thousands of lines, such as lock files) show at once and scroll smoothly. Before, a 25,000-line diff froze the window for over a second.
+
+### Fixed
+- Buttons with a keyboard shortcut now show it on hover: Fetch, Pull, Push, File Status, History, the branches menu, Stage all, Commit, commit search and Keyboard shortcuts in Settings.
 
 ## [0.2.0] - 2026-10-14
 
