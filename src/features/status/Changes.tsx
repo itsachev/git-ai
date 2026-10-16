@@ -354,7 +354,7 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, push, onCo
           </span>
         </div>
       </div>
-      <button className="primary commit-go" disabled={!ok} title={why || undefined}>
+      <button className="primary commit-go" disabled={!ok} title={why || "Ctrl+Enter in the message box"}>
         <span>{busy ? (amend ? "Amending…" : "Committing…") : amend ? "Amend" : finishing ? (finishing === "rebase" ? "Continue rebase" : `Finish ${finishing}`)
           : staged ? `Commit ${staged} file${staged === 1 ? "" : "s"}` : "Commit"}{!busy && pushAfter && !pushOff && " & push"}</span>
         <kbd aria-hidden="true">{navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"} ↵</kbd>
@@ -408,7 +408,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
       <div className="list-head">
         <h2>{title} <span className="count">{files.length}</span></h2>
         {onDiscard && <button className="small ghost" onClick={() => onDiscard(files)}>Discard all</button>}
-        <button className="small ghost" onClick={() => onAction(files)}>{action} all</button>
+        <button className="small ghost" onClick={() => onAction(files)} title={action === "Stage" ? "Stage all (Ctrl+Shift+S)" : undefined}>{action} all</button>
       </div>
       <ul className="files" aria-multiselectable
         onKeyDown={(e) => {

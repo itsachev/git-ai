@@ -111,7 +111,7 @@ function SettingsNav() {
         );
       })}
       {canOpenShortcuts() && (
-        <button type="button" className="settings-go" style={{ "--h": 175, "--i": SECTIONS.length } as React.CSSProperties} onClick={() => { set(false); openShortcuts(); }}>
+        <button type="button" className="settings-go" title="Keyboard shortcuts (Ctrl+/)" style={{ "--h": 175, "--i": SECTIONS.length } as React.CSSProperties} onClick={() => { set(false); openShortcuts(); }}>
           <span className="about-icon"><Icon name="command" /></span>
           <span className="settings-nav-text"><strong>Keyboard shortcuts</strong><small>Every shortcut on one page</small></span>
         </button>

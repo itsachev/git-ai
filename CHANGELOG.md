@@ -4,6 +4,10 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Fixed
+
+- Buttons with a keyboard shortcut now show it on hover: Fetch, Pull, Push, File Status, History, the branches menu, Stage all, Commit, commit search and Keyboard shortcuts in Settings.
+
 ## [0.3.0] - 2026-10-15
 
 ### Added

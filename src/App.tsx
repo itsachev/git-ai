@@ -19,7 +19,7 @@ import { FileHistoryDialog } from "./features/graph/FileHistory";
 import { CompareDialog, openCompare } from "./features/graph/Compare";
 import { ReflogDialog, openReflog } from "./features/refs/Reflog";
 import { StashDialog, StashSaveDialog, openStashSave } from "./features/refs/Stash";
-import { AskpassDialog, CloneDialog, SyncButtons, useSync } from "./features/remote/Remote";
+import { AskpassDialog, CloneDialog, SYNC_KEYS, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
@@ -388,7 +388,6 @@ function App() {
   );
 }
 
-const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+Shift+L", Push: "Ctrl+Shift+U" };
 const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pull: "git pull --no-rebase", Push: "git push" };
 const PULL_REBASE_GIT = "git pull --rebase --autostash";
 
@@ -421,7 +420,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   // Also true between the two steps of a rejected push (sync.busy covers the choice dialog in between).
   const busy = useOpBusy() || !!sync.busy;
   const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
-  const views = [["status", "File Status", "changes"], ["history", "History", "history"]] as const;
+  const views = [["status", "File Status", "changes", "Ctrl+1"], ["history", "History", "history", "Ctrl+2"]] as const;
   const shell = useRef<HTMLDivElement>(null);
 
   // Opening a repo: the rail head and views cascade in from the left, the toolbar drops in (the Sidebar reveals itself
@@ -493,8 +492,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <span className="branch-chip" key={branch ?? ""} title="Current branch"><Icon name="branch" /><span>{branch ?? "detached HEAD"}</span></span>
         </div>
         <nav className="views" aria-label="Views">
-          {views.map(([id, label, icon]) => (
-            <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => show(id)}
+          {views.map(([id, label, icon, keys]) => (
+            <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => show(id)} title={`${label} (${keys})`}
               className={id === "status" && status?.conflicted.length ? "conflict" : undefined}>
               <Icon name={icon} />
               <span>{label}</span>
@@ -510,7 +509,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
       <main className="stage">
         <fieldset className="lock" disabled={busy}>
         <header className="toolbar">
-          <button className="icon-btn menu" aria-label="Branches and views" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
+          <button className="icon-btn menu" aria-label="Branches and views" title="Branches and views (Ctrl+B)" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <h1>{tab === "status" ? "File Status" : tab === "history" ? "History" : "Keyboard shortcuts"}</h1>
           <SyncButtons sync={sync}>
             <button disabled={!changed} onClick={() => openStashSave()} title={changed ? "Stash changes: name it, pick which ones" : "No changes to stash"}>

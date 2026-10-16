@@ -124,7 +124,7 @@ export function CommitSearch({ path, opts, sel, onSelect, onHits }: {
       <label className="search">
         <Icon name="search" />
         <input id="commit-search" type="search" placeholder={FIELDS.find((f) => f[0] === field)![2]} aria-label="Search commits"
-          title="Enter: next match, Shift+Enter: previous" spellCheck={false} autoComplete="off"
+          title={"Search commits (Ctrl+F)\nEnter: next match, Shift+Enter: previous"} spellCheck={false} autoComplete="off"
           value={q} onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }

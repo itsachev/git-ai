@@ -135,6 +135,8 @@ function useAutoFetch(path: string, tracked: boolean, busy: string | null) {
 }
 
 /** Sourcetree's toolbar buttons for `useSync`. */
+export const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: "Ctrl+Shift+L", Push: "Ctrl+Shift+U" };
+
 export function SyncButtons({ sync, children }: { sync: Sync; children?: React.ReactNode }) {
   const pullPop = useRef<HTMLDivElement>(null);
   return (
@@ -149,7 +151,7 @@ export function SyncButtons({ sync, children }: { sync: Sync; children?: React.R
       {sync.ops.map((o) => (
         <Fragment key={o.label}>
           <button disabled={!!sync.busy || !!o.off} onClick={o.go} aria-busy={sync.busy === o.doing}
-            title={o.off || (o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"} (right-click to change)` : o.label)}
+            title={o.off || `${o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"}` : o.label} (${SYNC_KEYS[o.label]})${o.label === "Pull" ? "\nRight-click to change" : ""}`}
             onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
             <Icon name={o.label.toLowerCase() as IconName} />
             <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label === "Pull" && sync.rebase ? "Pull (rebase)" : o.label}</span>
