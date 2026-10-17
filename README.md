@@ -62,7 +62,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 - Hover a graph dot to see its branch
 - **Search commits** by message, author or id (Ctrl+F)
 - Commit details and diffs, **AI explanations**, file history and blame
-- **Compare** any two commits, branches, tags or the working copy: full file list and diffs (Ctrl+click a second commit)
+- **Compare** any two commits, branches, tags or the working copy: full file list and diffs, from any branch, tag or commit's right-click menu (including a branch against its remote) or Ctrl+click a second commit
 - **Recover lost commits** from the reflog, even after resets and rebases done in a terminal
 - Right-click any commit to branch, merge, rebase, revert or reset (soft, mixed, keep or hard, all undoable)
 

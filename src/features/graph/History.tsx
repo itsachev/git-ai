@@ -104,8 +104,6 @@ export function History({ path }: { path: string }) {
                 <button className="small ghost" title="Add a commit that undoes this one"
                   onClick={async () => (await confirm("Revert commit", `Add a commit on ${refs?.head ?? "the current branch"} that undoes ${d.oid.slice(0, 7)}? Undo history (sidebar) can reverse it.`, "Revert")) && run(() => revert(path, d.oid), `Reverted ${d.oid.slice(0, 7)}`)}><Icon name="undo" />Revert</button>
                 <button className="small ghost" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}><Icon name="tag" />Tag…</button>
-                <button className="small ghost" onClick={() => openCompare(d.oid, refs?.head ?? "HEAD", false)}
-                  title={`Every file that differs between this commit and ${refs?.head ?? "HEAD"} (or anything else you pick). Tip: Ctrl+click another commit to compare the two.`}><Icon name="changes" />Compare…</button>
                 <button className="small ghost" disabled={!!noRebase} onClick={() => openRebase(d.oid)} title={noRebase ?? "Reorder, edit, squash or drop the commits after this one"}><Icon name="restart" />Rebase…</button>
                 <button className="small ghost ai" disabled={explaining === d.oid || d.oid in explained} onClick={() => explain(d.oid)}
                   title={d.oid in explained ? "Already explained below" : hasKey ? "Explain this commit in plain words (message and diff sent to your AI provider)" : "Set up AI in Settings first"}>
@@ -162,8 +160,9 @@ export function CommitDiff({ path, oid, file, kind, stash }: { path: string; oid
   return <ReadDiff file={file} kind={kind} data={data} error={error} />;
 }
 
-/** Read-only diff of one file. `data`: undefined = loading, null = binary or over 1 MB, "" = no difference. */
-export function ReadDiff({ file, kind, data, error }: { file: string; kind?: string; data: string | null | undefined; error: unknown }) {
+/** Read-only diff of one file. `data`: undefined = loading, null = binary or over 1 MB, "" = no difference.
+ *  `sides`: names for the old and new side, shown above the lines (Compare, where neither is obviously "before"). */
+export function ReadDiff({ file, kind, data, error, sides }: { file: string; kind?: string; data: string | null | undefined; error: unknown; sides?: [string, string] }) {
   const lang = useLang(file, data);
   const { split, ws } = useDiffView();
   const head = <DiffHead file={file} kind={kind} />;
@@ -180,6 +179,11 @@ export function ReadDiff({ file, kind, data, error }: { file: string; kind?: str
   return (
     <section className="diff">
       <DiffHead file={file} kind={kind} lines={lines} />
+      {sides && (
+        <div className={split ? "diff-sides split" : "diff-sides"}>
+          <span className="old"><b aria-hidden="true">−</b>{sides[0]}</span><span className="new"><b aria-hidden="true">+</b>{sides[1]}</span>
+        </div>
+      )}
       <Lines key={file + split} label={`Diff of ${file}`} n={rows ? rows.length : lines.length} width={rows ? 0 : widest(lines)}
         hunk={(k) => !!lines[rows ? rows[k][0] : k]?.startsWith("@@")}
         row={(k) => {

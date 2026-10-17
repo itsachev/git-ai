@@ -445,9 +445,9 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
         })}
       </ul>
       <RefMenu pop={menu} label={`Actions for ${ctx?.path ?? "file"}`} actions={ctx ? [
-        ["Compare with branch…", () => openFileHistory("HEAD", ctx.path, "compare")],
+        ["Compare with a branch", () => openFileHistory("HEAD", ctx.path, "compare")],
         ["History and blame", () => openFileHistory("HEAD", ctx.path), ctx.kind === "?" || ctx.kind === "A" ? "New file: no history yet" : undefined],
-        [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files…` : "Stash this file…", () => openStashSave(pathsOf(ctxFiles))],
+        [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files` : "Stash this file", () => openStashSave(pathsOf(ctxFiles))],
       ] : []} />
     </section>
   );

@@ -8,6 +8,7 @@ import type { GraphPage } from "../../bindings/GraphPage";
 import type { GraphOpts } from "../../bindings/GraphOpts";
 import type { SearchIn } from "../../bindings/SearchIn";
 import { errorText, useRun } from "../status/Changes";
+import { openCompare } from "./Compare";
 import { RefMenu, confirmMerge, confirmRebase, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
 import { choose, confirm } from "../../lib/modal";
 import type { ResetMode } from "../../bindings/ResetMode";
@@ -158,7 +159,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
   function resetAction(r: GraphRow): Action {
     const at = r.oid.slice(0, 7);
     const target = branch ?? "HEAD";
-    return [`Reset ${target} to here…`, async () => {
+    return [`Reset ${target} to here`, async () => {
       const i = await choose(`Reset ${target} to ${at}`, r.head
         ? `${target} already points at “${r.summary}”, so only your uncommitted changes are affected. What should happen to them?`
         : `Moves ${target} to “${r.summary}”. Commits after it leave ${target}; Undo history (sidebar) can bring them back. What happens to the files?`,
@@ -181,6 +182,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
     const done = inHead ? `${branch} already has ${at}` : undefined;
     // Unlabeled commit: the same actions, by commit id.
     const own: Action[] = [["New branch from here", () => openNewBranch(r.oid)], ...(branch && !r.head ? [
+      ["Compare with a branch", () => openCompare(r.oid, branch, false)],
       [`Merge ${at} into ${branch}`, async () => (await confirmMerge(at, branch)) && run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`), done],
       [`Rebase ${branch} onto ${at}`, async () => (await confirmRebase(branch, at)) && run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`), done],
     ] as Action[] : [])];

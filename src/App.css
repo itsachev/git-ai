@@ -659,6 +659,13 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   transition: opacity 160ms var(--ease), scale 220ms var(--spring), display 160ms allow-discrete, overlay 160ms allow-discrete;
 }
 .row-menu:popover-open { display: grid; gap: 1px; opacity: 1; scale: 1; }
+/* A hairline between every two items (none after the last), inset to the label; hidden next to the hovered item. */
+.row-menu button { position: relative; }
+.row-menu button + button::before {
+  content: ""; position: absolute; top: -1px; left: 0.7rem; right: 0.7rem; height: 1px; pointer-events: none;
+  background: var(--line-strong); transition: opacity 140ms;
+}
+.row-menu button:is(:hover, :focus-visible)::before, .row-menu button:is(:hover, :focus-visible) + button::before { opacity: 0; }
 @starting-style { .row-menu:popover-open { opacity: 0; scale: 0.94; } }
 .row-menu button { justify-content: flex-start; color: inherit; background: none; box-shadow: none; padding: 0 0.7rem; border-radius: 6px; font-weight: 500; }
 /* Disabled item with a reason: the reason sits under the label, so it reads without hover (and on touch). */
@@ -873,6 +880,15 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .diff .split .ln { margin-right: 0.5rem; }
 /* Split / Ignore whitespace: on every diff header, pressed = on. */
 /* Diff view toggles: one segmented control. */
+/* Which side is which (Compare): two column heads in split view, a −/+ legend in unified. */
+.diff-sides { flex: none; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; padding: 0.35rem 1rem; border-bottom: 1px solid var(--line); font: 600 0.78rem var(--mono); color: var(--muted); }
+.diff-sides.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; padding: 0; }
+.diff-sides span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-sides.split span { padding: 0.35rem 0.75rem; }
+.diff-sides.split span + span { box-shadow: inset 1px 0 var(--line); }
+.diff-sides b { margin-right: 0.45rem; }
+.diff-sides .old b { color: var(--danger); }
+.diff-sides .new b { color: var(--add); }
 .diff-opts { flex: none; display: flex; gap: 2px; margin-left: auto; padding: 2px; border-radius: 8px; background: var(--sunken); }
 .diff-opts button { min-height: 1.6rem; border-radius: 6px; font-weight: 700; color: var(--muted); }
 .diff-opts button[aria-pressed="true"] { color: var(--fg-hi); background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.14); }

@@ -10,7 +10,7 @@ import { Icon } from "../../lib/icons";
 
 // Every file that differs between two branches, tags, commits or the working copy (""), and each file's diff.
 // `since`: start from where the two split, so only what `to` added shows (like a pull request).
-// Opened from branch and tag menus, a commit's Compare button, Ctrl+click on a second commit, and the palette.
+// Opened from branch and tag menus, a commit row's menu, Ctrl+click on a second commit, and the palette.
 type State = { from: string; to: string; since: boolean };
 let state: State | null = null;
 const subs = new Set<() => void>();
@@ -46,7 +46,18 @@ function Body({ path, initial }: { path: string; initial: State }) {
   // The working copy isn't a commit, so it has no split point with anything.
   const canSince = !!from && !!to && from !== to;
   const useSince = since && canSince;
-  const base = useQuery({ queryKey: ["merge-base", path, from, to], queryFn: () => mergeBase(path, from, to), enabled: useSince });
+  // Fetched whenever there is one (not only for `since`): it also tells which side is older.
+  const base = useQuery({ queryKey: ["merge-base", path, from, to], queryFn: () => mergeBase(path, from, to), enabled: canSince });
+  // −/+ read as removed/added only when the old side is on the left. If `to` is behind `from` (the split point is
+  // `to` itself, e.g. origin/main vs unpushed commits), swap them, once: ⇄ can still put them back.
+  const flipped = useRef(false);
+  const oidOf = (v: string) => (isOid(v) ? v : [...(refs?.local ?? []), ...(refs?.remote ?? []), ...(refs?.tags ?? [])].find((r) => r.name === v)?.oid);
+  const toOid = oidOf(to);
+  useEffect(() => {
+    if (flipped.current || !base.data || !toOid || base.data !== toOid || oidOf(from) === toOid) return;
+    flipped.current = true;
+    setFrom(to); setTo(from);
+  });
   // The `from` side actually diffed: the split point, the picked revision, or null = working copy. undefined while loading.
   const a = useSince ? base.data : from || null;
   const files = useQuery({ queryKey: ["compare-files", path, a, to], queryFn: () => compareFiles(path, a!, to || null), enabled: a !== undefined });
@@ -64,7 +75,7 @@ function Body({ path, initial }: { path: string; initial: State }) {
     <div className="nb-field">
       <label htmlFor={id}>{label}</label>
       <div className="select">
-        <select id={id} value={value} onChange={(e) => { set(e.target.value); setPicked(null); }}>
+        <select id={id} value={value} onChange={(e) => { flipped.current = true; set(e.target.value); setPicked(null); }}>
           <option value="">Working copy</option>
           {ids.map((o) => <option key={o} value={o}>{isOid(o) ? `Commit ${o.slice(0, 7)}` : o}</option>)}
           <RefOptions refs={refs} />
@@ -74,6 +85,9 @@ function Body({ path, initial }: { path: string; initial: State }) {
     </div>
   );
   const error = base.error ?? files.error;
+  // Diff column labels. With "only what it added" on, the old side is the split point, not `from` itself.
+  const label = (v: string) => (v === "" ? "Working copy" : name(v));
+  const sides: [string, string] = [useSince ? `${label(from)} where it split${base.data ? ` · ${base.data.slice(0, 7)}` : ""}` : label(from), label(to)];
   return (
     <div className="fh">
       <ModalHead id="cmp-title" icon="branch" title="Compare"
@@ -83,7 +97,7 @@ function Body({ path, initial }: { path: string; initial: State }) {
       <div className="cmp-opts">
         <div className="fh-range">
           {pick("cmp-from", "From", from, setFrom)}
-          <button type="button" className="small ghost" title="Swap sides" aria-label="Swap sides" onClick={() => { setFrom(to); setTo(from); setPicked(null); }}>⇄</button>
+          <button type="button" className="small ghost" title="Swap sides" aria-label="Swap sides" onClick={() => { flipped.current = true; setFrom(to); setTo(from); setPicked(null); }}>⇄</button>
           {pick("cmp-to", "To", to, setTo)}
         </div>
         <label className="nb-toggle" title={canSince ? undefined : "Needs two different branches, tags or commits"}>
@@ -113,8 +127,15 @@ function Body({ path, initial }: { path: string; initial: State }) {
               })}
             </ul>
           )}
-        {shown ? <ReadDiff file={shown.path} kind={shown.kind} data={diff.data} error={diff.error} />
-          : files.data && <section className="diff"><PaneNote icon="check" title="No differences"><p>Both sides have the same files.</p></PaneNote></section>}
+        {shown ? <ReadDiff file={shown.path} kind={shown.kind} data={diff.data} error={diff.error} sides={sides} />
+          : files.data && <section className="diff">
+            {/* Since the split point, `to` changed nothing (often: it is behind `from`). `from` may still have more. */}
+            {useSince
+              ? <PaneNote icon="check" title={`${name(to)} added nothing new`}>
+                  <p>Since the two split, <span className="mono">{name(to)}</span> has no changes of its own. Turn off the switch above, or swap the sides, to see what <span className="mono">{name(from)}</span> has that it doesn't.</p>
+                </PaneNote>
+              : <PaneNote icon="check" title="No differences"><p>Both sides have the same files.</p></PaneNote>}
+          </section>}
       </div>
       <div className="dialog-actions">
         <button type="button" onClick={close}>Close</button>

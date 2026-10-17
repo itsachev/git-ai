@@ -57,7 +57,6 @@ async function deleteLocal(path: string, name: string) {
 
 /** [label, handler, why it is disabled (absent = enabled)] */
 export type Action = [string, () => void, string?];
-
 /** Menu actions for a branch, remote branch or tag by short name (shared by the sidebar and the graph's ref labels). */
 export function useRefActions(path: string) {
   const data = useQuery(refsQuery(path)).data;
@@ -77,8 +76,12 @@ export function useRefActions(path: string) {
     if (ontoOnly) return onto;
     // A branch: what it has that the current one doesn't. A tag: what the current branch added since it.
     const isTag = data.tags.some((t) => t.name === name) && !data.local.some((b) => b.name === name);
-    const compare: Action[] = head && head !== name
-      ? [[`Compare with ${head}`, () => (isTag ? openCompare(name, head) : openCompare(head, name))]] : [];
+    // One item; the dialog's From/To pick the other side. It starts at the current branch, or for the current branch
+    // itself at its upstream (what's unpushed or not pulled yet). Compare puts the older side left.
+    const upstream = data.local.find((b) => b.name === name)?.upstream;
+    const other = head && head !== name ? head : upstream ?? data.local.find((b) => b.name !== name)?.name;
+    const compare: Action[] = other
+      ? [[isTag ? "Compare with a branch" : "Compare with another branch", () => (isTag ? openCompare(name, other) : openCompare(other, name, other !== upstream))]] : [];
     /** Checkout of a remote branch: its local namesake, created (tracking) if missing; asks what to do when the remote has commits the local lacks. */
     const checkoutRemote = (name: string) => {
       const short = name.slice(name.indexOf("/") + 1);
@@ -111,12 +114,12 @@ export function useRefActions(path: string) {
       };
     };
     if (data.local.some((b) => b.name === name)) {
-      const pr: Action = ["Create pull request…", () => openWriteUp("pr", null, name)];
+      const pr: Action = ["Create pull request", () => openWriteUp("pr", null, name)];
       const explain: Action = ["Explain branch (AI)", () => openWriteUp("explain", null, name)];
       // Its upstream has new commits: offer the same choices as checking out the remote branch.
       const up = data.local.find((b) => b.name === name)!;
-      const sync: Action[] = up.upstream && up.behind > 0 ? [[`Checkout ${up.upstream}…`, checkoutRemote(up.upstream)]] : [];
-      const rename: Action = ["Rename…", async () => {
+      const sync: Action[] = up.upstream && up.behind > 0 ? [[`Checkout ${up.upstream}`, checkoutRemote(up.upstream)]] : [];
+      const rename: Action = ["Rename", async () => {
         const v = await prompt(`Rename ${name}`, "", [{ label: "New name", value: name }], "Rename");
         if (v && v[0] !== name) run(() => renameBranch(path, name, v[0]), `Renamed ${name} to ${v[0]}`);
       }];
@@ -124,7 +127,7 @@ export function useRefActions(path: string) {
       const short = (r: string) => r.slice(r.indexOf("/") + 1);
       const candidates = data.remote.map((r) => r.name).filter((r) => r !== up.upstream && !r.endsWith("/HEAD"))
         .sort((a, b) => Number(short(b) === name) - Number(short(a) === name));
-      const track: Action = [up.upstream ? "Change tracked branch…" : "Track remote branch…", async () => {
+      const track: Action = [up.upstream ? "Change tracked branch" : "Track remote branch", async () => {
         const opts = [...candidates.map((r) => ({ label: r, hint: `Pull and Push use ${r}.` })),
           ...(up.upstream ? [{ label: "Stop tracking", hint: `${name} keeps its commits; Push publishes it again.`, tone: "warn" as const }] : [])];
         const i = await choose(`What should ${name} track?`, up.upstream ? `It tracks ${up.upstream} now.` : `${name} doesn't track a remote branch yet.`, opts, "remote");
@@ -132,7 +135,7 @@ export function useRefActions(path: string) {
         const to = i < candidates.length ? candidates[i] : null;
         run(() => setUpstream(path, name, to), to ? `${name} now tracks ${to}` : `${name} no longer tracks ${up.upstream}`);
       }, candidates.length || up.upstream ? undefined : "No remote branches yet. Fetch or push first."];
-      if (name === head) return [...sync, branchOff, pr, explain, rename, track];
+      if (name === head) return [...sync, branchOff, ...compare, pr, explain, rename, track];
       // The remote copy to offer deleting too: its upstream, else a same-named remote branch.
       const remote = up.upstream ?? data.remote.find((r) => short(r.name) === name)?.name;
       return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
@@ -258,7 +261,7 @@ export function Sidebar({ path }: { path: string }) {
   const remoteActions = (name: string): Action[] => {
     const url = remoteList?.find((r) => r.name === name)?.url ?? "";
     return [
-      ["Edit URL…", async () => {
+      ["Edit URL", async () => {
         const v = await prompt(`URL of ${name}`, "", [{ label: "URL", value: url }], "Save", "remote");
         if (v && v[0] !== url) run(() => remoteSet(path, name, v[0], true), `${name} now points at ${v[0]}`);
       }],
@@ -337,8 +340,8 @@ export function Sidebar({ path }: { path: string }) {
               ["Show changes", () => openStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
               ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
-              ["Rename…", () => renameStash(i, s)],
-              ["New branch from stash…", () => branchFromStash(i, s)],
+              ["Rename", () => renameStash(i, s)],
+              ["New branch from stash", () => branchFromStash(i, s)],
               ["Explain (AI)", () => openExplainStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Drop", () => dropStash(i, s)],
             ]} />
