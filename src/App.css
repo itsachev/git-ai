@@ -2,17 +2,25 @@
    and the default action. Dark is warm graphite, not blue-black. Teal sits apart from the diff green/red, so the
    signal never reads as "added" or "destructive". Geist / Geist Mono, bundled: works offline. */
 :root {
-  --bg: #f4f2ee;          /* window: warm stone */
-  --panel: #fdfcfa;       /* content: tables, diffs, cards (paper) */
-  --raised: #efece6;      /* hover */
-  --sunken: #e7e3db;      /* fills, segmented tracks */
-  --rail: #ebe7e0;        /* sidebar */
+  /* Light is a layer ladder, not a white sheet: stone canvas, accent-tinted rail, paper cards that cast real depth. */
+  --bg: #ebe7e0;          /* window: warm stone */
+  --panel: #fcfbf8;       /* content: tables, diffs, cards (paper) */
+  --raised: #f1eee8;      /* hover */
+  --sunken: #e0dbd2;      /* fills, segmented tracks */
+  --rail: color-mix(in srgb, var(--accent) 7%, #e4dfd7); /* sidebar: stone with a breath of the signal */
   --line: rgb(60 45 25 / 0.1);
   --line-strong: rgb(60 45 25 / 0.18);
+  /* Pane cards: hairline ring, contact shadow, soft long drop. */
+  --card: inset 0 0 0 1px rgb(60 45 25 / 0.08), 0 1px 2px rgb(40 30 15 / 0.06), 0 12px 32px -14px rgb(40 30 15 / 0.18);
+  /* Stage canvas: a static glow of the signal from the top right, honey from the bottom left. No paint per frame. */
+  --canvas:
+    radial-gradient(70rem 42rem at 100% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 62%),
+    radial-gradient(56rem 36rem at -10% 110%, rgb(212 160 23 / 0.1), transparent 60%),
+    var(--bg);
   --fg: #1d1b18;          /* ink */
   --fg-hi: #12110f;       /* headlines and the current thing */
   --muted: #5a554e;       /* 7:1 on --panel: secondary text stays readable */
-  --faint: #8a847a;
+  --faint: #7c766c;       /* darker than before: holds ~3.5:1 on the deeper stone */
   --accent: #0f766e;      /* fills: the "signal" (spruce teal); white text on it is 5.4:1 */
   --accent-ink: #ffffff;  /* text on fills */
   --accent-fg: #0b5e57;   /* accent as text / outline */
@@ -83,6 +91,8 @@
   --mod: #eba24c;
   --info: #9aa9ee;
   --shadow: 0 0 0 0.5px rgb(0 0 0 / 0.6), inset 0 0.5px 0 rgb(255 245 230 / 0.07), 0 16px 48px rgb(0 0 0 / 0.5);
+  --card: inset 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.04);
+  --canvas: var(--bg);
   --glass: rgb(38 36 34 / 0.8);
   --tool: linear-gradient(#353330, #2b2927);
   --tool-lit: inset 0 1px 0 rgb(255 245 230 / 0.07);
@@ -120,6 +130,9 @@ h1, h2, h3, .rail-head .back strong, .commit-info .subject, .ci-author strong, .
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--fg) 38%, transparent); }
+/* Pane cards have 12px corners and a square track: inset the horizontal track at both ends and the vertical one
+   at the bottom, so neither thumb runs under a rounded corner. */
+:is(.diff pre, .graph-body)::-webkit-scrollbar-track { margin: 0 12px 12px; }
 
 /* ---------- Controls: push buttons, text fields ---------- */
 button {
@@ -180,15 +193,17 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 @media (min-width: 60rem) { .home { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-content: center; } }
 /* Backdrop (features/home/Backdrop.tsx): the artwork plus a canvas of light mapped onto it, in a layer that drifts (parallax). */
 .home { position: relative; isolation: isolate; overflow-x: clip; } /* reveals slide in from the edges: no page-wide scrollbar flash */
-.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: var(--bg); animation: home-bg-in 1.4s var(--ease) both; }
+.home-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: var(--canvas); animation: home-bg-in 1.4s var(--ease) both; }
 .home-art {
   position: absolute; inset: -24px; /* bleed, so the drift never shows an edge */
   background: url("./assets/app_bg.jpg") center / cover no-repeat;
-  /* Light: the dark artwork (and its light) flipped to a light one, then warmed to stone. */
-  filter: invert(1) hue-rotate(180deg) sepia(0.35) saturate(0.8);
+  /* Light: the dark artwork flipped to a light one, then multiplied onto the stone canvas: its near-white ground
+     drops out, so the glow shows through and only the graph lines and cards stay, as ink. */
+  filter: invert(1) hue-rotate(180deg) sepia(0.35) saturate(0.8) contrast(1.15);
+  mix-blend-mode: multiply;
 }
 /* Dark: the cool blue-grey artwork pulled to neutral graphite, to sit with the warm surfaces. */
-:root[data-theme="dark"] .home-art { filter: sepia(0.45) hue-rotate(125deg) saturate(0.9); }
+:root[data-theme="dark"] .home-art { filter: sepia(0.45) hue-rotate(125deg) saturate(0.9); mix-blend-mode: normal; }
 .home-art canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.55; } /* the moving light stays subtle */
 @keyframes home-bg-in { from { opacity: 0; } }
 .brand { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 clamp(0.75rem, 3vh, 1.5rem); font: 650 1.05rem var(--display); letter-spacing: -0.03em; }
@@ -475,10 +490,10 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .views button.conflict[aria-current="page"] { background: color-mix(in srgb, var(--danger) 13%, transparent); box-shadow: inset 3px 0 0 var(--danger); }
 .views button.conflict .count { color: #fff; background: var(--danger); }
 
-.stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--canvas); }
 .toolbar {
   display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--line); background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
 /* View title over a one-line summary of where the repo stands ("4 changes on main · 2 to push"). */
 .toolbar-title { min-width: 0; display: grid; gap: 0.15rem; }
@@ -521,7 +536,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
   .toolbar > .icon-btn:hover .icon[data-icon="monitor"] { scale: 1.12; }
 }
 /* Bottom status bar: the command palette hint, quiet and out of the toolbar. */
-.statusbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); background: var(--bg); }
+.statusbar { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.15rem 0.5rem; border-top: 1px solid var(--line); }
 .versions { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.78rem var(--sans); color: var(--faint); }
 .versions b { font-size: 0.875rem; color: var(--muted); } /* matches the Commands button label */
 /* Undo ribbon: the last destructive step stays one click from undone. */
@@ -662,8 +677,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
    one strong thing in it (the file name, the commit subject). Row and hunk actions are ghost buttons, so the
    dark push buttons stay for the few real actions (Commit, Fetch/Pull/Push). */
 .side, .commit-info, .graph, .diff {
-  background: var(--panel); border-radius: 12px;
-  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.04);
+  background: var(--panel); border-radius: 12px; box-shadow: var(--card);
 }
 /* Ghost: text + icon, no fill until hover. */
 button.ghost { color: var(--muted); background: transparent; box-shadow: none; font-weight: 500; }
@@ -1109,7 +1123,8 @@ button.sha .icon { width: 0.9rem; height: 0.9rem; opacity: 0.75; }
 .commit-actions button.ghost:hover:not(:disabled) { background: var(--panel); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
 .commit-actions button[aria-expanded="true"] { color: var(--accent-fg); background: var(--panel); }
 .commit-actions .ai .icon { color: var(--accent-fg); }
-@container info (max-width: 22rem) { .commit-actions button.small { flex: 1 1 auto; } }
+/* Narrow: equal columns, so a button that wraps alone keeps its cell instead of stretching across the row. */
+@container info (max-width: 22rem) { .commit-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); } }
 .commit-info .explain { margin: 0 0 0.85rem; padding: 0.7rem 0.85rem; border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
 .commit-info .explain summary { list-style: none; cursor: pointer; border-radius: 6px; }
 .commit-info .explain summary::-webkit-details-marker { display: none; }

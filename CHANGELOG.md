@@ -4,10 +4,17 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Fixed
+
+- The scrollbars in the diff and commit graph no longer run into the panel's rounded corners.
+- In a narrow commit details panel, the last action button (such as Explain) no longer stretches across a row by itself.
+
 ### Changed
 
 - Sidebar section headings, branch, remote and tag names, and the status bar's version and identity line now use the same typeface as the rest of the interface.
 - The current branch in the sidebar now stands out as a card with an accent wash, with its ahead/behind counts shown as small badges.
+- The light theme has more depth and warmth: a stone backdrop with a soft accent glow, a lightly tinted sidebar, and panels that sit on it as raised cards instead of one flat white sheet. The home screen artwork now sits on the same warm, glowing backdrop instead of a white wash.
+
 ## [0.3.0] - 2026-10-15
 
 ### Added
