@@ -23,7 +23,7 @@ export const Brand = () => <span className="brand-name">git-ai</span>;
 
 // In-app replacement for the native confirm box, so confirms look like every other modal.
 /** One option of `choose`: `hint` is a plain line under the label; `suggested` tags the likely right pick. */
-export type Choice = { label: string; hint?: string; tone?: Tone; suggested?: boolean };
+export type Choice = { label: string; hint?: string; tone?: Tone; suggested?: boolean; icon?: IconName };
 /** A text field of `prompt`. */
 export type Field = { label: string; value?: string; placeholder?: string };
 type Ask = { title: string; message: React.ReactNode; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; check?: React.ReactNode; resolve: (i: number, values: string[], checked?: boolean) => void };
@@ -93,8 +93,12 @@ export function ConfirmDialog() {
           {!one && (
             <div className="choices">
               {a.choices.map((c, i) => (
-                <button key={c.label} type="button" className={`choice tone-${c.tone ?? "accent"}`} onClick={() => answer(i)}>
-                  <strong>{c.label}{c.suggested && <span className="choice-tag">Suggested</span>}</strong>{c.hint && <span className="muted">{c.hint}</span>}
+                <button key={c.label} type="button" className={`choice tone-${c.tone ?? "accent"}${c.suggested ? " suggested" : ""}`} onClick={() => answer(i)}>
+                  {c.icon && <span className="choice-icon"><Icon name={c.icon} /></span>}
+                  <span className="choice-body">
+                    <strong>{c.label}{c.suggested && <span className="choice-tag">Suggested</span>}</strong>{c.hint && <span className="muted">{c.hint}</span>}
+                  </span>
+                  <span className="choice-go"><Icon name="chevron" /></span>
                 </button>
               ))}
             </div>

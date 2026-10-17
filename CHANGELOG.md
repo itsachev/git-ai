@@ -14,11 +14,13 @@ What's new in each git-ai release. Newest first.
 ### Fixed
 
 - Compare with "Only what … added" on no longer claims both sides are the same when the other branch simply has nothing new (for example origin/main when you have unpushed commits); it says so and points to how to see your own changes.
+- Push no longer greys out after you move a branch back to an older commit (for example a reset or a rebase onto an older commit). It asks whether to force push, so the remote moves back too, or to pull instead when someone else pushed.
 - The scrollbars in the diff and commit graph no longer run into the panel's rounded corners.
 - In a narrow commit details panel, the last action button (such as Explain) no longer stretches across a row by itself.
 
 ### Changed
 
+- Dialogs that ask you to pick a way forward now list the options as cards with an icon and an arrow, and the suggested one stands out. When your branch is behind its remote, the Push dialog draws the gap: your branch, the commits only the remote has, then the remote branch.
 - Sidebar section headings, branch, remote and tag names, and the status bar's version and identity line now use the same typeface as the rest of the interface.
 - The current branch in the sidebar now stands out as a card with an accent wash, with its ahead/behind counts shown as small badges.
 - The light theme has more depth and warmth: a stone backdrop with a soft accent glow, a lightly tinted sidebar, and panels that sit on it as raised cards instead of one flat white sheet. The home screen artwork now sits on the same warm, glowing backdrop instead of a white wash.

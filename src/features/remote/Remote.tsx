@@ -45,6 +45,23 @@ export function useSync(path: string, run: Run) {
   const target = `${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`;
   const pullMerge = op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} into ${refs?.head ?? "your branch"}…`, `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0);
   const pullRebase = op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} with rebase…`, `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true), cur?.behind ?? 0);
+  // Pull-then-push or force push, when a plain push can't land. `mine` (rebased/amended) picks the suggestion; undefined suggests neither.
+  const pushChoice = async (title: string, message: React.ReactNode, mine?: boolean) => {
+    const pullThenPush: Choice = { label: "Pull, then push", icon: "pull", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: mine === false };
+    const force: Choice = { label: "Force push", icon: "push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase, amend or moving the branch back. Undo history can put them back.", suggested: mine };
+    const choices = mine ? [force, pullThenPush] : [pullThenPush, force];
+    const i = await choose(title, message, choices, "push", "warn");
+    if (i < 0) return;
+    if (choices[i] === force) {
+      if (!(await confirm(`Force push ${target}?`, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
+      await push(path, true);
+      pushed = `Force pushed ${target}`;
+    } else {
+      await pull(path);
+      await push(path);
+      pushed = `Pulled and pushed ${target}`;
+    }
+  };
   const pushOp = op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
         pushed = undefined;
         try {
@@ -54,21 +71,7 @@ export function useSync(path: string, run: Run) {
           const code = (e as AppError).code;
           if (code !== "rejected" && code !== "rewritten") throw e;
           // "rewritten": the branch was rebased or amended after its last push, so force push is the likely fix.
-          const mine = code === "rewritten";
-          const pullThenPush: Choice = { label: "Pull, then push", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: !mine };
-          const force: Choice = { label: "Force push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase or amend. Undo history can put them back.", suggested: mine };
-          const choices = mine ? [force, pullThenPush] : [pullThenPush, force];
-          const i = await choose("Push rejected", errorText(e), choices);
-          if (i < 0) return;
-          if (choices[i] === force) {
-            if (!(await confirm(`Force push ${target}?`, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
-            await push(path, true);
-            pushed = `Force pushed ${target}`;
-          } else {
-            await pull(path);
-            await push(path);
-            pushed = `Pulled and pushed ${target}`;
-          }
+          await pushChoice("Push rejected", errorText(e), code === "rewritten");
         }
       }, cur?.ahead ?? 0,
         // No upstream: ahead is unknown (0), but the branch exists only here.
@@ -78,9 +81,24 @@ export function useSync(path: string, run: Run) {
   // `default_remote`) already points at this tip, e.g. a branch just made from main.
   // ponytail: same-tip check only; a branch behind a remote branch still offers Push. merge-base if that matters.
   const pushTo = remoteList?.find((r) => r.name === "origin")?.name ?? remoteList?.[0]?.name;
+  // Behind only: the branch was moved back (reset, rebase onto an older commit) or someone else pushed. A plain
+  // push can't do either, so Push goes straight to the pull / force push choice.
+  const behindOnly = !!cur?.upstream && !cur.ahead && !!cur.behind;
+  const rewindOp = op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
+    pushed = undefined;
+    const n = cur?.behind ?? 0;
+    await pushChoice(`${cur?.upstream} is ahead of ${refs?.head}`, <>
+      <span className="diverge" role="img" aria-label={`${cur?.upstream} has ${n} commit${n === 1 ? "" : "s"} that ${refs?.head} doesn't`}>
+        <code>{refs?.head}</code>
+        <span className="diverge-track"><i />{Array.from({ length: Math.min(n, 4) }, (_, k) => <i key={k} />)}{n > 4 && <b>+{n - 4}</b>}</span>
+        <code>{cur?.upstream}</code>
+      </span>
+      {`${cur?.upstream} has ${n} commit${n === 1 ? "" : "s"} that ${refs?.head} doesn't. Moved ${refs?.head} back on purpose? Force push makes the remote match. Someone else pushed? Pull instead.`}
+    </>);
+  }, 0, "↺", `${cur?.upstream} has commits ${refs?.head} doesn't: pull, or force push to move the remote back`);
   const pushOff = !refs?.local.length ? "Make a first commit to push"
     : !cur ? "Check out a branch to push it"
-    : cur.upstream ? (cur.ahead ? "" : "Nothing to push: no new commits")
+    : cur.upstream ? (cur.ahead || behindOnly ? "" : "Nothing to push: no new commits")
     : refs.remote.some((r) => r.oid === cur.oid && r.name.startsWith(`${pushTo}/`)) ? "Nothing to push: no new commits"
     : "";
   const pullOff = !cur ? "Check out a branch to pull into it"
@@ -101,7 +119,8 @@ export function useSync(path: string, run: Run) {
     ops: [
       op("Fetch", "Fetching…", "Fetching from all remotes…", "Fetched all remotes", () => fetchAll(path)),
       { ...(rebase ? pullRebase : pullMerge), off: pullOff },
-      { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushOp.go() },
+      behindOnly ? rewindOp
+        : { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushOp.go() },
     ],
   };
 }
