@@ -15,7 +15,7 @@ import { Lines, widest } from "../../lib/Lines";
 import { ModalHead, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
-import { RefMenu, showMenu } from "../refs/Sidebar";
+import { RefMenu, menuKeys, showMenu } from "../refs/Sidebar";
 import { openFileHistory } from "../graph/FileHistory";
 import { openStashSave } from "../refs/Stash";
 
@@ -543,7 +543,7 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
               el.style.top = `${Math.min(r.bottom + 4, innerHeight - el.offsetHeight - 4)}px`;
               el.querySelector<HTMLElement>("[aria-checked=true]")?.focus();
             }}><Icon name="chevron" /></button>
-            <div ref={menu} popover="auto" className="row-menu editor-menu" role="menu" aria-label="Open in">
+            <div ref={menu} popover="auto" className="row-menu editor-menu" role="menu" aria-label="Open in" onKeyDown={menuKeys}>
               {["", ...(eds.data?.found ?? [])].map((n) => (
                 <button key={n} role="menuitemradio" aria-checked={n === chosen}
                   onClick={() => { menu.current!.hidePopover(); setEditor(n); open(n); }}>

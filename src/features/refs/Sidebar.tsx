@@ -188,11 +188,28 @@ export function showMenu(el: HTMLElement | null, e: React.MouseEvent<HTMLElement
 
 // ponytail: in-page popover; the native Tauri menu showed but its item clicks never arrived (Windows).
 export function RefMenu({ pop, label, actions }: { pop: React.RefObject<HTMLDivElement | null>; label: string; actions: Action[] }) {
+  // Destructive actions sink to the bottom as their own red group.
+  const risky = (a: string) => DESTRUCTIVE.test(a);
+  const sorted = [...actions.filter(([a]) => !risky(a)), ...actions.filter(([a]) => risky(a))];
   return (
-    <div ref={pop} popover="auto" className="row-menu" role="menu" aria-label={label}>
-      {actions.map(([a, fn, off]) => <button key={a} role="menuitem" disabled={!!off} onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}{off && <small>{off}</small>}</button>)}
+    <div ref={pop} popover="auto" className="row-menu" role="menu" aria-label={label} onKeyDown={menuKeys}>
+      {sorted.map(([a, fn, off], i) => (
+        <button key={a} role="menuitem" className={risky(a) ? "risky" : undefined} style={{ "--i": i } as React.CSSProperties} disabled={!!off}
+          onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}{off && <small>{off}</small>}</button>
+      ))}
     </div>
   );
+}
+const DESTRUCTIVE = /^(Reset|Delete|Discard|Drop|Force|Remove)\b/;
+
+/** Arrow/Home/End move focus between a menu's enabled items, wrapping at the ends. */
+export function menuKeys(e: React.KeyboardEvent<HTMLElement>) {
+  const items = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+  const at = items.indexOf(document.activeElement as HTMLButtonElement);
+  const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key];
+  if (to === undefined || !items.length) return;
+  e.preventDefault();
+  items[(to + items.length) % items.length].focus();
 }
 
 /** Branches, remotes, tags and stashes (Sourcetree's left sidebar). Double-click a branch to check it out. */

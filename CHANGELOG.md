@@ -9,7 +9,7 @@ What's new in each git-ai release. Newest first.
 - Compare labels both sides of the diff: in Split view each column is headed with what it shows (for example your commit on the left, origin/main on the right), and the single-column view shows which side the − and + lines come from.
 - Compare puts the older side on the left: when the second pick is behind the first (for example origin/main next to your unpushed commits), the two are swapped, so + really means added and − removed. ⇄ still swaps them back.
 - Compare lives in right-click menus: Compare with another branch (or "Compare with a branch" on tags and commits) in the sidebar or in History (now including the current branch, which starts against its remote branch: what you haven't pushed or pulled). The Compare… button under commit details is gone.
-- Right-click menus show a thin line between every option, and options are written out in full instead of ending in "…".
+- Right-click menus are redesigned: an option's text lights up in an accent gradient as you point at it, and destructive ones (Reset, Delete, Discard, Drop, Force push) sit together at the bottom in red. A thin line separates every option. Options are written out in full instead of ending in "…", and the arrow keys, Home and End move between them.
 
 ### Fixed
 
