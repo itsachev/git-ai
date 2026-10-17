@@ -4,6 +4,10 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Changed
+
+- Sidebar section headings, branch, remote and tag names, and the status bar's version and identity line now use the same typeface as the rest of the interface.
+- The current branch in the sidebar now stands out as a card with an accent wash, with its ahead/behind counts shown as small badges.
 ## [0.3.0] - 2026-10-15
 
 ### Added
