@@ -153,6 +153,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
   const qc = useQueryClient();
   const menuPop = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<Action[]>([]);
+  const [menuLabel, setMenuLabel] = useState("");
   const [tip, setTip] = useState<{ i: number; col: number; names: string[] } | null>(null);
 
   /** Reset the current branch to commit `r` (row menu and its ref labels' menus). */
@@ -186,7 +187,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
       [`Merge ${at} into ${branch}`, async () => (await confirmMerge(at, branch)) && run(() => merge(path, r.oid, false), `Merged ${at} into ${branch}`), done],
       [`Rebase ${branch} onto ${at}`, async () => (await confirmRebase(branch, at)) && run(() => rebaseOnto(path, r.oid), `Rebased ${branch} onto ${at}`), done],
     ] as Action[] : [])];
-    flushSync(() => setMenu([...(ref ? refActions(ref) : own), resetAction(r)]));
+    flushSync(() => { setMenu([...(ref ? refActions(ref) : own), resetAction(r)]); setMenuLabel(ref ?? at); });
     showMenu(menuPop.current, e);
   }
 
@@ -346,7 +347,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
           )}
         </div>
       </div>
-      <RefMenu pop={menuPop} label="Commit actions" actions={menu} />
+      <RefMenu pop={menuPop} label={menuLabel} actions={menu} />
     </section>
   );
 }

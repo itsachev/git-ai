@@ -26,7 +26,6 @@
   --accent-fg: #0b5e57;   /* accent as text / outline */
   /* Active things (current branch, view, HEAD): tinted fill + 3px bar + bold accent text. */
   --active: color-mix(in srgb, var(--accent) 12%, transparent);
-  --active-bar: inset 3px 0 0 var(--accent);
   --pick: rgb(60 45 25 / 0.06); /* hover */
   --danger: #c2321f;      /* brick */
   --add: #3b7d28;         /* leaf */
@@ -322,6 +321,13 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent button > span { display: grid; min-width: 0; transition: translate 280ms var(--ease); }
 .recent li > button:first-child:hover > span { translate: 3px 0; }
 .recent strong { font-weight: 600; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; }
+/* Current branch beside the name, with ↑ to push / ↓ to pull pills like the tab bar's. */
+.recent strong { display: flex; align-items: center; gap: 0.6em; }
+.recent-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-head { flex: none; display: inline-flex; align-items: center; gap: 0.3em; font: 500 0.78rem/1 var(--mono); color: var(--muted); }
+.recent button .recent-head .icon { width: 0.95em; height: 0.95em; color: inherit; }
+.recent-head b { padding: 0.15em 0.4em; border-radius: 99px; font-weight: 700; color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.recent-head .behind { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
 .recent small { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
 .recent li { position: relative; display: flex; align-items: center; gap: 2px; }
 .recent li > button:first-child { flex: 1; min-width: 0; }
@@ -330,7 +336,6 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent .missing button .icon, .recent .missing button:hover .icon { color: var(--danger); }
 .recent .missing em { font-style: normal; font-family: var(--sans); font-weight: 700; color: var(--danger); }
 /* Already open in a tab: a click switches to it. */
-.recent .opened em { font-style: normal; font-family: var(--sans); font-weight: 700; color: var(--accent-fg); }
 /* Remove… button: shown on row hover/focus where there is a mouse, always on touch. */
 .recent .icon-btn { flex: none; width: var(--ctl); min-height: var(--ctl); justify-content: center; padding: 0; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms, scale 200ms var(--spring); }
 .recent li:hover .icon-btn, .recent .icon-btn:focus-visible { opacity: 1; }
@@ -487,7 +492,7 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .views button[aria-current="page"] .icon { color: var(--accent); }
 /* Unresolved conflicts: File Status turns red, active or not. */
 .views button.conflict, .views button.conflict .icon { color: var(--danger); }
-.views button.conflict[aria-current="page"] { background: color-mix(in srgb, var(--danger) 13%, transparent); box-shadow: inset 3px 0 0 var(--danger); }
+.views button.conflict[aria-current="page"] { background: color-mix(in srgb, var(--danger) 13%, transparent); }
 .views button.conflict .count { color: #fff; background: var(--danger); }
 
 .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--canvas); }
@@ -651,27 +656,58 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .refs .more { position: absolute; right: 0.2rem; width: 1.7rem; min-height: 1.7rem; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms, scale 200ms var(--spring); }
 .refs li:hover .more, .refs li:focus-within .more { opacity: 1; }
 @media (hover: none) { .refs .more { opacity: 1; } }
+/* Context menu: a glass sheet, items as quiet rows whose label lights in an accent gradient, destructive actions sunk into a red group at the bottom. Radii are concentric:
+   12px sheet - 4px padding = 8px items. Opens with a short drop plus a staggered unfurl of its items. */
 .row-menu {
-  position: fixed; inset: auto; margin: 0; padding: 0.3rem; min-width: 10rem; color: var(--fg);
-  background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
-  transform-origin: top left; opacity: 0; scale: 0.94;
-  transition: opacity 160ms var(--ease), scale 220ms var(--spring), display 160ms allow-discrete, overlay 160ms allow-discrete;
+  position: fixed; inset: auto; margin: 0; padding: 4px; min-width: 13rem; max-width: min(20rem, calc(100vw - 8px)); color: var(--fg);
+  /* An accent glow pooled in the top-left corner (where the pointer opened it), fading over the glass. */
+  background:
+    radial-gradient(110% 70% at 0% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 65%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 40%),
+    var(--glass);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8); backdrop-filter: blur(28px) saturate(1.8);
+  border: 0; border-radius: 12px;
+  box-shadow: var(--shadow), 0 0 0 0.5px var(--line-strong), inset 0 0.5px 0 rgb(255 255 255 / 0.5);
+  transform-origin: top left; opacity: 0; scale: 0.96; translate: 0 -4px;
+  transition: opacity 140ms var(--ease), scale 240ms var(--spring), translate 240ms var(--ease), display 140ms allow-discrete, overlay 140ms allow-discrete;
 }
-.row-menu:popover-open { display: grid; gap: 1px; opacity: 1; scale: 1; }
-/* A hairline between every two items (none after the last), inset to the label; hidden next to the hovered item. */
+:root[data-theme="dark"] .row-menu { box-shadow: var(--shadow), 0 0 0 0.5px var(--line-strong), inset 0 0.5px 0 rgb(255 245 230 / 0.08); }
+.row-menu:popover-open { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; opacity: 1; scale: 1; translate: 0; }
+@starting-style { .row-menu:popover-open { opacity: 0; scale: 0.96; translate: 0 -4px; } }
+.row-menu button {
+  justify-content: flex-start; min-height: calc(var(--ctl) - 0.15rem); padding: 0 0.7rem; border-radius: 8px;
+  color: inherit; background: none; box-shadow: none; font-size: 0.875rem; font-weight: 500; letter-spacing: -0.006em;
+}
+.row-menu button:active:not(:disabled) { scale: 1; filter: none; }
+/* Hover: no fill, the label itself lights up in an accent gradient. */
+.row-menu button:hover:not(:disabled), .row-menu button:focus-visible {
+  outline: none; box-shadow: none; color: transparent; -webkit-background-clip: text; background-clip: text;
+  background-image: linear-gradient(90deg, var(--accent-fg), color-mix(in oklch, var(--accent-fg) 55%, var(--fg-hi)));
+}
+/* A hairline between every two items, inset to the label. */
 .row-menu button { position: relative; }
 .row-menu button + button::before {
   content: ""; position: absolute; top: -1px; left: 0.7rem; right: 0.7rem; height: 1px; pointer-events: none;
-  background: var(--line-strong); transition: opacity 140ms;
+  background: color-mix(in srgb, var(--line) 55%, transparent);
 }
-.row-menu button:is(:hover, :focus-visible)::before, .row-menu button:is(:hover, :focus-visible) + button::before { opacity: 0; }
-@starting-style { .row-menu:popover-open { opacity: 0; scale: 0.94; } }
-.row-menu button { justify-content: flex-start; color: inherit; background: none; box-shadow: none; padding: 0 0.7rem; border-radius: 6px; font-weight: 500; }
+/* Destructive group: brick text, a gap and a red-led line above the first, a red text gradient on hover. */
+.row-menu button.risky { color: var(--danger); }
+.row-menu button:not(.risky) + button.risky { margin-top: 4px; }
+.row-menu button:not(.risky) + button.risky::before {
+  top: -3px; background: linear-gradient(90deg, color-mix(in srgb, var(--danger) 30%, transparent), color-mix(in srgb, var(--line) 55%, transparent) 45%);
+}
+.row-menu button.risky:disabled { color: var(--faint); }
+.row-menu button.risky:is(:hover:not(:disabled), :focus-visible) {
+  background-image: linear-gradient(90deg, var(--danger), color-mix(in oklch, var(--danger) 55%, var(--fg-hi)));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .row-menu:popover-open > button { animation: menu-item 220ms var(--ease) backwards; animation-delay: calc(min(var(--i, 0), 8) * 14ms + 30ms); }
+}
+@keyframes menu-item { from { opacity: 0; translate: 0 -3px; } }
+@media (prefers-reduced-motion: reduce) { .row-menu { scale: 1; translate: 0; } @starting-style { .row-menu:popover-open { scale: 1; translate: 0; } } }
 /* Disabled item with a reason: the reason sits under the label, so it reads without hover (and on touch). */
 .row-menu button:has(small) { flex-direction: column; align-items: flex-start; gap: 0.05rem; padding-block: 0.4rem; opacity: 1; color: var(--faint); }
 .row-menu button small { max-width: 15rem; white-space: normal; text-align: left; font-size: 0.76rem; line-height: 1.35; color: var(--muted); }
-.row-menu button:hover:not(:disabled), .row-menu button:focus-visible { background: var(--accent); color: var(--accent-ink); outline: none; }
 /* Undo history: label over its time, Undo always visible. */
 .ops .name { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0.3rem 0.25rem 0.3rem 1.6rem; font-family: inherit; }
 .ops .name small { color: var(--muted); font-size: 0.74rem; }
@@ -706,7 +742,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 }
 .files li:is(:hover, .sel)::before, .files li:is(:hover, .sel) + li::before { opacity: 0; }
 /* Selected file: tint + bar (the "active" pattern), so the kind and file-type colours stay readable. */
-.files li.sel { background: var(--active); box-shadow: var(--active-bar); }
+.files li.sel { background: var(--active); }
 .files .row {
   flex: 1; min-width: 0; justify-content: flex-start; gap: 0.6rem;
   color: inherit; background: none; box-shadow: none; text-align: left; padding: 0 0.45rem; min-height: var(--ctl);
@@ -1051,7 +1087,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .grow::after { content: ""; position: absolute; inset: auto 0 0; height: 1px; background: color-mix(in srgb, var(--line) 60%, transparent); pointer-events: none; }
 .grow { transition: background-color 120ms; }
 .grow:hover { background: var(--raised); }
-.grow.head:not(.sel) { background: var(--active); box-shadow: var(--active-bar); }
+.grow.head:not(.sel) { background: var(--active); }
 .grow.hit:not(.sel) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .grow.hit:not(.sel) .sum { font-weight: 650; }
 .grow.sel { background: var(--accent); color: var(--accent-ink); }
@@ -1803,7 +1839,7 @@ dialog.file-history { width: clamp(min(72rem, 100vw - 2rem), 80vw, 120rem); heig
 .fh-list .row { transition: background-color 160ms; }
 .fh-list .row:hover { background: var(--raised); }
 .fh-list .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.fh-list .row[aria-pressed="true"] { background: var(--active); box-shadow: var(--active-bar); }
+.fh-list .row[aria-pressed="true"] { background: var(--active); }
 .fh-list .row[aria-pressed="true"] strong { color: var(--accent-fg); }
 .fh-list strong, .fh-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fh-list small { color: var(--faint); font-size: 0.8rem; }

@@ -94,6 +94,12 @@ pub fn missing_repos(app: AppHandle) -> Vec<String> {
     recent_repos(app).into_iter().filter(|p| !Path::new(p).exists()).collect()
 }
 
+/// Current branch and ahead/behind of each recent repo, by path. Repos on a detached HEAD or gone are left out.
+#[tauri::command(async)]
+pub fn recent_heads(app: AppHandle) -> std::collections::HashMap<String, read::RefItem> {
+    recent_repos(app).into_iter().filter_map(|p| Some((p.clone(), read::head_item(Path::new(&p))?))).collect()
+}
+
 /// Drops `path` from the recent list; the folder stays on disk.
 #[tauri::command(async)]
 pub fn forget_repo(app: AppHandle, path: String) -> Result<(), AppError> {

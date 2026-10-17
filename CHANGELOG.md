@@ -4,30 +4,25 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
-### Added
-
-- Compare labels both sides of the diff: in Split view each column is headed with what it shows (for example your commit on the left, origin/main on the right), and the single-column view shows which side the − and + lines come from.
-- Compare puts the older side on the left: when the second pick is behind the first (for example origin/main next to your unpushed commits), the two are swapped, so + really means added and − removed. ⇄ still swaps them back.
-- Compare lives in right-click menus: Compare with another branch (or "Compare with a branch" on tags and commits) in the sidebar or in History (now including the current branch, which starts against its remote branch: what you haven't pushed or pulled). The Compare… button under commit details is gone.
-- Right-click menus show a thin line between every option, and options are written out in full instead of ending in "…".
-
 ### Fixed
 
-- Compare with "Only what … added" on no longer claims both sides are the same when the other branch simply has nothing new (for example origin/main when you have unpushed commits); it says so and points to how to see your own changes.
 - Push no longer greys out after you move a branch back to an older commit (for example a reset or a rebase onto an older commit). It asks whether to force push, so the remote moves back too, or to pull instead when someone else pushed.
-- The scrollbars in the diff and commit graph no longer run into the panel's rounded corners.
-- In a narrow commit details panel, the last action button (such as Explain) no longer stretches across a row by itself.
 
 ### Changed
 
 - Dialogs that ask you to pick a way forward now list the options as cards with an icon and an arrow, and the suggested one stands out. When your branch is behind its remote, the Push dialog draws the gap: your branch, the commits only the remote has, then the remote branch.
-- Sidebar section headings, branch, remote and tag names, and the status bar's version and identity line now use the same typeface as the rest of the interface.
-- The current branch in the sidebar now stands out as a card with an accent wash, with its ahead/behind counts shown as small badges.
-- The light theme has more depth and warmth: a stone backdrop with a soft accent glow, a lightly tinted sidebar, and panels that sit on it as raised cards instead of one flat white sheet. The home screen artwork now sits on the same warm, glowing backdrop instead of a white wash.
 
-## [0.3.0] - 2026-10-15
+## [0.1.0] - 2026-10-17
+
+First release. Windows only for now: macOS and Linux installers will follow once the macOS app is code-signed and the Linux build is tested.
 
 ### Added
+
+- The home screen's recent list shows each repository's current branch, with how many commits are waiting to push (↑) and to pull (↓).
+- Compare labels both sides of the diff: in Split view each column is headed with what it shows (for example your commit on the left, origin/main on the right), and the single-column view shows which side the − and + lines come from.
+- Compare puts the older side on the left: when the second pick is behind the first (for example origin/main next to your unpushed commits), the two are swapped, so + really means added and − removed. ⇄ still swaps them back.
+- Compare lives in right-click menus: Compare with another branch (or "Compare with a branch" on tags and commits) in the sidebar or in History (now including the current branch, which starts against its remote branch: what you haven't pushed or pulled). The Compare… button under commit details is gone.
+- Right-click menus are redesigned: an option's text lights up in an accent gradient as you point at it, and destructive ones (Reset, Delete, Discard, Drop, Force push) sit together at the bottom in red. A thin line separates every option. Options are written out in full instead of ending in "…", and the arrow keys, Home and End move between them.
 - **Feature tour after first-run setup:** the last setup step invites you to see everything git-ai can do. Show me the superpowers opens the feature list; Skip the tour goes straight to the app.
 - **Delete the remote branch too:** when you delete a local branch that also exists on the remote, the confirm box has an "Also delete … on the remote" checkbox, so both go in one step. Deleting a remote branch works the same way: an "Also delete local branch …" checkbox removes your local copy with it (not offered for the branch you're on).
 - Branch names in delete confirmations are bold and colored: local in teal, remote in blue.
@@ -44,60 +39,10 @@ What's new in each git-ai release. Newest first.
 - **Ignore whitespace:** a button on any diff hides changes that only add or remove spaces and tabs, so re-indented code shows only its real changes. Turn it off to stage single lines. Both choices are remembered.
 - **Recover lost commits:** a list of every place your branch pointer has been (commits, checkouts, resets, rebases), also ones done in a terminal. Commits no branch has anymore are marked Lost; pick one to see its changes, then "Branch from here" brings it back. Open it from the clock button on Undo history in the sidebar, or "Recover lost commits…" in the command palette.
 - **Submodules:** repositories with submodules list them in the sidebar, marked when one isn't cloned yet or needs an update. Update one or all of them, or open one in its own tab. Cloning now brings submodules along.
-
-### Changed
-- Dialogs fit their content. Confirmations, errors and password prompts are small, focused boxes instead of stretching across most of the window. Settings, About, file history and other big views keep their large size.
-- **Feature search in About:** the "Find a feature" box now sits in the dialog's header, so it is visible right away and stays in reach while you scroll.
-- **New app icon:** a dark tile with a teal branch-and-merge glyph replaces the default Tauri logo in the taskbar, Start menu, Dock and installer.
-- **Redesigned commit box:** the message and its tools (Generate, Amend, Push) now sit in one field. Amend and Push are toggle chips. A full-width Commit button names exactly what will happen and shows the keyboard shortcut.
-- **Easier-to-read status bar:** the Git and Node versions, your commit identity and the Commands button use larger, darker text. "Commands" is now bold.
-- **Big diffs open instantly:** diffs, file history and blame of long files (thousands of lines, such as lock files) show at once and scroll smoothly. Before, a 25,000-line diff froze the window for over a second.
-
-### Fixed
-- Buttons with a keyboard shortcut now show it on hover: Fetch, Pull, Push, File Status, History, the branches menu, Stage all, Commit, commit search and Keyboard shortcuts in Settings.
-
-## [0.2.0] - 2026-10-14
-
-### Added
 - **Find any file's history from Ctrl+K:** type part of a file name in the command palette and pick the file to open its history and blame. You no longer need to find a commit that changed it first.
 - **Choose what History search looks at:** a menu next to the search box picks All, Message, Author, Commit id, or File or folder. With File or folder, type part of a path (for example `App.tsx` or `src/lib`) to highlight every commit that changed it.
 - **See who you commit as:** the status bar at the bottom of a repository shows the name and email your commits in that repository will carry.
 - **Open tabs come back:** repositories you had open in tabs reopen the next time you start git-ai, on the tab you were last using.
-
-### Changed
-- **Calmer dark theme:** text no longer glares white everywhere. Titles, commit subjects and the current branch stay bright; body text is a soft parchment, and dates, authors, hashes and labels step back. Easier to scan, easier on the eyes.
-- **Coloured toolbar icons:** Fetch and Pull, Push, Stash and Branch each have their own icon colour, so you can find them at a glance.
-- **Colourful feature names in About:** each feature name in the About dialog now shows in its area's colour, with a small marker in front, so the list is no longer a wall of white.
-- **Tidier Clone and Create buttons:** on the home screen their titles now sit next to their icons.
-- **Commit title in colour:** the selected commit's title in the details pane fades from your accent colour into white.
-- **Push works before you have a remote:** in a repository with no remote yet, Push asks for the repository URL, adds it as origin, and pushes your branch there. Push stays greyed out when there's nothing new to send, including a fresh branch that still matches a branch on the remote you push to. Pull is greyed out, with the reason, when your branch doesn't track a remote branch yet.
-- **Revert any commit:** Revert in commit details now works on commits from other branches too, not only the current one.
-- **Themed hover hints:** the hints that appear when you hover a button now match the app's light or dark theme, instead of the plain system box. Greyed-out buttons say why when you hover them: nothing to stash, no search matches, a field still empty, already explained, and so on.
-- **Greyed-out menu items say why:** in a branch's menu, an option you can't use right now shows the reason underneath it, instead of in a plain pop-up you had to hover for.
-- **Better-looking dropdowns:** on Windows, every dropdown opens as a soft, translucent menu that matches the rest of the app, with group headings for branches, remote branches and tags, a highlight on the option you're pointing at and a check next to the current choice. They still work fully from the keyboard.
-- **Syntax colours for many more languages:** diffs now colour nearly every programming language, about 190 in all (Elixir, Haskell, Scala, Dart, PowerShell, Clojure and more), plus Vue, Svelte and Astro components. Rarer languages load the first time you open such a file.
-- **Ask before risky actions:** resetting a branch (after you pick Soft, Mixed, Keep or Hard), recreating a branch from its remote, merging or rebasing from a menu or by dragging a branch, force pushing, and undoing now each ask you to confirm first.
-- **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.
-- **Current branch stays in view:** in the sidebar's branch list, your current branch stays stuck at the top while you scroll through the others.
-- **Blame opens at the commit you picked:** in a file's history, switching to Blame scrolls to the first lines that the selected commit last changed. Clicking a commit in Blame scrolls the History list to it.
-- **Undo history keeps 30 days:** operations older than 30 days leave the undo list, and the backup copies kept for them are released so Git can free the disk space.
-- **Roomier Settings, About and File history on big screens:** they open at 80% of the window, and Settings lays its sections out two by two with paired fields side by side. Small windows keep the stacked layout.
-
-### Fixed
-- The author picture on the selected commit no longer has its outline cut off on one side.
-- Scrollbars in dialogs no longer stick out past their rounded corners.
-- **Settings side list stays put:** scrolling the Settings window no longer nudges the section list on the left before it settles.
-- Names of repository tabs you are not on now sit centred in the tab bar instead of slightly low.
-- **Every graph dot names its branch:** hovering a commit that came in through a merge (including `git pull` merges) now shows the branch it was merged into, and dots far down the history show their branch too.
-- Big headings on the home screen and the Keyboard shortcuts page are smaller and no longer clip the edges of letters such as "y" and "e".
-- Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
-- A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.
-
-## [0.1.1] - 2026-10-13
-
-First release. Windows only for now: macOS and Linux installers will follow once the macOS app is code-signed and the Linux build is tested.
-
-### Added
 - **File Status:** stage and unstage files, hunks or single lines, and discard changes (with a backup). Commit and amend. Select several files at once with Ctrl+click, Shift+click, Ctrl+A or by dragging. A greyed-out Commit button tells you why on hover.
 - **History:** a commit graph that stays fast on repositories with 100,000+ commits. Search commits (Ctrl+F), show all branches or just the current one, show only a branch's own commits, and hover a graph dot to see its branch.
 - **Several repositories at once, in tabs** (Ctrl+T, Ctrl+Tab, Ctrl+W).
@@ -117,7 +62,49 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - **Auto-update**, first-run setup, an About guide to every feature, SSH key choice, and Git and Node versions in the status bar.
 - **Portable Windows app:** `git-ai_<version>_x64-portable.exe` runs from any folder without installing.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/itsachev/git-ai/releases/tag/v0.1.1
+### Changed
+
+- Sidebar section headings, branch, remote and tag names, and the status bar's version and identity line now use the same typeface as the rest of the interface.
+- The current branch in the sidebar now stands out as a card with an accent wash, with its ahead/behind counts shown as small badges.
+- The light theme has more depth and warmth: a stone backdrop with a soft accent glow, a lightly tinted sidebar, and panels that sit on it as raised cards instead of one flat white sheet. The home screen artwork now sits on the same warm, glowing backdrop instead of a white wash.
+- Dialogs fit their content. Confirmations, errors and password prompts are small, focused boxes instead of stretching across most of the window. Settings, About, file history and other big views keep their large size.
+- **Feature search in About:** the "Find a feature" box now sits in the dialog's header, so it is visible right away and stays in reach while you scroll.
+- **New app icon:** a dark tile with a teal branch-and-merge glyph replaces the default Tauri logo in the taskbar, Start menu, Dock and installer.
+- **Redesigned commit box:** the message and its tools (Generate, Amend, Push) now sit in one field. Amend and Push are toggle chips. A full-width Commit button names exactly what will happen and shows the keyboard shortcut.
+- **Easier-to-read status bar:** the Git and Node versions, your commit identity and the Commands button use larger, darker text. "Commands" is now bold.
+- **Big diffs open instantly:** diffs, file history and blame of long files (thousands of lines, such as lock files) show at once and scroll smoothly. Before, a 25,000-line diff froze the window for over a second.
+- **Calmer dark theme:** text no longer glares white everywhere. Titles, commit subjects and the current branch stay bright; body text is a soft parchment, and dates, authors, hashes and labels step back. Easier to scan, easier on the eyes.
+- **Coloured toolbar icons:** Fetch and Pull, Push, Stash and Branch each have their own icon colour, so you can find them at a glance.
+- **Colourful feature names in About:** each feature name in the About dialog now shows in its area's colour, with a small marker in front, so the list is no longer a wall of white.
+- **Tidier Clone and Create buttons:** on the home screen their titles now sit next to their icons.
+- **Commit title in colour:** the selected commit's title in the details pane fades from your accent colour into white.
+- **Push works before you have a remote:** in a repository with no remote yet, Push asks for the repository URL, adds it as origin, and pushes your branch there. Push stays greyed out when there's nothing new to send, including a fresh branch that still matches a branch on the remote you push to. Pull is greyed out, with the reason, when your branch doesn't track a remote branch yet.
+- **Revert any commit:** Revert in commit details now works on commits from other branches too, not only the current one.
+- **Themed hover hints:** the hints that appear when you hover a button now match the app's light or dark theme, instead of the plain system box. Greyed-out buttons say why when you hover them: nothing to stash, no search matches, a field still empty, already explained, and so on.
+- **Greyed-out menu items say why:** in a branch's menu, an option you can't use right now shows the reason underneath it, instead of in a plain pop-up you had to hover for.
+- **Better-looking dropdowns:** on Windows, every dropdown opens as a soft, translucent menu that matches the rest of the app, with group headings for branches, remote branches and tags, a highlight on the option you're pointing at and a check next to the current choice. They still work fully from the keyboard.
+- **Syntax colours for many more languages:** diffs now colour nearly every programming language, about 190 in all (Elixir, Haskell, Scala, Dart, PowerShell, Clojure and more), plus Vue, Svelte and Astro components. Rarer languages load the first time you open such a file.
+- **Ask before risky actions:** resetting a branch (after you pick Soft, Mixed, Keep or Hard), recreating a branch from its remote, merging or rebasing from a menu or by dragging a branch, force pushing, and undoing now each ask you to confirm first.
+- **Merge commits read at a glance:** in commit details, the merged branch name shows in a color gradient and the branch it went into in the accent color.
+- **Current branch stays in view:** in the sidebar's branch list, your current branch stays stuck at the top while you scroll through the others.
+- **Blame opens at the commit you picked:** in a file's history, switching to Blame scrolls to the first lines that the selected commit last changed. Clicking a commit in Blame scrolls the History list to it.
+- **Undo history keeps 30 days:** operations older than 30 days leave the undo list, and the backup copies kept for them are released so Git can free the disk space.
+- **Roomier Settings, About and File history on big screens:** they open at 80% of the window, and Settings lays its sections out two by two with paired fields side by side. Small windows keep the stacked layout.
+
+### Fixed
+
+- Compare with "Only what … added" on no longer claims both sides are the same when the other branch simply has nothing new (for example origin/main when you have unpushed commits); it says so and points to how to see your own changes.
+- The scrollbars in the diff and commit graph no longer run into the panel's rounded corners.
+- In a narrow commit details panel, the last action button (such as Explain) no longer stretches across a row by itself.
+- Buttons with a keyboard shortcut now show it on hover: Fetch, Pull, Push, File Status, History, the branches menu, Stage all, Commit, commit search and Keyboard shortcuts in Settings.
+- The author picture on the selected commit no longer has its outline cut off on one side.
+- Scrollbars in dialogs no longer stick out past their rounded corners.
+- **Settings side list stays put:** scrolling the Settings window no longer nudges the section list on the left before it settles.
+- Names of repository tabs you are not on now sit centred in the tab bar instead of slightly low.
+- **Every graph dot names its branch:** hovering a commit that came in through a merge (including `git pull` merges) now shows the branch it was merged into, and dots far down the history show their branch too.
+- Big headings on the home screen and the Keyboard shortcuts page are smaller and no longer clip the edges of letters such as "y" and "e".
+- Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
+- A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.
+
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/itsachev/git-ai/releases/tag/v0.1.0
