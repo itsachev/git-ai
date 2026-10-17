@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
-import { forgetRepo, gitIdentity, initRepo, missingRepos, openRepo, openTerminal, recentRepos, stage, toolVersions, trashRepo, undo, unstage } from "./lib/ipc";
+import { forgetRepo, gitIdentity, initRepo, missingRepos, openRepo, openTerminal, recentHeads, recentRepos, stage, toolVersions, trashRepo, undo, unstage } from "./lib/ipc";
 import { Icon } from "./lib/icons";
 import { Splitter } from "./lib/splitter";
 import { Brand, ConfirmDialog, ModalHead } from "./lib/modal";
@@ -10,6 +10,7 @@ import { ThemeButton, themeCommands, useTheme, type Theme } from "./lib/theme";
 import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
 import type { OpEntry } from "./bindings/OpEntry";
+import type { RefItem } from "./bindings/RefItem";
 import { Changes, Notice, OpErrorDialog, confirmUndo, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useOpBusy, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
@@ -156,6 +157,7 @@ function App() {
   const qc = useQueryClient();
   const [recent, setRecent] = useState<string[]>([]);
   const [missing, setMissing] = useState<string[]>([]);
+  const [heads, setHeads] = useState<Record<string, RefItem>>({});
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
   const [filter, setFilter] = useState("");
@@ -191,6 +193,8 @@ function App() {
   }, { scope: home, dependencies: [!!repo, hasRecent], revertOnUpdate: true });
 
   async function refresh() {
+    // Branches come apart: ahead/behind across many repos can lag, the list shouldn't wait for it.
+    recentHeads().then(setHeads, () => {});
     const [r, m] = await Promise.all([recentRepos(), missingRepos()]);
     setRecent(r);
     setMissing(m);
@@ -352,14 +356,24 @@ function App() {
         {recent.length > 0 && !shown.length && <p className="empty">No repository matches “{filter}”.</p>}
         <ul className="recent">
           {shown.map((p) => {
-            const gone = missing.includes(p), opened = tabs.some((t) => t.path === p);
+            const gone = missing.includes(p), h = gone ? undefined : heads[p];
+            const sync = h && [h.ahead && `${h.ahead} to push`, h.behind && `${h.behind} to pull`].filter(Boolean).join(", ");
             return (
-            <li key={p} className={gone ? "missing" : opened ? "opened" : undefined} onContextMenu={(e) => { e.preventDefault(); setRemoving(p); }}>
+            <li key={p} className={gone ? "missing" : undefined} onContextMenu={(e) => { e.preventDefault(); setRemoving(p); }}>
               <button onClick={() => load(p)} title={gone ? `Deleted from disk: ${p}` : p}>
                 <Icon name={gone ? "warn" : "folder"} />
                 <span>
-                  <strong>{p.split(/[\\/]/).pop()}</strong>
-                  <small>{gone ? <><em>Deleted from disk</em> · {p}</> : opened ? <><em>Open</em> · {p}</> : p}</small>
+                  <strong>
+                    <span className="recent-name">{p.split(/[\\/]/).pop()}</span>
+                    {h && (
+                      <span className="recent-head" title={`On ${h.name}${sync ? `: ${sync}` : ""}`}>
+                        <Icon name="branch" />{h.name}
+                        {h.ahead > 0 && <b aria-label={`${h.ahead} to push`}>↑{h.ahead}</b>}
+                        {h.behind > 0 && <b aria-label={`${h.behind} to pull`} className="behind">↓{h.behind}</b>}
+                      </span>
+                    )}
+                  </strong>
+                  <small>{gone ? <><em>Deleted from disk</em> · {p}</> : p}</small>
                 </span>
               </button>
               <button className="icon-btn" onClick={() => setRemoving(p)} title="Remove…" aria-label={`Remove ${p}`}>

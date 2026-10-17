@@ -658,6 +658,22 @@ pub fn refs(repo: &Path) -> Result<Refs, AppError> {
     Ok(Refs { head, local, remote, tags, stashes })
 }
 
+/// The current branch with its upstream and ahead/behind counts, for the home screen's recent list.
+/// None when HEAD is detached or unborn, or the folder isn't a repo.
+pub fn head_item(repo: &Path) -> Option<RefItem> {
+    let repo = git2::Repository::open(repo).ok()?;
+    let head = repo.head().ok().filter(|h| h.is_branch())?;
+    let oid = head.target()?;
+    let mut it = RefItem { name: head.shorthand().ok()?.to_string(), oid: oid.to_string(), upstream: None, ahead: 0, behind: 0 };
+    if let Ok(up) = git2::Branch::wrap(head).upstream() {
+        if let Some(up_oid) = up.get().target() {
+            (it.ahead, it.behind) = repo.graph_ahead_behind(oid, up_oid).map(|(a, b)| (a as u32, b as u32)).unwrap_or_default();
+        }
+        it.upstream = up.name().ok().flatten().map(String::from);
+    }
+    Some(it)
+}
+
 /// Short names of the branches, remote branches and tags already part of HEAD (merging or rebasing
 /// onto them would do nothing). Apart from `refs` because it can take a second on a long history.
 /// Runs `git for-each-ref --merged`, an exception to "reads use git2": it reads the commit-graph file and

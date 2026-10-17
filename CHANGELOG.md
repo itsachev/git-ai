@@ -6,6 +6,7 @@ What's new in each git-ai release. Newest first.
 
 ### Added
 
+- The home screen's recent list shows each repository's current branch, with how many commits are waiting to push (↑) and to pull (↓).
 - Compare labels both sides of the diff: in Split view each column is headed with what it shows (for example your commit on the left, origin/main on the right), and the single-column view shows which side the − and + lines come from.
 - Compare puts the older side on the left: when the second pick is behind the first (for example origin/main next to your unpushed commits), the two are swapped, so + really means added and − removed. ⇄ still swaps them back.
 - Compare lives in right-click menus: Compare with another branch (or "Compare with a branch" on tags and commits) in the sidebar or in History (now including the current branch, which starts against its remote branch: what you haven't pushed or pulled). The Compare… button under commit details is gone.

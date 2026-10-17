@@ -321,6 +321,13 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent button > span { display: grid; min-width: 0; transition: translate 280ms var(--ease); }
 .recent li > button:first-child:hover > span { translate: 3px 0; }
 .recent strong { font-weight: 600; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; }
+/* Current branch beside the name, with ↑ to push / ↓ to pull pills like the tab bar's. */
+.recent strong { display: flex; align-items: center; gap: 0.6em; }
+.recent-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-head { flex: none; display: inline-flex; align-items: center; gap: 0.3em; font: 500 0.78rem/1 var(--mono); color: var(--muted); }
+.recent button .recent-head .icon { width: 0.95em; height: 0.95em; color: inherit; }
+.recent-head b { padding: 0.15em 0.4em; border-radius: 99px; font-weight: 700; color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.recent-head .behind { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
 .recent small { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
 .recent li { position: relative; display: flex; align-items: center; gap: 2px; }
 .recent li > button:first-child { flex: 1; min-width: 0; }
@@ -329,7 +336,6 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .recent .missing button .icon, .recent .missing button:hover .icon { color: var(--danger); }
 .recent .missing em { font-style: normal; font-family: var(--sans); font-weight: 700; color: var(--danger); }
 /* Already open in a tab: a click switches to it. */
-.recent .opened em { font-style: normal; font-family: var(--sans); font-weight: 700; color: var(--accent-fg); }
 /* Remove… button: shown on row hover/focus where there is a mouse, always on touch. */
 .recent .icon-btn { flex: none; width: var(--ctl); min-height: var(--ctl); justify-content: center; padding: 0; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms, scale 200ms var(--spring); }
 .recent li:hover .icon-btn, .recent .icon-btn:focus-visible { opacity: 1; }
