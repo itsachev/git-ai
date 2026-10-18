@@ -8,6 +8,7 @@ What's new in each git-ai release. Newest first.
 
 - Push no longer greys out after you move a branch back to an older commit (for example a reset or a rebase onto an older commit). It asks whether to force push, so the remote moves back too, or to pull instead when someone else pushed.
 - Checking out a local branch (right-click → Checkout or double-click) that is behind its remote now asks what to do: bring in the remote commits, recreate the branch from the remote, switch as is, or start a new branch. Before, it switched without asking.
+- The window no longer flickers or jumps when the app starts. It now appears once, at its final size and position.
 
 ### Changed
 

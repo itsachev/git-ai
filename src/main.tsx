@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 // Bundled (offline) variable fonts: Geist for UI, Geist Mono for refs, hashes and diffs.
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
@@ -75,3 +76,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// The window starts hidden (tauri.conf.json) so its resize to the work area and the blank
+// webview never show. Reveal it once the first frame has painted.
+requestAnimationFrame(() => requestAnimationFrame(() => getCurrentWindow().show()));
