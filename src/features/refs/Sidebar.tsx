@@ -138,7 +138,9 @@ export function useRefActions(path: string) {
       if (name === head) return [...sync, branchOff, ...compare, pr, explain, rename, track];
       // The remote copy to offer deleting too: its upstream, else a same-named remote branch.
       const remote = up.upstream ?? data.remote.find((r) => short(r.name) === name)?.name;
-      return [["Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
+      // Behind its upstream: Checkout asks (merge, recreate, as is, branch off) instead of switching silently.
+      const checkoutLocal = sync.length ? checkoutRemote(up.upstream!) : () => run(() => switchTo(path, name, false));
+      return [["Checkout", checkoutLocal], branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
         const msg = <>Delete branch <b className="name-local">{name}</b>? Undo history (sidebar) can restore it.</>;
         const alsoRemote = remote ? await confirmCheck("Delete branch", msg, "Delete", <span>Also delete <b className="name-remote">{remote}</b> on the remote</span>, "danger")
           : (await confirm("Delete branch", msg, "Delete", "danger")) ? false : null;
@@ -318,7 +320,7 @@ export function Sidebar({ path }: { path: string }) {
         <ul className="refs">
           {local.map((b) => {
             const cur = b.name === data.head;
-            return <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : () => run(() => switchTo(path, b.name, false))} actions={actions(b.name)} dnd={dnd(b.name)} />;
+            return <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : actions(b.name)[0]?.[1] /* Checkout */} actions={actions(b.name)} dnd={dnd(b.name)} />;
           })}
         </ul>
       </details>
