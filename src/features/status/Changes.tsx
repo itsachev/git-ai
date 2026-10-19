@@ -12,7 +12,7 @@ import { FileIcon } from "../../lib/fileIcon";
 import { Splitter } from "../../lib/splitter";
 import { DiffLine, useLang } from "../../lib/highlight";
 import { Lines, widest } from "../../lib/Lines";
-import { ModalHead, choose, confirm } from "../../lib/modal";
+import { Local, ModalHead, Remote, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
 import { RefMenu, menuKeys, showMenu } from "../refs/Sidebar";
@@ -25,7 +25,7 @@ export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryF
 type Selection = { file: string; staged: boolean };
 /** `done`: the success notice, or a function called after success (undefined = no notice).
  *  `doing`: shown in the notice while the op runs ("Pushing main…"). */
-export type Run = (op: () => Promise<unknown>, done?: string | (() => string | undefined), doing?: string) => Promise<boolean>;
+export type Run = (op: () => Promise<unknown>, done?: React.ReactNode | (() => React.ReactNode), doing?: React.ReactNode) => Promise<boolean>;
 
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
@@ -42,14 +42,14 @@ const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.d
 
 // `run(op, done, doing)`: `doing` shows in `Notice` while the op runs, then `done` ("Pushed main") for a few seconds.
 // `pending`: when the op started. `waited`: this success follows a pending notice.
-let notice: { text: string; gen: number; pending?: number; waited?: boolean } | null = null;
+let notice: { text: React.ReactNode; gen: number; pending?: number; waited?: boolean } | null = null;
 
 /** True while an op started with a `doing` label runs (Commit, Fetch, Pull, Push): the repo window locks. */
 export const useOpBusy = () => useSyncExternalStore(subscribeOps, () => !!notice?.pending);
 
 export function useRun() {
   const qc = useQueryClient();
-  async function run(op: () => Promise<unknown>, done?: string | (() => string | undefined), doing?: string) {
+  async function run(op: () => Promise<unknown>, done?: React.ReactNode | (() => React.ReactNode), doing?: React.ReactNode) {
     const mine = ++opGen;
     notice = doing ? { text: doing, gen: mine, pending: Date.now() } : null;
     opSubs.forEach((f) => f());
@@ -69,7 +69,7 @@ export function useRun() {
         ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
         : { title: code === "clash" ? "Nothing was switched" : (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code,
             // `extra` is appended to the success notice ("… Your changes are in the stash.").
-            retry: (extra?: string) => { run(op, extra ? () => `${(typeof done === "function" ? done() : done) ?? "Done"}. ${extra}` : done, doing); } };
+            retry: (extra?: string) => { run(op, extra ? () => <>{(typeof done === "function" ? done() : done) ?? "Done"}. {extra}</> : done, doing); } };
       opSubs.forEach((f) => f());
       return false;
     } finally {
@@ -855,8 +855,14 @@ export function opLabel(e: OpEntry): string {
 }
 
 /** Asks before undoing `e`: it moves branches back, so commits made since can leave the branch. */
-export const confirmUndo = (e: OpEntry) =>
-  confirm(`${opLabel({ ...e, op: `undo ${e.op}` })}?`, "Branches go back to where they were before it. Undoing again puts them back.", "Undo");
+export function confirmUndo(e: OpEntry) {
+  const label = opLabel({ ...e, op: `undo ${e.op}` });
+  // The label ends with the ref's short name ("Undo: Delete branch main"): show it as a branch name.
+  const r = e.ref_name ?? "", n = r.replace(/^refs\/(heads|tags|remotes)\//, "");
+  const ref = r.startsWith("refs/remotes/") ? <Remote name={n} /> : r.startsWith("refs/heads/") ? <Local name={n} /> : <b>{n}</b>;
+  const title = n && label.endsWith(` ${n}`) ? <>{label.slice(0, -n.length)}{ref}?</> : `${label}?`;
+  return confirm(title, "Branches go back to where they were before it. Undoing again puts them back.", "Undo");
+}
 
 /** Roughly what undoing `e` runs, for the palette's terminal hint. */
 export function undoHint(e: OpEntry): string | undefined {

@@ -14,7 +14,7 @@ import { openReflog } from "./Reflog";
 
 /** Opens `dir` (a repo) in a new tab; App listens. */
 export const openRepoTab = (dir: string) => dispatchEvent(new CustomEvent("gitai-open-repo", { detail: dir }));
-import { choose, confirm, confirmCheck, prompt } from "../../lib/modal";
+import { Local, Remote, choose, confirm, confirmCheck, prompt } from "../../lib/modal";
 import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
 /** Switch that, when there are uncommitted changes, offers to bring them along, or stash them, instead of just failing. */
@@ -23,9 +23,10 @@ export async function switchTo(path: string, name: string, track: boolean) {
     await checkout(path, name, track);
   } catch (e) {
     if ((e as AppError).code !== "dirty") throw e;
-    const pick = await choose("Bring your changes along?", <>You have uncommitted changes, so nothing was switched. Bring them to <b className={track ? "name-remote" : "name-local"}>{name}</b>, or stash them first?</>, [
-      { label: "Switch and bring changes", hint: `Stashes them, switches, and puts them back on ${name}. If they clash, nothing is switched and your changes stay here.` },
-      { label: "Stash and switch", hint: `Parks them in Stashes and switches to a clean ${name}. Apply or Pop the stash later to get them back.` },
+    const to = track ? <Remote name={name} /> : <Local name={name} />;
+    const pick = await choose("Bring your changes along?", <>You have uncommitted changes, so nothing was switched. Bring them to {to}, or stash them first?</>, [
+      { label: "Switch and bring changes", hint: <>Stashes them, switches, and puts them back on {to}. If they clash, nothing is switched and your changes stay here.</> },
+      { label: "Stash and switch", hint: <>Parks them in Stashes and switches to a clean {to}. Apply or Pop the stash later to get them back.</> },
     ]);
     if (pick === 0) await checkout(path, name, track, true);
     if (pick === 1) {
@@ -38,10 +39,10 @@ export async function switchTo(path: string, name: string, track: boolean) {
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
 export const remotesQuery = (path: string) => ({ queryKey: ["remotes", path], queryFn: () => remotes(path) });
 
-export const confirmMerge = (from: string, into: string) =>
-  confirm("Merge", `Merge ${from} into ${into}? Undo history (sidebar) can reverse it.`, "Merge");
-export const confirmRebase = (branch: string, onto: string) =>
-  confirm("Rebase", `Rebase ${branch} onto ${onto}? Its commits are rewritten on top of ${onto}; if it was pushed, the next push needs Force push. Undo history (sidebar) can reverse it.`, "Rebase");
+export const confirmMerge = (from: React.ReactNode, into: React.ReactNode) =>
+  confirm("Merge", <>Merge {from} into {into}? Undo history (sidebar) can reverse it.</>, "Merge");
+export const confirmRebase = (branch: React.ReactNode, onto: React.ReactNode) =>
+  confirm("Rebase", <>Rebase {branch} onto {onto}? Its commits are rewritten on top of {onto}; if it was pushed, the next push needs Force push. Undo history (sidebar) can reverse it.</>, "Rebase");
 
 /** Deletes local branch `name`, asking before force-deleting an unmerged one. False when the user backs out. */
 async function deleteLocal(path: string, name: string) {
@@ -66,12 +67,15 @@ export function useRefActions(path: string) {
   return (name: string, ontoOnly = false): Action[] => {
     if (!data) return [];
     const head = data.head;
+    /** A ref name styled by kind: remote branch, local branch, or plain bold (tag). */
+    const ref = (n: string) => data.remote.some((r) => r.name === n) ? <Remote name={n} />
+      : data.local.some((b) => b.name === n) ? <Local name={n} /> : <b>{n}</b>;
     const branchOff: Action = ["New branch from here", () => openNewBranch(name)];
     // Merge/rebase need a current branch that isn't this one, and do nothing when it already has all of this one.
     const done = merged?.includes(name) ? `${head} already has everything in ${name}` : undefined;
     const onto: Action[] = head && head !== name ? [
-      [`Merge ${name} into ${head}`, async () => (await confirmMerge(name, head)) && run(() => merge(path, name, false), `Merged ${name} into ${head}`), done],
-      [`Rebase ${head} onto ${name}`, async () => (await confirmRebase(head, name)) && run(() => rebaseOnto(path, name), `Rebased ${head} onto ${name}`), done],
+      [`Merge ${name} into ${head}`, async () => (await confirmMerge(ref(name), <Local name={head} />)) && run(() => merge(path, name, false), <>Merged {ref(name)} into <Local name={head} /></>), done],
+      [`Rebase ${head} onto ${name}`, async () => (await confirmRebase(<Local name={head} />, ref(name))) && run(() => rebaseOnto(path, name), <>Rebased <Local name={head} /> onto {ref(name)}</>), done],
     ] : [];
     if (ontoOnly) return onto;
     // A branch: what it has that the current one doesn't. A tag: what the current branch added since it.
@@ -92,31 +96,31 @@ export function useRefActions(path: string) {
       const newer = local && (tracks ? local.behind > 0 : local.oid !== remote.oid);
       return async () => {
         if (!local) {
-          const msg = <>Create local branch <b className="name-local">{short}</b> tracking <b className="name-remote">{name}</b> and switch to it?</>;
-          if ((await choose(`Switch / Checkout ${name}`, msg, [{ label: "Switch / Checkout", tone: "accent" }], "branch")) !== 0) return;
-          return run(() => switchTo(path, name, true), `Created ${short} from ${name} and switched to it`);
+          const msg = <>Create local branch <Local name={short} /> tracking <Remote name={name} /> and switch to it?</>;
+          if ((await choose(<>Switch / Checkout <Remote name={name} /></>, msg, [{ label: "Switch / Checkout", tone: "accent" }], "branch")) !== 0) return;
+          return run(() => switchTo(path, name, true), <>Created <Local name={short} /> from <Remote name={name} /> and switched to it</>);
         }
         if (!newer) return run(() => switchTo(path, short, false));
         const behind = tracks ? `${local.behind} commit${local.behind === 1 ? "" : "s"}` : "commits";
         const own = tracks ? local.ahead : 1; // unknown: assume it may have its own
         const sw = head !== short;
-        const lose = tracks ? `its ${own} commit${own === 1 ? "" : "s"} not on ${name}` : `any commits not on ${name}`;
-        const loc = <b className="name-local">{short}</b>;
-        const msg = <><b className="name-remote">{name}</b> has {behind} that your local {loc} doesn't. What should {loc} do?</>;
-        const pick = await choose(`Switch / Checkout ${name}`, msg, [
-          { label: sw ? `Switch and ${own ? `merge ${name}` : "fast-forward"}` : own ? `Merge ${name}` : "Fast-forward", hint: own ? `Merges ${name} into ${short}; your commits stay.` : `Moves ${short} up to ${name}.` },
-          { label: `Recreate ${short} from ${name}`, tone: own ? "danger" : "accent", hint: own ? `Resets ${short} to ${name}, dropping ${lose}. Undo history can reverse it.` : `Resets ${short} to ${name}.` },
-          { label: head === short ? `Keep ${short} as is` : `Switch to ${short} as is`, hint: `Leaves ${short} where it is; Pull later.` },
-          { label: "New branch from here…", hint: `Starts a new local branch at ${name}.` },
+        const loc = <Local name={short} />, rem = <Remote name={name} />;
+        const lose = tracks ? <>its {own} commit{own === 1 ? "" : "s"} not on {rem}</> : <>any commits not on {rem}</>;
+        const msg = <>{rem} has {behind} that your local {loc} doesn't. What should {loc} do?</>;
+        const pick = await choose(<>Switch / Checkout {rem}</>, msg, [
+          { label: sw ? <>Switch and {own ? <>merge {rem}</> : "fast-forward"}</> : own ? <>Merge {rem}</> : "Fast-forward", hint: own ? <>Merges {rem} into {loc}; your commits stay.</> : <>Moves {loc} up to {rem}.</> },
+          { label: <>Recreate {loc} from {rem}</>, tone: own ? "danger" : "accent", hint: own ? <>Resets {loc} to {rem}, dropping {lose}. Undo history can reverse it.</> : <>Resets {loc} to {rem}.</> },
+          { label: head === short ? <>Keep {loc} as is</> : <>Switch to {loc} as is</>, hint: <>Leaves {loc} where it is; Pull later.</> },
+          { label: "New branch from here…", hint: <>Starts a new local branch at {rem}.</> },
         ], "branch");
         if (pick === 3) return openNewBranch(name);
         if (pick < 0) return;
-        if (pick === 1 && own && !(await confirm(`Recreate ${short}?`, `${short} is reset to ${name}, dropping ${lose}. Undo history (sidebar) can reverse it.`, "Recreate", "danger"))) return;
+        if (pick === 1 && own && !(await confirm(<>Recreate {loc}?</>, <>{loc} is reset to {rem}, dropping {lose}. Undo history (sidebar) can reverse it.</>, "Recreate", "danger"))) return;
         run(async () => {
           if (head !== short) await switchTo(path, short, false);
           if (pick === 0) await merge(path, name, false);
           if (pick === 1) await resetTo(path, name, "Keep");
-        }, pick < 2 ? `${pick ? "Recreated" : "Updated"} ${short} from ${name}` : undefined);
+        }, pick < 2 ? <>{pick ? "Recreated" : "Updated"} {loc} from {rem}</> : undefined);
       };
     };
     if (data.local.some((b) => b.name === name)) {
@@ -126,28 +130,29 @@ export function useRefActions(path: string) {
       const up = data.local.find((b) => b.name === name)!;
       const sync: Action[] = up.upstream && up.behind > 0 ? [[`Switch / Checkout ${up.upstream}`, checkoutRemote(up.upstream)]] : [];
       const rename: Action = ["Rename", async () => {
-        const v = await prompt(`Rename ${name}`, "", [{ label: "New name", value: name }], "Rename");
-        if (v && v[0] !== name) run(() => renameBranch(path, name, v[0]), `Renamed ${name} to ${v[0]}`);
+        const v = await prompt(<>Rename <Local name={name} /></>, "", [{ label: "New name", value: name }], "Rename");
+        if (v && v[0] !== name) run(() => renameBranch(path, name, v[0]), <>Renamed <Local name={name} /> to <Local name={v[0]} /></>);
       }];
       // Same-named remote branches first: that's almost always the one.
       const short = (r: string) => r.slice(r.indexOf("/") + 1);
       const candidates = data.remote.map((r) => r.name).filter((r) => r !== up.upstream && !r.endsWith("/HEAD"))
         .sort((a, b) => Number(short(b) === name) - Number(short(a) === name));
       const track: Action = [up.upstream ? "Change tracked branch" : "Track remote branch", async () => {
-        const opts = [...candidates.map((r) => ({ label: r, hint: `Pull and Push use ${r}.` })),
-          ...(up.upstream ? [{ label: "Stop tracking", hint: `${name} keeps its commits; Push publishes it again.`, tone: "warn" as const }] : [])];
-        const i = await choose(`What should ${name} track?`, up.upstream ? `It tracks ${up.upstream} now.` : `${name} doesn't track a remote branch yet.`, opts, "remote");
+        const me = <Local name={name} />;
+        const opts = [...candidates.map((r) => ({ label: <Remote name={r} />, hint: <>Pull and Push use <Remote name={r} />.</> })),
+          ...(up.upstream ? [{ label: "Stop tracking", hint: <>{me} keeps its commits; Push publishes it again.</>, tone: "warn" as const }] : [])];
+        const i = await choose(<>What should {me} track?</>, up.upstream ? <>It tracks <Remote name={up.upstream} /> now.</> : <>{me} doesn't track a remote branch yet.</>, opts, "remote");
         if (i < 0) return;
         const to = i < candidates.length ? candidates[i] : null;
-        run(() => setUpstream(path, name, to), to ? `${name} now tracks ${to}` : `${name} no longer tracks ${up.upstream}`);
+        run(() => setUpstream(path, name, to), to ? <>{me} now tracks <Remote name={to} /></> : <>{me} no longer tracks <Remote name={up.upstream!} /></>);
       }, candidates.length || up.upstream ? undefined : "No remote branches yet. Fetch or push first."];
       if (name === head) return [...sync, branchOff, ...compare, pr, explain, rename, track];
       // The remote copy to offer deleting too: its upstream, else a same-named remote branch.
       const remote = up.upstream ?? data.remote.find((r) => short(r.name) === name)?.name;
       // Switch / Checkout (and double-click) just switches; being behind is Pull's job. The sync item offers the choices.
       return [["Switch / Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
-        const msg = <>Delete branch <b className="name-local">{name}</b>? Undo history (sidebar) can restore it.</>;
-        const alsoRemote = remote ? await confirmCheck("Delete branch", msg, "Delete", <span>Also delete <b className="name-remote">{remote}</b> on the remote</span>, "danger")
+        const msg = <>Delete branch <Local name={name} />? Undo history (sidebar) can restore it.</>;
+        const alsoRemote = remote ? await confirmCheck("Delete branch", msg, "Delete", <span>Also delete <Remote name={remote} /> on the remote</span>, "danger")
           : (await confirm("Delete branch", msg, "Delete", "danger")) ? false : null;
         if (alsoRemote === null) return;
         let deleted = false;
@@ -155,7 +160,7 @@ export function useRefActions(path: string) {
           if (!(await deleteLocal(path, name))) return;
           if (alsoRemote) await deleteRemoteBranch(path, remote!);
           deleted = true;
-        }, () => (alsoRemote && deleted ? `Deleted ${name} and ${remote} on the remote` : undefined));
+        }, () => (alsoRemote && deleted ? <>Deleted <Local name={name} /> and <Remote name={remote!} /> on the remote</> : undefined));
       }]];
     }
     if (data.remote.some((r) => r.name === name)) {
@@ -164,15 +169,15 @@ export function useRefActions(path: string) {
       const local = (data.local.find((b) => b.upstream === name) ?? data.local.find((b) => b.name === short))?.name;
       const offerLocal = local && local !== head ? local : undefined;
       return [["Switch / Checkout", checkoutRemote(name)], branchOff, ...compare, ...onto, ["Delete", async () => {
-        const msg = <>Delete branch <b className="name-remote">{name}</b> on the remote? Undo history (sidebar) can push it back.</>;
-        const alsoLocal = offerLocal ? await confirmCheck("Delete remote branch", msg, "Delete", <span>Also delete local branch <b className="name-local">{offerLocal}</b></span>, "danger")
+        const msg = <>Delete branch <Remote name={name} /> on the remote? Undo history (sidebar) can push it back.</>;
+        const alsoLocal = offerLocal ? await confirmCheck("Delete remote branch", msg, "Delete", <span>Also delete local branch <Local name={offerLocal} /></span>, "danger")
           : (await confirm("Delete remote branch", msg, "Delete", "danger")) ? false : null;
         if (alsoLocal === null) return;
         let both = false;
         run(async () => {
           await deleteRemoteBranch(path, name);
           both = !!alsoLocal && (await deleteLocal(path, offerLocal!));
-        }, () => (both ? `Deleted ${name} on the remote and ${offerLocal}` : `Deleted ${name} on the remote`));
+        }, () => (both ? <>Deleted <Remote name={name} /> on the remote and <Local name={offerLocal!} /></> : <>Deleted <Remote name={name} /> on the remote</>));
       }]];
     }
     return [branchOff, ...compare, ["Changelog since this tag (AI)", () => openWriteUp("changelog", name)], ["Push", () => run(() => pushTag(path, name), `Pushed tag ${name}`)], ["Delete", async () => {
@@ -308,7 +313,7 @@ export function Sidebar({ path }: { path: string }) {
     const v = await prompt("New branch from stash",
       "Starts at the commit the stash was made on, so its changes fit. The stash is applied there, then dropped.",
       [{ label: "Branch name", placeholder: "feature/…" }], "Create branch", "branch");
-    if (v?.[0]) run(() => stashBranch(path, i, s.oid, v[0]), `Created and switched to ${v[0]} with the stash applied`);
+    if (v?.[0]) run(() => stashBranch(path, i, s.oid, v[0]), <>Created and switched to <Local name={v[0]} /> with the stash applied</>);
   }
   async function dropStash(i: number, s: RefItem) {
     if (await confirm("Drop stash", `Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, "Drop", "danger"))

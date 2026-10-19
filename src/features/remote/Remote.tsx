@@ -10,7 +10,7 @@ import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
 import { RefMenu, refsQuery, remotesQuery, showMenu } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
-import { Brand, ModalHead, choose, confirm, prompt, type Choice } from "../../lib/modal";
+import { Brand, Local, ModalHead, Remote as RemoteName, choose, confirm, prompt, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
 
 export type Sync = ReturnType<typeof useSync>;
@@ -30,7 +30,7 @@ export function useSync(path: string, run: Run) {
   };
   useAutoFetch(path, !!cur?.upstream, busy);
   // `doing` fits the button; `notice` is the longer line for the toast ("Pushing main to origin/main…").
-  const op = (label: string, doing: string, notice: string, done: string | (() => string | undefined), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
+  const op = (label: string, doing: string, notice: React.ReactNode, done: React.ReactNode | (() => React.ReactNode), fn: () => Promise<unknown>, count = 0, badge = count > 0 ? String(count) : "", hint = `${count} to ${label.toLowerCase()}`) => ({
     label, doing, badge, hint, off: "",
     go: async () => {
       if (busy) return;
@@ -41,33 +41,35 @@ export function useSync(path: string, run: Run) {
       setBusy(null);
     },
   });
-  let pushed: string | undefined;
-  const target = `${refs?.head ?? "branch"}${cur?.upstream ? ` to ${cur.upstream}` : ""}`;
-  const pullMerge = op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} into ${refs?.head ?? "your branch"}…`, `Pulled ${cur?.upstream ?? "upstream"}`, () => pull(path), cur?.behind ?? 0);
-  const pullRebase = op("Pull", "Pulling…", `Pulling ${cur?.upstream ?? "upstream"} with rebase…`, `Rebased onto ${cur?.upstream ?? "upstream"}`, () => pull(path, true), cur?.behind ?? 0);
+  let pushed: React.ReactNode;
+  const head = refs?.head ? <Local name={refs.head} /> : "branch";
+  const upstream = cur?.upstream ? <RemoteName name={cur.upstream} /> : "upstream";
+  const target = <>{head}{cur?.upstream && <> to {upstream}</>}</>;
+  const pullMerge = op("Pull", "Pulling…", <>Pulling {upstream} into {refs?.head ? head : "your branch"}…</>, <>Pulled {upstream}</>, () => pull(path), cur?.behind ?? 0);
+  const pullRebase = op("Pull", "Pulling…", <>Pulling {upstream} with rebase…</>, <>Rebased onto {upstream}</>, () => pull(path, true), cur?.behind ?? 0);
   // Pull-then-push or force push, when a plain push can't land. `mine` (rebased/amended) picks the suggestion; undefined suggests neither.
-  const pushChoice = async (title: string, message: React.ReactNode, mine?: boolean) => {
+  const pushChoice = async (title: React.ReactNode, message: React.ReactNode, mine?: boolean) => {
     const pullThenPush: Choice = { label: "Pull, then push", icon: "pull", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: mine === false };
     const force: Choice = { label: "Force push", icon: "push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase, amend or moving the branch back. Undo history can put them back.", suggested: mine };
     const choices = mine ? [force, pullThenPush] : [pullThenPush, force];
     const i = await choose(title, message, choices, "push", "warn");
     if (i < 0) return;
     if (choices[i] === force) {
-      if (!(await confirm(`Force push ${target}?`, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
+      if (!(await confirm(<>Force push {target}?</>, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
       await push(path, true);
-      pushed = `Force pushed ${target}`;
+      pushed = <>Force pushed {target}</>;
     } else {
       await pull(path);
       await push(path);
-      pushed = `Pulled and pushed ${target}`;
+      pushed = <>Pulled and pushed {target}</>;
     }
   };
-  const pushOp = op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
+  const pushOp = op("Push", "Pushing…", <>Pushing {target}…</>, () => pushed, async () => {
         pushed = undefined;
         try {
           const to = await push(path);
           // No upstream before: this push created the remote branch.
-          pushed = cur?.upstream ? `Pushed ${target}` : `Created and pushed to branch ${to}`;
+          pushed = cur?.upstream ? <>Pushed {target}</> : <>Created and pushed to branch <RemoteName name={to} /></>;
         } catch (e) {
           const code = (e as AppError).code;
           if (code !== "rejected" && code !== "rewritten") throw e;
@@ -85,16 +87,16 @@ export function useSync(path: string, run: Run) {
   // Behind only: the branch was moved back (reset, rebase onto an older commit) or someone else pushed. A plain
   // push can't do either, so Push goes straight to the pull / force push choice.
   const behindOnly = !!cur?.upstream && !cur.ahead && !!cur.behind;
-  const rewindOp = op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
+  const rewindOp = op("Push", "Pushing…", <>Pushing {target}…</>, () => pushed, async () => {
     pushed = undefined;
     const n = cur?.behind ?? 0;
-    await pushChoice(`${cur?.upstream} is ahead of ${refs?.head}`, <>
+    await pushChoice(<>{upstream} is ahead of {head}</>, <>
       <span className="diverge" role="img" aria-label={`${cur?.upstream} has ${n} commit${n === 1 ? "" : "s"} that ${refs?.head} doesn't`}>
         <code>{refs?.head}</code>
         <span className="diverge-track"><i />{Array.from({ length: Math.min(n, 4) }, (_, k) => <i key={k} />)}{n > 4 && <b>+{n - 4}</b>}</span>
         <code>{cur?.upstream}</code>
       </span>
-      {`${cur?.upstream} has ${n} commit${n === 1 ? "" : "s"} that ${refs?.head} doesn't. Moved ${refs?.head} back on purpose? Force push makes the remote match. Someone else pushed? Pull instead.`}
+      {upstream} has {n} commit{n === 1 ? "" : "s"} that {head} doesn't. Moved {head} back on purpose? Force push makes the remote match. Someone else pushed? Pull instead.
     </>);
   }, 0, "↺", `${cur?.upstream} has commits ${refs?.head} doesn't: pull, or force push to move the remote back`);
   const pushOff = !refs?.local.length ? "Make a first commit to push"
@@ -107,7 +109,7 @@ export function useSync(path: string, run: Run) {
     : "";
   // No remote yet: the first push asks where to, adds it as origin, then pushes (and sets the upstream).
   const firstPush = async () => {
-    const v = await prompt("Push to a new remote", `${cur?.name ?? "This branch"} has nowhere to go yet. Paste the URL of the repository to push to, for example an empty one you just made on GitHub.`,
+    const v = await prompt("Push to a new remote", <>{cur ? <Local name={cur.name} /> : "This branch"} has nowhere to go yet. Paste the URL of the repository to push to, for example an empty one you just made on GitHub.</>,
       [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote");
     if (v && await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`)) await pushOp.go();
   };

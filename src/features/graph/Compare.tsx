@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { compareFile, compareFiles, mergeBase } from "../../lib/ipc";
-import { ModalHead } from "../../lib/modal";
+import { Local, ModalHead, Remote } from "../../lib/modal";
 import { FileLabel, PaneNote, errorText, useDiffView } from "../status/Changes";
 import { ReadDiff } from "./History";
 import { refsQuery } from "../refs/Sidebar";
@@ -87,12 +87,15 @@ function Body({ path, initial }: { path: string; initial: State }) {
   const error = base.error ?? files.error;
   // Diff column labels. With "only what it added" on, the old side is the split point, not `from` itself.
   const label = (v: string) => (v === "" ? "Working copy" : name(v));
+  // In the header and toggle: branches in their local/remote colours, tags and commits in mono.
+  const nameEl = (v: string) => refs?.local.some((b) => b.name === v) ? <Local name={v} />
+    : refs?.remote.some((b) => b.name === v) ? <Remote name={v} /> : <span className="mono">{name(v)}</span>;
   const sides: [string, string] = [useSince ? `${label(from)} where it split${base.data ? ` · ${base.data.slice(0, 7)}` : ""}` : label(from), label(to)];
   return (
     <div className="fh">
       <ModalHead id="cmp-title" icon="branch" title="Compare"
-        sub={<>{useSince ? <>What <span className="mono">{name(to)}</span> changed since it split from <span className="mono">{name(from)}</span></>
-          : <><span className="mono">{name(from)}</span> → <span className="mono">{name(to)}</span></>}
+        sub={<>{useSince ? <>What {nameEl(to)} changed since it split from {nameEl(from)}</>
+          : <>{nameEl(from)} → {nameEl(to)}</>}
           {n !== undefined && ` · ${n} file${n === 1 ? "" : "s"}`}</>} />
       <div className="cmp-opts">
         <div className="fh-range">
@@ -103,9 +106,9 @@ function Body({ path, initial }: { path: string; initial: State }) {
         <label className="nb-toggle" title={canSince ? undefined : "Needs two different branches, tags or commits"}>
           <input type="checkbox" role="switch" checked={useSince} disabled={!canSince} onChange={(e) => setSince(e.target.checked)} />
           <span>
-            <strong>Only what {name(to)} added</strong>
+            <strong>Only what {nameEl(to)} added</strong>
             <small className="muted">{useSince
-              ? `Starts where the two split, like a pull/merge request. Changes made on ${name(from)} since then are left out.`
+              ? <>Starts where the two split, like a pull/merge request. Changes made on {nameEl(from)} since then are left out.</>
               : `Every difference between the two, whichever side made it.`}</small>
           </span>
         </label>

@@ -16,6 +16,8 @@ What's new in each git-ai release. Newest first.
 - Checkout is now called Switch / Checkout everywhere (branch menus, graph labels, command palette).
 - "Create pull request" is now "Create pull/merge request" everywhere, since it opens a merge request on GitLab.
 - Switching branches stops whenever you have uncommitted changes, and asks whether to bring them along or stash them. Before, changes that didn't clash were moved to the other branch without a word.
+- Dialogs have a new look: a warm tinted sheet instead of plain white, a coloured header with a dot pattern, and a shelf at the bottom for the buttons. Options in choice dialogs carry a gradient in their own colour (blue for safe, orange for careful, red for destructive) that brightens on hover. Buttons are flatter and crisper, with clearer main and danger actions.
+- Branch names are highlighted the same way in every dialog and notification (local branches in the accent colour, remote ones in blue), including dialog titles, option labels and the messages after an action finishes.
 
 ### Fixed
 

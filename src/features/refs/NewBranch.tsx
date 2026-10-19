@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { commitDetails, createBranch } from "../../lib/ipc";
 import { Icon } from "../../lib/icons";
-import { ModalHead } from "../../lib/modal";
+import { Local, ModalHead } from "../../lib/modal";
 import { statusQuery, useRun } from "../status/Changes";
 import { refsQuery } from "./Sidebar";
 
@@ -93,7 +93,7 @@ function Form({ path, initial }: { path: string; initial: string | null }) {
   async function submit() {
     if (!ok) return;
     setBusy(true);
-    const done = await run(() => createBranch(path, name, from || null, co), co ? `Created and switched to ${name}` : `Created ${name}`);
+    const done = await run(() => createBranch(path, name, from || null, co), co ? <>Created and switched to <Local name={name} /></> : <>Created <Local name={name} /></>);
     setBusy(false);
     if (done) close();
   }

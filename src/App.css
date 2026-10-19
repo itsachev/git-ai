@@ -33,11 +33,13 @@
   --info: #4f63a8;        /* slate blue */
   --shadow: 0 0 0 0.5px rgb(40 30 15 / 0.08), 0 4px 12px rgb(40 30 15 / 0.07), 0 16px 40px rgb(40 30 15 / 0.1);
   --glass: rgb(250 248 244 / 0.8);
-  /* Push buttons: a paper key on the stone window, ink text, hairline edge, top light. */
-  --tool: linear-gradient(#fffefc, #f5f2ec);
+  /* Push buttons: a flat paper key with a pressed-in bottom edge, like a keycap seen from the front. */
+  --tool: #fffdf9;
   --tool-ink: var(--fg);
-  --tool-lit: inset 0 1px 0 rgb(255 255 255 / 0.8);
-  --tool-edge: 0 0 0 1px var(--line-strong), 0 1px 2px rgb(40 30 15 / 0.08);
+  --tool-lit: inset 0 -1.5px 0 rgb(60 45 25 / 0.09);
+  --tool-edge: 0 0 0 1px var(--line-strong), 0 1px 2px rgb(40 30 15 / 0.07);
+  /* Modal sheet: warm stone, a step below paper, so fields and cards inside it lift off as white. */
+  --sheet-base: #f4f1eb;
   --veil: inset 0 0 0 100vmax rgb(40 30 15 / 0.04); /* hover: a wash over a gradient fill */
   /* Geist + Geist Mono: one superfamily, so prose, refs and hashes share metrics and rhythm.
      Bundled from @fontsource-variable (imported in main.tsx), so it works offline. */
@@ -93,8 +95,9 @@
   --card: inset 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.04);
   --canvas: var(--bg);
   --glass: rgb(38 36 34 / 0.8);
-  --tool: linear-gradient(#353330, #2b2927);
-  --tool-lit: inset 0 1px 0 rgb(255 245 230 / 0.07);
+  --tool: #33312e;
+  --tool-lit: inset 0 1px 0 rgb(255 245 230 / 0.07), inset 0 -1.5px 0 rgb(0 0 0 / 0.25);
+  --sheet-base: #1f1e1c;
   --tool-edge: 0 0 0 1px rgb(0 0 0 / 0.55), 0 1px 2px rgb(0 0 0 / 0.3);
   --veil: inset 0 0 0 100vmax rgb(255 245 230 / 0.05);
 }
@@ -136,8 +139,8 @@ h1, h2, h3, .rail-head .back strong, .commit-info .subject, .ci-author strong, .
 /* ---------- Controls: push buttons, text fields ---------- */
 button {
   font: inherit; color: var(--tool-ink); background: var(--tool);
-  border: 0; border-radius: var(--r); box-shadow: var(--tool-lit), var(--tool-edge);
-  min-height: var(--ctl); padding: 0 0.75rem;
+  border: 0; border-radius: 8px; box-shadow: var(--tool-lit), var(--tool-edge);
+  min-height: var(--ctl); padding: 0 0.8rem;
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   white-space: nowrap;
   /* No opacity/transform here: GSAP reveals tween those per frame, and a CSS transition on them makes the reveal lag. */
@@ -152,14 +155,22 @@ button:active:not(:disabled) { filter: brightness(0.9); scale: 0.97; transition-
 /* Filled actions lift on hover and settle back when pressed. */
 button:is(.primary, .danger, .tile):hover:not(:disabled):not(:active) { translate: 0 -1px; }
 button:disabled { opacity: 0.45; }
-button.primary {
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
-  color: var(--accent-ink); font-weight: 500;
-  box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 70%, black), 0 0.5px 1.5px rgb(0 0 0 / 0.18);
+/* Filled actions: one solid --fill, a lit top lip and a shaded bottom lip (a key, not a gradient blob), a glow
+   in their own colour on hover. Flat fills, so the hover colour transitions instead of needing a veil. */
+button:is(.primary, .danger) {
+  --fill: var(--accent);
+  background: var(--fill); color: var(--accent-ink); font-weight: 650; letter-spacing: -0.01em;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 -2px 0 rgb(0 0 0 / 0.16),
+    0 0 0 1px color-mix(in srgb, var(--fill) 75%, black), 0 2px 6px -2px color-mix(in srgb, var(--fill) 60%, transparent);
 }
-button.primary:hover:not(:disabled) {
-  box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 70%, black), 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent), var(--veil);
+button.danger { --fill: var(--danger); color: #fff; }
+:root[data-theme="dark"] button.danger { --fill: #c2402c; } /* the dark --danger is a text tint: too light under white */
+button:is(.primary, .danger):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fill) 90%, white);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.26), inset 0 -2px 0 rgb(0 0 0 / 0.16),
+    0 0 0 1px color-mix(in srgb, var(--fill) 75%, black), 0 10px 24px -8px color-mix(in srgb, var(--fill) 70%, transparent);
 }
+button:is(.primary, .danger):active:not(:disabled) { box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.2), 0 0 0 1px color-mix(in srgb, var(--fill) 75%, black); }
 button.small { min-height: calc(var(--ctl) - 0.35rem); padding: 0 0.55rem; font-size: 0.92em; flex-shrink: 0; }
 .icon-btn { padding: 0; width: var(--ctl); background: none; box-shadow: none; color: var(--muted); }
 .icon-btn:hover:not(:disabled) { color: var(--fg); background: var(--pick); }
@@ -287,7 +298,7 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
 .tile:not(.primary) small { grid-column: 1 / -1; }
 .tile strong { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.015em; }
 .tile small { font-size: 0.84rem; line-height: 1.35; color: var(--muted); font-weight: 400; }
-.tile.primary small { color: color-mix(in srgb, var(--accent-ink) 75%, transparent); }
+.tile.primary small { color: color-mix(in srgb, var(--accent-ink) 75%, transparent); font-weight: 450; letter-spacing: normal; }
 /* Recent: a glass panel, so the list reads over the artwork. */
 .home-recent {
   min-width: 0; align-self: center; display: flex; flex-direction: column; gap: 0.75rem;
@@ -1208,8 +1219,10 @@ dialog {
 dialog[open] { opacity: 1; scale: 1; translate: 0 0; }
 @starting-style { dialog[open] { opacity: 0; scale: 0.95; translate: 0 10px; } }
 /* Fixed blur, faded with opacity: transitioning the blur radius re-renders the whole window every frame and flickers. */
+/* Tinted by the modal's tone where ::backdrop inherits custom properties (Chromium 122+, Safari 17.4+); plain umber elsewhere. */
 dialog::backdrop {
-  background: rgb(24 18 10 / 0.36); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0;
+  background: color-mix(in srgb, color-mix(in srgb, var(--tone, rgb(24 18 10)) 22%, rgb(24 18 10)) 42%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0;
   transition: opacity 220ms var(--ease), display 220ms allow-discrete, overlay 220ms allow-discrete;
 }
 dialog[open]::backdrop { opacity: 1; }
@@ -1229,13 +1242,16 @@ dialog.modal {
   /* Sized to the content: a form-sized default; long forms and the big modals opt into wider tiers below. */
   width: min(34rem, 100vw - 2rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--pad);
   border-radius: 20px; scrollbar-gutter: stable; scroll-padding: 6rem 0 5rem;
-  /* A soft tone glow behind the header instead of a flat tint. */
+  /* A stone sheet breathing the tone, not a white page: white fields and cards sit on it as the layer above. */
+  --sheet: color-mix(in oklab, var(--tone) 5%, var(--sheet-base));
   background:
-    radial-gradient(120% 9rem at 0 0, color-mix(in srgb, var(--tone) 14%, transparent), transparent 70%) no-repeat,
-    var(--panel);
-  border-color: color-mix(in srgb, var(--tone) 24%, var(--line));
-  box-shadow: var(--shadow), 0 30px 80px -20px color-mix(in srgb, var(--tone) 22%, transparent);
+    radial-gradient(130% 10rem at 0 0, color-mix(in srgb, var(--tone) 18%, transparent), transparent 72%) no-repeat,
+    var(--sheet);
+  border-color: color-mix(in srgb, var(--tone) 30%, var(--line));
+  /* Lit top rim, then the drop and a long tone glow underneath. */
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), var(--shadow), 0 40px 90px -24px color-mix(in srgb, var(--tone) 34%, transparent);
 }
+:root[data-theme="dark"] dialog.modal { box-shadow: inset 0 1px 0 rgb(255 245 230 / 0.06), var(--shadow), 0 40px 90px -24px color-mix(in srgb, var(--tone) 30%, transparent); }
 /* Keep the scrollbar inside the rounded corners: the track is square, so inset it by the radius. */
 dialog.modal::-webkit-scrollbar-track { margin-block: 20px; }
 dialog.modal.tone-accent { --tone: var(--accent); }
@@ -1248,12 +1264,14 @@ dialog.modal:is(.rebase-dialog, .write-up, .setup) { width: min(46rem, 100vw - 2
 /* No reserved scrollbar gutter: it made the right padding wider than the left. */
 dialog.modal.alert { width: min(28rem, 100vw - 2rem); scrollbar-gutter: auto; }
 dialog.alert .modal-head { position: static; margin: 0 0 0.6rem; padding: 0; background: none; border: 0; }
+/* Static head: its dot field anchors to the dialog's top edge instead. */
+dialog.alert .modal-head::before { inset: 0 0 auto; height: 8rem; }
 dialog.alert .modal-head h2 { font-size: 1.2rem; line-height: 1.3; }
 /* Options read as a list of ways forward, one per row. */
 dialog.alert .choices { margin: 1.1rem 0 0; }
 dialog.alert input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; }
 dialog.alert .modal-text { color: var(--muted); line-height: 1.55; text-wrap: pretty; }
-dialog.alert .dialog-actions { position: static; margin: 1.4rem 0 0; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; }
+dialog.alert .dialog-actions { position: static; margin-top: 1.4rem; }
 /* Two columns of options when the window has room, one on narrow windows. */
 dialog.modal.alert:has(.choices) { width: min(46rem, 100vw - 2rem); }
 dialog.alert .choices { grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr)); }
@@ -1263,20 +1281,48 @@ dialog.alert .choices { grid-template-columns: repeat(auto-fit, minmax(min(19rem
 .choices .choice {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.85rem;
   min-height: 44px; padding: 0.8rem 0.85rem 0.8rem 0.8rem; text-align: left;
-  color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  /* Each card's gradient is its action's own tone (accent / warn / danger), running deep to light along a
+     diagonal (--tone2: the same hue, lifted): a wash on the fill, a stronger one on the 1px edge (border-box layer). */
+  --tone2: color-mix(in oklab, var(--tone) 55%, white);
+  --edge: linear-gradient(135deg, color-mix(in srgb, var(--tone) 55%, transparent), var(--line) 40%, var(--line) 60%, color-mix(in srgb, var(--tone2) 45%, transparent));
+  position: relative; isolation: isolate; overflow: hidden;
+  color: var(--fg); border: 1px solid transparent; border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--tone) 11%, var(--panel)), var(--panel) 55%, color-mix(in oklab, var(--tone2) 8%, var(--panel))) padding-box,
+    var(--edge) border-box;
   box-shadow: 0 1px 2px rgb(40 30 15 / 0.06);
-  transition: border-color 160ms, background-color 160ms, box-shadow 200ms var(--ease);
+  transition: box-shadow 260ms var(--ease), translate 280ms var(--spring);
 }
-.choices .choice.suggested { border-color: color-mix(in srgb, var(--tone) 45%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 10%, transparent); }
-.choices .choice:hover, .choices .choice:focus-visible {
-  border-color: color-mix(in srgb, var(--tone) 70%, var(--line)); background: color-mix(in srgb, var(--tone) 6%, var(--panel));
-  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--tone) 45%, transparent);
+/* Hover: a deeper wash fades in (opacity, since gradients can't transition), and a light sheen sweeps across once. */
+.choices .choice::before, .choices .choice::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; }
+.choices .choice::before {
+  background: linear-gradient(120deg, color-mix(in srgb, var(--tone) 20%, transparent), transparent 48%, color-mix(in srgb, var(--tone2) 16%, transparent));
+  opacity: 0; transition: opacity 280ms var(--ease);
 }
+.choices .choice::after {
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
+  translate: -110% 0;
+}
+:root[data-theme="dark"] .choices .choice::after { background: linear-gradient(105deg, transparent 30%, rgb(255 245 230 / 0.07) 50%, transparent 70%); }
+.choices .choice.suggested {
+  --edge: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 30%, transparent) 50%, var(--tone2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 12%, transparent), 0 8px 22px -12px color-mix(in srgb, var(--tone) 60%, transparent);
+}
+.choices .choice.suggested::before { opacity: 0.55; }
+.choices .choice:is(:hover, :focus-visible) {
+  --edge: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 35%, transparent) 50%, var(--tone2));
+  box-shadow: 0 10px 26px -12px color-mix(in srgb, var(--tone) 65%, transparent), 0 2px 6px -3px color-mix(in srgb, var(--tone2) 40%, transparent);
+}
+.choices .choice:is(:hover, :focus-visible):not(:active) { translate: 0 -2px; }
+.choices .choice:is(:hover, :focus-visible)::before { opacity: 1; }
+.choices .choice:hover::after { translate: 110% 0; transition: translate 900ms var(--ease); }
 /* No icon tile: body and arrow take the first two columns. */
 .choices .choice:not(:has(.choice-icon)) { grid-template-columns: minmax(0, 1fr) auto; }
 .choice-icon {
   display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 11px;
-  color: var(--tone); background: color-mix(in srgb, var(--tone) 13%, transparent);
+  color: var(--tone);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 22%, transparent), color-mix(in srgb, var(--tone2) 10%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 22%, transparent);
 }
 /* `anywhere`: long branch names ("origin/feature/x") break instead of widening the card past its column. */
 .choice-body { display: grid; gap: 0.2rem; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
@@ -1302,23 +1348,37 @@ dialog.alert .choices { grid-template-columns: repeat(auto-fit, minmax(min(19rem
   position: sticky; top: calc(-1 * var(--pad)); z-index: 2;
   display: flex; gap: 0.9rem; align-items: center;
   margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 1.1rem; padding: var(--pad) var(--pad) 1rem;
-  background: linear-gradient(color-mix(in srgb, var(--tone) 7%, var(--panel)), var(--panel));
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  /* Opaque (content scrolls under it): the tone glow over the sheet, closed by a tone hairline that fades
+     out to the right, like a branch lane leaving the badge. */
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--tone) 45%, transparent), color-mix(in srgb, var(--line) 60%, transparent) 55%) bottom / 100% 1px no-repeat,
+    radial-gradient(130% 10rem at 0 0, color-mix(in srgb, var(--tone) 18%, transparent), transparent 72%) no-repeat,
+    var(--sheet, var(--panel));
 }
-.modal-head h2 { font-size: 1.35rem; overflow-wrap: anywhere; text-wrap: balance; }
-.modal-head p { margin: 0.15rem 0 0; font-size: 0.92rem; line-height: 1.4; }
+/* A dot grid (commit nodes on a lattice) in the top right, masked to fade toward the title. Static paint. */
+.modal-head::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tone) 42%, transparent) 1px, transparent 1.4px) 0 0 / 13px 13px;
+  -webkit-mask-image: radial-gradient(85% 130% at 100% 0, #000, transparent 75%); mask-image: radial-gradient(85% 130% at 100% 0, #000, transparent 75%);
+  opacity: 0.7;
+}
+.modal-head h2 { font-size: 1.45rem; font-weight: 720; letter-spacing: -0.035em; line-height: 1.15; overflow-wrap: anywhere; text-wrap: balance; }
+.modal-head p { margin: 0.2rem 0 0; font-size: 0.92rem; line-height: 1.4; }
+/* Solid tone squircle: lit top lip, a soft ring of the tone, and its glow below. */
 .modal-badge {
-  display: grid; place-items: center; flex: none; width: 2.6rem; height: 2.6rem; border-radius: 13px;
-  color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 70%, white), var(--tone) 55%, color-mix(in srgb, var(--tone) 80%, black));
-  box-shadow: inset 0 1px rgb(255 255 255 / 0.35), 0 0 0 4px color-mix(in srgb, var(--tone) 14%, transparent), 0 6px 18px color-mix(in srgb, var(--tone) 38%, transparent);
+  display: grid; place-items: center; flex: none; width: 2.75rem; height: 2.75rem; border-radius: 14px;
+  color: #fff; background: radial-gradient(120% 90% at 30% 0, color-mix(in srgb, var(--tone) 72%, white), var(--tone) 60%);
+  box-shadow: inset 0 1px rgb(255 255 255 / 0.4), inset 0 -2px rgb(0 0 0 / 0.14), 0 0 0 1px color-mix(in srgb, var(--tone) 70%, black),
+    0 0 0 5px color-mix(in srgb, var(--tone) 13%, transparent), 0 8px 20px -4px color-mix(in srgb, var(--tone) 50%, transparent);
 }
+:root[data-theme="dark"] .modal-badge { background: radial-gradient(120% 90% at 30% 0, color-mix(in srgb, var(--tone) 70%, white), color-mix(in srgb, var(--tone) 72%, black) 70%); }
 .modal-badge .icon { width: 1.35rem; height: 1.35rem; }
 dialog.modal[open] .modal-badge { animation: pop 380ms var(--spring) 80ms backwards; }
 dialog.modal.tone-danger[open] .modal-badge .icon { animation: nudge 420ms var(--ease) 380ms; }
-/* Cards: About's feature groups and Settings' sections sit on a quiet sunken surface. */
+/* Cards: About's feature groups and Settings' sections are paper lifted off the stone sheet. */
 .about-grid section, dialog.settings .setting {
   padding: 1rem 1.1rem 1.05rem; border-radius: 14px;
-  background: color-mix(in srgb, var(--sunken) 55%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+  background: var(--panel); box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgb(40 30 15 / 0.05);
 }
 
 /* ---------- About (features/about/About.tsx): a field guide. Side nav of every feature (scroll-spied) beside
@@ -1388,7 +1448,7 @@ dialog.modal[open] .about-stats div { animation: rise 500ms var(--ease) backward
 /* One area per row, in nav order, so scrolling reads top to bottom; features flow in columns inside each card. */
 .about-grid { display: grid; gap: 0.9rem; }
 .about-grid section {
-  background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, color-mix(in srgb, var(--sunken) 55%, var(--panel));
+  background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, var(--panel);
   transition: box-shadow 200ms var(--ease);
 }
 .about-grid section:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 35%, var(--line)); }
@@ -1457,7 +1517,7 @@ dialog.modal[open] .settings-nav button { animation: rise 420ms var(--ease) back
   .settings-card .identity > :not(label:not(.check)) { grid-column: 1 / -1; }
 }
 dialog.settings .settings-card .setting {
-  background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, color-mix(in srgb, var(--sunken) 55%, var(--panel));
+  background: linear-gradient(90deg, var(--hc), transparent 65%) top / 100% 2px no-repeat, var(--panel);
   transition: box-shadow 200ms var(--ease);
 }
 dialog.settings .settings-card .setting:focus-within { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 40%, var(--line)); }
@@ -1485,18 +1545,20 @@ dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards;
 /* Section titles inside any modal: larger and heavier than body text so sections scan at a glance. */
 dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg-hi); }
 .modal-text { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
-button.danger {
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, white), var(--danger));
-  color: #fff; font-weight: 500; box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 0.5px 1.5px rgb(0 0 0 / 0.18);
-}
-button.danger:hover:not(:disabled) { box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, black), 0 6px 18px color-mix(in srgb, var(--danger) 45%, transparent), var(--veil); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
+/* The action dock: a deeper stone shelf across the modal's foot, so the way out reads as its own place. */
 .modal .dialog-actions {
-  position: sticky; bottom: calc(-1 * var(--pad)); z-index: 2;
-  margin: 1.25rem calc(-1 * var(--pad)) calc(-1 * var(--pad)); padding: 0.85rem var(--pad) var(--pad);
-  background: color-mix(in srgb, var(--panel) 86%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  position: sticky; bottom: calc(-1 * var(--pad)); z-index: 2; gap: 0.6rem;
+  margin: 1.4rem calc(-1 * var(--pad)) calc(-1 * var(--pad)); padding: 0.9rem var(--pad);
+  background: color-mix(in srgb, color-mix(in oklab, var(--sunken) 55%, var(--sheet, var(--panel))) 90%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 var(--line), inset 0 2px 6px -4px rgb(40 30 15 / 0.12);
 }
+.modal .dialog-actions > button { min-height: calc(var(--ctl) + 0.35rem); padding: 0 1.1rem; border-radius: 10px; font-weight: 600; }
+/* Beside a filled action, the others step back to an outline on the shelf. */
+.modal .dialog-actions > button:not(.primary, .danger) { color: var(--fg); background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.modal .dialog-actions > button:not(.primary, .danger):hover:not(:disabled) { background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong), 0 1px 2px rgb(40 30 15 / 0.08); }
+dialog.modal[open] .dialog-actions > button { animation: rise 420ms var(--ease) 140ms backwards; }
 @media (max-width: 30rem) { .modal .dialog-actions button { flex: 1; } }
 /* Near the top, full width minus a gutter on phones. Backdrop clicks close it via the global handler in main.tsx. */
 dialog.palette {

@@ -21,24 +21,28 @@ export function ModalHead({ id, icon, tone = "accent", title, sub, children }: {
 /** The app name, set larger in the brand gradient wherever it shows up in visible text. */
 export const Brand = () => <span className="brand-name">git-ai</span>;
 
+/** Branch names in dialogs and notices: local ones in the accent, remote ones (origin/x) in slate blue. */
+export const Local = ({ name }: { name: React.ReactNode }) => <b className="name-local">{name}</b>;
+export const Remote = ({ name }: { name: React.ReactNode }) => <b className="name-remote">{name}</b>;
+
 // In-app replacement for the native confirm box, so confirms look like every other modal.
 /** One option of `choose`: `hint` is a plain line under the label; `suggested` tags the likely right pick. */
-export type Choice = { label: string; hint?: string; tone?: Tone; suggested?: boolean; icon?: IconName };
+export type Choice = { label: React.ReactNode; hint?: React.ReactNode; tone?: Tone; suggested?: boolean; icon?: IconName };
 /** A text field of `prompt`. */
 export type Field = { label: string; value?: string; placeholder?: string };
-type Ask = { title: string; message: React.ReactNode; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; check?: React.ReactNode; resolve: (i: number, values: string[], checked?: boolean) => void };
+type Ask = { title: React.ReactNode; message: React.ReactNode; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; check?: React.ReactNode; resolve: (i: number, values: string[], checked?: boolean) => void };
 let asking: Ask | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 
 /** Resolves the index of the picked choice, -1 on Cancel or Esc. */
-export function choose(title: string, message: React.ReactNode, choices: Choice[], icon: IconName = "warn", tone: Tone = "accent") {
+export function choose(title: React.ReactNode, message: React.ReactNode, choices: Choice[], icon: IconName = "warn", tone: Tone = "accent") {
   asking?.resolve(-1, []);
   return new Promise<number>((resolve) => { asking = { title, message, icon, tone, choices, resolve }; emit(); });
 }
 
 /** Asks for one or more lines of text; resolves the trimmed values, or null on Cancel or Esc. */
-export function prompt(title: string, message: string, fields: Field[], ok: string, icon: IconName = "branch") {
+export function prompt(title: React.ReactNode, message: React.ReactNode, fields: Field[], ok: string, icon: IconName = "branch") {
   asking?.resolve(-1, []);
   return new Promise<string[] | null>((resolve) => {
     asking = { title, message, icon, tone: "accent", choices: [{ label: ok }], fields, resolve: (i, v) => resolve(i === 0 ? v : null) };
@@ -47,11 +51,11 @@ export function prompt(title: string, message: string, fields: Field[], ok: stri
 }
 
 /** Resolves true on the OK button, false on Cancel or Esc. */
-export const confirm = (title: string, message: React.ReactNode, ok = "OK", tone: Tone = "warn") =>
+export const confirm = (title: React.ReactNode, message: React.ReactNode, ok = "OK", tone: Tone = "warn") =>
   choose(title, message, [{ label: ok, tone }], "warn", tone).then((i) => i === 0);
 
 /** `confirm` with an unchecked checkbox labeled `check`: resolves its state on OK, null on Cancel or Esc. */
-export function confirmCheck(title: string, message: React.ReactNode, ok: string, check: React.ReactNode, tone: Tone = "warn") {
+export function confirmCheck(title: React.ReactNode, message: React.ReactNode, ok: string, check: React.ReactNode, tone: Tone = "warn") {
   asking?.resolve(-1, []);
   return new Promise<boolean | null>((resolve) => {
     asking = { title, message, icon: "warn", tone, choices: [{ label: ok, tone }], check, resolve: (i, _, c) => resolve(i === 0 ? !!c : null) };
@@ -93,7 +97,7 @@ export function ConfirmDialog() {
           {!one && (
             <div className="choices">
               {a.choices.map((c, i) => (
-                <button key={c.label} type="button" className={`choice tone-${c.tone ?? "accent"}${c.suggested ? " suggested" : ""}`} onClick={() => answer(i)}>
+                <button key={i} type="button" className={`choice tone-${c.tone ?? "accent"}${c.suggested ? " suggested" : ""}`} onClick={() => answer(i)}>
                   {c.icon && <span className="choice-icon"><Icon name={c.icon} /></span>}
                   <span className="choice-body">
                     <strong>{c.label}{c.suggested && <span className="choice-tag">Suggested</span>}</strong>{c.hint && <span className="muted">{c.hint}</span>}
