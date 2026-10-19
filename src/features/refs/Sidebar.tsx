@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, submoduleUpdate, submodules, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
-import { canUndo, confirmUndo, errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
+import { canUndo, confirmUndo, errorText, opLabel, opLogQuery, statusQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
@@ -58,13 +58,25 @@ async function deleteLocal(path: string, name: string) {
 
 /** [label, handler, why it is disabled (absent = enabled)] */
 export type Action = [string, () => void, string?];
+
+/** Why history-changing actions are off: a merge/rebase/cherry-pick/revert paused at conflicts. "" when none. */
+export function usePaused(path: string) {
+  const op = useQuery(statusQuery(path)).data?.operation;
+  return op ? `Finish or abort the ${op} first` : "";
+}
+/** Actions that move HEAD, switch branches or touch the working tree: they can't run while an op is paused. */
+export const PAUSE_BLOCKED = /^(Switch|Merge|Rebase|New branch|Reset|Apply|Pop|Stash|Pull|Push|Cherry-pick|Revert)\b/;
+export const blockPaused = (actions: Action[], why: string): Action[] =>
+  why ? actions.map(([a, fn, off]) => [a, fn, PAUSE_BLOCKED.test(a) ? why : off]) : actions;
 /** Menu actions for a branch, remote branch or tag by short name (shared by the sidebar and the graph's ref labels). */
 export function useRefActions(path: string) {
   const data = useQuery(refsQuery(path)).data;
   const merged = useQuery({ queryKey: ["merged", path], queryFn: () => mergedRefs(path) }).data;
   const run = useRun();
+  const paused = usePaused(path);
   /** `ontoOnly`: just the merge/rebase actions (for branch drag and drop). */
-  return (name: string, ontoOnly = false): Action[] => {
+  return (name: string, ontoOnly = false) => blockPaused(all(name, ontoOnly), paused);
+  function all(name: string, ontoOnly: boolean): Action[] {
     if (!data) return [];
     const head = data.head;
     /** A ref name styled by kind: remote branch, local branch, or plain bold (tag). */
@@ -184,7 +196,7 @@ export function useRefActions(path: string) {
       if (await confirm("Delete tag", `Delete tag ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))
         run(() => deleteTag(path, name));
     }]];
-  };
+  }
 }
 
 /** Opens a `RefMenu` popover: at the pointer on right-click or drop, else under the clicked element. */
@@ -232,6 +244,7 @@ export function Sidebar({ path }: { path: string }) {
   const subsList = useQuery({ queryKey: ["submodules", path], queryFn: () => submodules(path) }).data;
   const run = useRun();
   const actions = useRefActions(path);
+  const paused = usePaused(path);
   // Network: may clone. `sub` null = all of them.
   const updateSub = (sub: string | null) =>
     run(() => submoduleUpdate(path, sub), sub ? `Updated ${sub}` : "Updated the submodules", sub ? `Updating ${sub}…` : "Updating submodules…");
@@ -327,12 +340,13 @@ export function Sidebar({ path }: { path: string }) {
       <details open>
         <summary>
           <Icon name="branch" />Branches <span className="count">{data.local.length}</span>
-          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openNewBranch(); }} aria-label="New branch" title="New branch"><Icon name="add" /></button>
+          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openNewBranch(); }} aria-label="New branch" title={paused || "New branch"} disabled={!!paused}><Icon name="add" /></button>
         </summary>
         <ul className="refs">
           {local.map((b) => {
             const cur = b.name === data.head;
-            return <Row key={b.name} item={b} cur={cur} onOpen={cur ? undefined : actions(b.name)[0]?.[1] /* Switch / Checkout */} actions={actions(b.name)} dnd={dnd(b.name)} />;
+            const acts = actions(b.name);
+            return <Row key={b.name} item={b} cur={cur} onOpen={cur || acts[0]?.[2] ? undefined : acts[0]?.[1] /* Switch / Checkout */} actions={acts} dnd={dnd(b.name)} />;
           })}
         </ul>
       </details>
@@ -346,7 +360,7 @@ export function Sidebar({ path }: { path: string }) {
             <RemoteSummary name={remote} actions={remoteActions(remote)} />
             <ul className="refs">
               {pin(items, upstream).map((r) => (
-                <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={actions(r.name)[0][1]} actions={actions(r.name)} dnd={dnd(r.name)} />
+                <Row key={r.name} item={r} label={r.name.slice(remote.length + 1)} onOpen={paused ? undefined : actions(r.name)[0][1]} actions={actions(r.name)} dnd={dnd(r.name)} />
               ))}
             </ul>
           </details>
@@ -363,11 +377,11 @@ export function Sidebar({ path }: { path: string }) {
       <details>
         <summary>
           <Icon name="stash" />Stashes <span className="count">{data.stashes.length}</span>
-          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openStashSave(); }} aria-label="Stash changes…" title="Stash changes…"><Icon name="add" /></button>
+          <button className="icon-btn" onClick={(e) => { e.preventDefault(); openStashSave(); }} aria-label="Stash changes…" title={paused || "Stash changes…"} disabled={!!paused}><Icon name="add" /></button>
         </summary>
         <ul className="refs">
           {data.stashes.map((s, i) => s.name.toLowerCase().includes(f) && (
-            <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} onPick={() => openStash(s.oid, `stash@{${i}}: ${s.name}`)} actions={[
+            <Row key={s.oid} item={s} label={`stash@{${i}}: ${s.name}`} onPick={() => openStash(s.oid, `stash@{${i}}: ${s.name}`)} actions={blockPaused([
               ["Show changes", () => openStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Apply", () => run(() => stash(path, "Apply", i, s.oid))],
               ["Pop", () => run(() => stash(path, "Pop", i, s.oid))],
@@ -375,7 +389,7 @@ export function Sidebar({ path }: { path: string }) {
               ["New branch from stash", () => branchFromStash(i, s)],
               ["Explain (AI)", () => openExplainStash(s.oid, `stash@{${i}}: ${s.name}`)],
               ["Drop", () => dropStash(i, s)],
-            ]} />
+            ], paused)} />
           ))}
         </ul>
       </details>

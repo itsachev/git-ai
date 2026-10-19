@@ -8,7 +8,7 @@ import { DiffLine, useLang } from "../../lib/highlight";
 import { Lines, widest } from "../../lib/Lines";
 import { ago } from "../refs/NewBranch";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
-import { NameForm, refsQuery } from "../refs/Sidebar";
+import { NameForm, refsQuery, usePaused } from "../refs/Sidebar";
 import { Avatar, CommitGraph, CommitSearch, GraphOptions, savedOpts, type Picked } from "./CommitGraph";
 import { Splitter } from "../../lib/splitter";
 import { openRebase } from "./Rebase";
@@ -63,8 +63,11 @@ export function History({ path }: { path: string }) {
     graphSearch(path, opts, "Id", tip).then((h) => h[0] && setSel({ i: h[0][0], oid: h[0][1] }), () => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refs?.head, tip]);
+  // Why Cherry-pick / Merge are off.
+  const paused = usePaused(path);
+  const noPick = paused || (d?.in_head ? inHead : "");
   // Rebase rewrites commits after `d` on the current branch: none if `d` is the tip or not on it.
-  const noRebase = !d ? null : d.oid === tip ? "This is the newest commit: nothing after it to rebase" : !d.in_head ? "Not on the current branch" : null;
+  const noRebase = !d ? null : paused ? paused : d.oid === tip ? "This is the newest commit: nothing after it to rebase" : !d.in_head ? "Not on the current branch" : null;
   // Keep the picked file only while the commit has it, else show the first file.
   const shown = d?.files.find((f) => f.path === file)?.path ?? d?.files[0]?.path ?? null;
   const nl = d?.message.indexOf("\n") ?? -1;
@@ -107,9 +110,9 @@ export function History({ path }: { path: string }) {
                 <time dateTime={new Date(d.time * 1000).toISOString()} title={new Date(d.time * 1000).toLocaleString()}>{ago(d.time)}</time>
               </div>
               <div className="commit-actions" role="toolbar" aria-label="Commit actions">
-                <button className="small ghost" disabled={d.in_head} title={d.in_head ? inHead : "Copy this commit onto the current branch"} onClick={() => run(() => merge(path, d.oid, true), `Cherry-picked ${d.oid.slice(0, 7)}`)}><Icon name="pull" />Cherry-pick</button>
-                <button className="small ghost" disabled={d.in_head} title={d.in_head ? inHead : undefined} onClick={async () => (await confirm("Merge commit", <>Merge {d.oid.slice(0, 7)} into {refs?.head ? <Local name={refs.head} /> : "the current branch"}? Undo history (sidebar) can reverse it.</>, "Merge")) && run(() => merge(path, d.oid, false), `Merged ${d.oid.slice(0, 7)} into the current branch`)}><Icon name="branch" />Merge</button>
-                <button className="small ghost" title="Add a commit that undoes this one"
+                <button className="small ghost" disabled={!!noPick} title={noPick || "Copy this commit onto the current branch"} onClick={() => run(() => merge(path, d.oid, true), `Cherry-picked ${d.oid.slice(0, 7)}`)}><Icon name="pull" />Cherry-pick</button>
+                <button className="small ghost" disabled={!!noPick} title={noPick || undefined} onClick={async () => (await confirm("Merge commit", <>Merge {d.oid.slice(0, 7)} into {refs?.head ? <Local name={refs.head} /> : "the current branch"}? Undo history (sidebar) can reverse it.</>, "Merge")) && run(() => merge(path, d.oid, false), `Merged ${d.oid.slice(0, 7)} into the current branch`)}><Icon name="branch" />Merge</button>
+                <button className="small ghost" disabled={!!paused} title={paused || "Add a commit that undoes this one"}
                   onClick={async () => (await confirm("Revert commit", <>Add a commit on {refs?.head ? <Local name={refs.head} /> : "the current branch"} that undoes {d.oid.slice(0, 7)}? Undo history (sidebar) can reverse it.</>, "Revert")) && run(() => revert(path, d.oid), `Reverted ${d.oid.slice(0, 7)}`)}><Icon name="undo" />Revert</button>
                 <button className="small ghost" aria-expanded={tagging} onClick={() => setTagging((t) => !t)}><Icon name="tag" />Tag…</button>
                 <button className="small ghost" disabled={!!noRebase} onClick={() => openRebase(d.oid)} title={noRebase ?? "Reorder, edit, squash or drop the commits after this one"}><Icon name="restart" />Rebase…</button>

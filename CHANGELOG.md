@@ -18,10 +18,14 @@ What's new in each git-ai release. Newest first.
 - Switching branches stops whenever you have uncommitted changes, and asks whether to bring them along or stash them. Before, changes that didn't clash were moved to the other branch without a word.
 - Dialogs have a new look: a warm tinted sheet instead of plain white, a coloured header with a dot pattern, and a shelf at the bottom for the buttons. Options in choice dialogs carry a gradient in their own colour (blue for safe, orange for careful, red for destructive) that brightens on hover. Buttons are flatter and crisper, with clearer main and danger actions.
 - Branch names are highlighted the same way in every dialog and notification (local branches in the accent colour, remote ones in blue), including dialog titles, option labels and the messages after an action finishes.
+- While a merge, rebase, cherry-pick or revert is paused on conflicts, actions that can't run until it's finished or aborted (Pull, Push, Stash, New branch, Switch / Checkout, Merge, Rebase, Reset, Cherry-pick, Revert, applying stashes) are greyed out, with a note saying why. Fetch still works.
 - Repository tabs have a new look: each tab fills the whole tab bar with clear edges, and gets its own colour so you can tell repos apart at a glance.
 
 ### Fixed
 
+- Aborting a rebase or merge no longer leaves File Status blank (toolbar, file list and diff all missing until the app was reloaded).
+- Aborting a merge or rebase while a conflicted file was open no longer marks that file as resolved and stages it.
+- The progress notification at the bottom ("Pushing … to origin/…") no longer breaks into narrow, letter-wrapped columns when it shows branch names.
 - Push, pull and fetch over HTTPS no longer hang forever when the connection drops: after a minute with nothing getting through, they stop with a "connection stalled" message and a Try again button.
 - Checking out a remote branch that has no local copy now asks first, and says when the new local branch is created.
 - Choice dialogs no longer misplace the arrow on options without an icon, and show options in two columns when the window is wide enough.

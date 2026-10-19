@@ -9,7 +9,7 @@ import type { GraphOpts } from "../../bindings/GraphOpts";
 import type { SearchIn } from "../../bindings/SearchIn";
 import { errorText, useRun } from "../status/Changes";
 import { openCompare } from "./Compare";
-import { RefMenu, confirmMerge, confirmRebase, refsQuery, showMenu, useRefActions, type Action } from "../refs/Sidebar";
+import { RefMenu, blockPaused, confirmMerge, confirmRebase, refsQuery, showMenu, usePaused, useRefActions, type Action } from "../refs/Sidebar";
 import { Local, choose, confirm } from "../../lib/modal";
 import type { ResetMode } from "../../bindings/ResetMode";
 import { Icon } from "../../lib/icons";
@@ -149,6 +149,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
   const refsData = useQuery(refsQuery(path)).data;
   const branch = refsData?.head;
   const refActions = useRefActions(path);
+  const paused = usePaused(path);
   const run = useRun();
   const qc = useQueryClient();
   const menuPop = useRef<HTMLDivElement>(null);
@@ -188,7 +189,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
       [`Merge ${at} into ${branch}`, async () => (await confirmMerge(at, <Local name={branch} />)) && run(() => merge(path, r.oid, false), <>Merged {at} into <Local name={branch} /></>), done],
       [`Rebase ${branch} onto ${at}`, async () => (await confirmRebase(<Local name={branch} />, at)) && run(() => rebaseOnto(path, r.oid), <>Rebased <Local name={branch} /> onto {at}</>), done],
     ] as Action[] : [])];
-    flushSync(() => { setMenu([...(ref ? refActions(ref) : own), resetAction(r)]); setMenuLabel(ref ?? at); });
+    flushSync(() => { setMenu(blockPaused([...(ref ? refActions(ref) : own), resetAction(r)], paused)); setMenuLabel(ref ?? at); });
     showMenu(menuPop.current, e);
   }
 
@@ -356,7 +357,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
 /** Branch/tag label on a commit; right-click for the same actions as the sidebar. */
 function RefChip({ name, path, extra }: { name: string; path: string; extra: Action[] }) {
   const pop = useRef<HTMLDivElement>(null);
-  const actions = [...useRefActions(path)(name), ...extra];
+  const actions = blockPaused([...useRefActions(path)(name), ...extra], usePaused(path));
   return (
     <>
       <span className="ref" title={`${name} (right-click for actions)`} onContextMenu={(e) => { e.stopPropagation(); showMenu(pop.current, e); }}>{name}</span>

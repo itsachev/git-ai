@@ -13,9 +13,10 @@ const subs = new Set<() => void>();
 export const openNewBranch = (from: string | null = null) => { state = { from }; subs.forEach((f) => f()); };
 const close = () => { state = null; subs.forEach((f) => f()); };
 
-export function NewBranchButton() {
+/** `off`: why it's disabled. */
+export function NewBranchButton({ off }: { off?: string }) {
   return (
-    <button onClick={() => openNewBranch()} title="New branch (Ctrl+Shift+B)">
+    <button onClick={() => openNewBranch()} disabled={!!off} title={off || "New branch (Ctrl+Shift+B)"}>
       <Icon name="branch" /><span className="btn-label">Branch</span>
     </button>
   );

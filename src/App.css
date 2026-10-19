@@ -1711,10 +1711,13 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
   background: linear-gradient(90deg, transparent, var(--tone), transparent); animation: sweep 1.3s var(--ease) infinite;
 }
 .toast .ring { width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 2.5px solid color-mix(in srgb, var(--tone) 25%, transparent); border-top-color: var(--tone); animation: spin 800ms linear infinite; }
-.toast .elapsed { margin-left: auto; padding-left: 0.5rem; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); animation: fade 300ms var(--ease); }
+/* One flex item for the whole line, so branch-name spans flow inline instead of becoming columns. */
+.notice-text { min-width: 0; }
+.toast .elapsed { flex: none; white-space: nowrap; margin-left: auto; padding-left: 0.5rem; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); animation: fade 300ms var(--ease); }
 .notice .toast.settled { animation: settle 420ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
-/* Repo window lock during Commit/Fetch/Pull/Push: a layout-free <fieldset disabled>. */
-.lock { display: contents; }
+/* Repo window lock during Commit/Fetch/Pull/Push: a <fieldset disabled> that fills the rail/stage as their flex column.
+   Not display: contents: Chromium (WebView2) then drops its grandchildren's layout boxes after some updates, blanking the toolbar and body. */
+.lock { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; }
 .lock:disabled, .lock:disabled button:disabled { cursor: progress; }
 /* Dims only after 250 ms (unlocking is instant), so a quick commit doesn't flash the whole window. */
 .lock:disabled button:disabled { transition: opacity 160ms var(--ease) 250ms; }

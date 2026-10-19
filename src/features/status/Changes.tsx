@@ -161,10 +161,10 @@ export function Notice() {
       {cur && (cur.pending
         ? <span key={cur.gen} className="toast tone-accent pending">
             <span className="modal-badge tone-accent"><span className="ring" aria-hidden="true" /></span>
-            {cur.text}{secs >= 2 && <span className="elapsed" aria-hidden="true">{secs}s</span>}
+            <span className="notice-text">{cur.text}</span>{secs >= 2 && <span className="elapsed" aria-hidden="true">{secs}s</span>}
           </span>
         : <span key={`${cur.gen}-done`} className={`toast tone-ok${cur.waited ? " settled" : ""}`}>
-            <span className="modal-badge tone-ok"><Icon name="check" /></span>{cur.text}
+            <span className="modal-badge tone-ok"><Icon name="check" /></span><span className="notice-text">{cur.text}</span>
           </span>)}
     </p>
   );
@@ -192,7 +192,7 @@ export function Changes({ path, push }: { path: string; push: () => Promise<unkn
   const conflicted = !!cur && !cur.staged && data.conflicted.some((f) => f.path === cur.file);
   const resolved = !!cur && cur.staged && hadConflict.current.has(cur.file);
 
-  const list = { sel: cur, onSelect: setSel };
+  const list = { sel: cur, onSelect: setSel, paused: data.operation ? `Finish or abort the ${data.operation} first` : undefined };
   async function ignoreFile(file: string) {
     const pats = ignorePatterns(file);
     const i = await choose("Ignore", `Git stops listing matching untracked files. The pattern goes into .gitignore, which you commit like any file.`,
@@ -378,9 +378,11 @@ type ListProps = {
   onIgnore?: (file: string) => void;
   sel: Selection | null;
   onSelect: (s: Selection) => void;
+  /** Why Stash is off: a merge/rebase/... is paused. */
+  paused?: string;
 };
 
-function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore, sel, onSelect }: ListProps) {
+function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore, sel, onSelect, paused }: ListProps) {
   // Multi-selection: Ctrl/Shift+click, Ctrl+A, or drag over rows. Only shown while the diff's file is in this list.
   const [marked, setMarked] = useState<Set<string>>(new Set());
   const anchor = useRef(0);
@@ -447,7 +449,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
       <RefMenu pop={menu} label={`Actions for ${ctx?.path ?? "file"}`} actions={ctx ? [
         ["Compare with a branch", () => openFileHistory("HEAD", ctx.path, "compare")],
         ["History and blame", () => openFileHistory("HEAD", ctx.path), ctx.kind === "?" || ctx.kind === "A" ? "New file: no history yet" : undefined],
-        [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files` : "Stash this file", () => openStashSave(pathsOf(ctxFiles))],
+        [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files` : "Stash this file", () => openStashSave(pathsOf(ctxFiles)), paused],
       ] : []} />
     </section>
   );
@@ -475,7 +477,13 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
     if (/^(<{7}|>{7})( |\r?$)/m.test(data)) hadMarkers.current = true;
     else if (hadMarkers.current) {
       hadMarkers.current = false;
-      run(() => stage(path, [file]), `Resolved ${file}`);
+      // The markers may be gone because the merge/rebase was just aborted (status not refetched yet): stage only a live conflict.
+      let staged = false;
+      run(async () => {
+        if (!(await repoStatus(path)).conflicted.some((f) => f.path === file)) return;
+        await stage(path, [file]);
+        staged = true;
+      }, () => staged && `Resolved ${file}`);
     }
   }, [data, resolved]);
   const open = (n: string) => run(() => openFile(path, file, n || null).then(() => void eds.refetch()));

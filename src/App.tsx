@@ -13,7 +13,7 @@ import type { OpEntry } from "./bindings/OpEntry";
 import type { RefItem } from "./bindings/RefItem";
 import { Changes, Notice, OpErrorDialog, canUndo, confirmUndo, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useOpBusy, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
-import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
+import { PAUSE_BLOCKED, Sidebar, refsQuery, switchTo, usePaused } from "./features/refs/Sidebar";
 import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs/NewBranch";
 import { WriteUpDialog, openWriteUp } from "./features/refs/WriteUp";
 import { RebaseDialog } from "./features/graph/Rebase";
@@ -459,6 +459,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   // Also true between the two steps of a rejected push (sync.busy covers the choice dialog in between).
   const busy = useOpBusy() || !!sync.busy;
   const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
+  const paused = usePaused(path);
   const views = [["status", "File Status", "changes", "Ctrl+1"], ["history", "History", "history", "Ctrl+2"]] as const;
   const shell = useRef<HTMLDivElement>(null);
 
@@ -559,10 +560,10 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
             </p>
           </div>
           <SyncButtons sync={sync}>
-            <button disabled={!changed} onClick={() => openStashSave()} title={changed ? "Stash changes: name it, pick which ones" : "No changes to stash"}>
+            <button disabled={!changed || !!paused} onClick={() => openStashSave()} title={paused || (changed ? "Stash changes: name it, pick which ones" : "No changes to stash")}>
               <Icon name="stash" /><span className="btn-label">Stash</span>
             </button>
-            <NewBranchButton />
+            <NewBranchButton off={paused} />
             <button onClick={() => run(() => openTerminal(path))} title="Open this repository in a terminal">
               <Icon name="terminal" /><span className="btn-label">Terminal</span>
             </button>
@@ -583,8 +584,8 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <StashSaveDialog path={path} />
         <LfsDialog path={path} />
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} push={sync.pushNow} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
-        {/* No shortcuts or palette commands while busy. */}
-        <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : commands} path={busy ? undefined : path} /></footer>
+        {/* No shortcuts or palette commands while busy; mid-merge/rebase, none that move HEAD or switch branches. */}
+        <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : paused ? commands.filter((c) => !PAUSE_BLOCKED.test(c.label)) : commands} path={busy ? undefined : path} /></footer>
         </fieldset>
       </main>
     </div>

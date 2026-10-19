@@ -8,7 +8,7 @@ import type { GhRepo } from "../../bindings/GhRepo";
 import type { AskpassPrompt } from "../../bindings/AskpassPrompt";
 import type { RepoInfo } from "../../bindings/RepoInfo";
 import { errorText, type Run } from "../status/Changes";
-import { RefMenu, refsQuery, remotesQuery, showMenu } from "../refs/Sidebar";
+import { RefMenu, refsQuery, remotesQuery, showMenu, usePaused } from "../refs/Sidebar";
 import { Icon, type IconName } from "../../lib/icons";
 import { Brand, Local, ModalHead, Remote as RemoteName, choose, confirm, prompt, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
@@ -21,6 +21,8 @@ export function useSync(path: string, run: Run) {
   const refs = useQuery(refsQuery(path)).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
   const remoteList = useQuery(remotesQuery(path)).data;
+  // Mid-merge/rebase: Pull and Push wait until it's finished or aborted. Fetch is still fine.
+  const paused = usePaused(path);
   const [busy, setBusy] = useState<string | null>(null);
   // The Pull button's mode, last picked in its menu; kept in localStorage like the other per-window UI choices.
   const [rebase, setRebase] = useState(() => { try { return localStorage.getItem(PULL_KEY) === "rebase"; } catch { return false; } });
@@ -99,12 +101,14 @@ export function useSync(path: string, run: Run) {
       {upstream} has {n} commit{n === 1 ? "" : "s"} that {head} doesn't. Moved {head} back on purpose? Force push makes the remote match. Someone else pushed? Pull instead.
     </>);
   }, 0, "↺", `${cur?.upstream} has commits ${refs?.head} doesn't: pull, or force push to move the remote back`);
-  const pushOff = !refs?.local.length ? "Make a first commit to push"
+  const pushOff = paused ? paused
+    : !refs?.local.length ? "Make a first commit to push"
     : !cur ? "Check out a branch to push it"
     : cur.upstream ? (cur.ahead || behindOnly ? "" : "Nothing to push: no new commits")
     : refs.remote.some((r) => r.oid === cur.oid && r.name.startsWith(`${pushTo}/`)) ? "Nothing to push: no new commits"
     : "";
-  const pullOff = !cur ? "Check out a branch to pull into it"
+  const pullOff = paused ? paused
+    : !cur ? "Check out a branch to pull into it"
     : !cur.upstream ? `${cur.name} doesn't track a remote branch yet. Push publishes it, or pick one with Track remote branch… in its menu`
     : "";
   // No remote yet: the first push asks where to, adds it as origin, then pushes (and sets the upstream).
@@ -122,7 +126,7 @@ export function useSync(path: string, run: Run) {
     ops: [
       op("Fetch", "Fetching…", "Fetching from all remotes…", "Fetched all remotes", () => fetchAll(path)),
       { ...(rebase ? pullRebase : pullMerge), off: pullOff },
-      behindOnly ? rewindOp
+      behindOnly ? { ...rewindOp, off: paused, badge: paused ? "" : rewindOp.badge }
         : { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushOp.go() },
     ],
   };
