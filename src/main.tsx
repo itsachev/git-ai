@@ -7,6 +7,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import App from "./App";
+import { zoomReady } from "./lib/zoom";
 
 // Data only refetches when the repo watcher says something changed.
 const queryClient = new QueryClient({
@@ -79,4 +80,4 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 
 // The window starts hidden (tauri.conf.json) so its resize to the work area and the blank
 // webview never show. Reveal it once the first frame has painted.
-requestAnimationFrame(() => requestAnimationFrame(() => getCurrentWindow().show()));
+zoomReady.then(() => requestAnimationFrame(() => requestAnimationFrame(() => getCurrentWindow().show())));

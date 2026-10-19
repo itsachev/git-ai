@@ -27,6 +27,8 @@ const IN_PLACE: Omit<Area, "hue">[] = [
     ["Esc", "Cancel a name form, close the branches drawer"],
     ["Middle-click", "Close a repository tab"],
     ["Arrows", "Resize a focused panel divider"],
+    ["Ctrl+= / Ctrl+-", "Zoom the whole app in or out (or Ctrl+mouse wheel)"],
+    ["Ctrl+0", "Reset the zoom"],
   ] },
 ];
 const HUES = [175, 255, 145, 300, 45];

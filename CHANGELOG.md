@@ -4,6 +4,10 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+
+- Zoom the whole app with Ctrl + and Ctrl − (⌘ on macOS) or Ctrl + mouse wheel; Ctrl 0 resets it. The zoom level is remembered.
+
 ### Changed
 
 - Pushing a branch that isn't on the remote yet now says so when it finishes: "Created and pushed to branch origin/…".

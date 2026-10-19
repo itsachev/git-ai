@@ -91,6 +91,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 ### ⌨️ Everywhere
 - Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>) and keyboard shortcuts, all listed on one page (<kbd>Ctrl</kbd>+<kbd>/</kbd>)
 - Light, dark or system theme; seven app colors; first-run setup; auto-update
+- Zoom the whole app with <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>−</kbd> or <kbd>Ctrl</kbd>+mouse wheel (<kbd>Ctrl</kbd>+<kbd>0</kbd> resets)
 - Installed Git and Node.js versions in the status bar
 
 </td></tr>
