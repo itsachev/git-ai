@@ -424,7 +424,7 @@ pub async fn pull(path: String, rebase: bool) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub async fn push(path: String, force: bool) -> Result<(), AppError> {
+pub async fn push(path: String, force: bool) -> Result<String, AppError> {
     cli::push(Path::new(&path), force)
 }
 

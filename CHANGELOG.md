@@ -6,6 +6,7 @@ What's new in each git-ai release. Newest first.
 
 ### Changed
 
+- Pushing a branch that isn't on the remote yet now says so when it finishes: "Created and pushed to branch origin/…".
 - Opening History, or switching branches while it's open, now selects the current branch's newest commit and scrolls the commit list to it. The sidebar scrolls the current branch into view too.
 - Double-clicking a local branch (or right-click → Switch / Checkout) switches to it straight away again, even when its remote has newer commits. To bring those in, check out the remote branch or use Switch / Checkout origin/… in the branch's menu.
 - Checkout is now called Switch / Checkout everywhere (branch menus, graph labels, command palette).

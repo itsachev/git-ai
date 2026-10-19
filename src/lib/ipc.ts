@@ -210,7 +210,8 @@ export const fetchUpstream = (path: string) => invoke<void>("fetch_upstream", { 
 export const pull = (path: string, rebase = false) => invoke<void>("pull", { path, rebase });
 /** Pushes the current branch; without an upstream it goes to origin and becomes the upstream. Code "rejected" = pull first.
  *  `force` overwrites the remote branch if it's still where the last fetch saw it (else code "stale_remote"); undoable. */
-export const push = (path: string, force = false) => invoke<void>("push", { path, force });
+/** Returns the remote branch pushed to, e.g. "origin/feat". */
+export const push = (path: string, force = false) => invoke<string>("push", { path, force });
 export const pushTag = (path: string, name: string) => invoke<void>("push_tag", { path, name });
 /** `name` is the remote branch, e.g. "origin/feat". Undo pushes it back. */
 export const deleteRemoteBranch = (path: string, name: string) => invoke<void>("delete_remote_branch", { path, name });

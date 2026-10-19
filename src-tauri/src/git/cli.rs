@@ -508,8 +508,9 @@ pub fn pull(repo: &Path, rebase: bool) -> Result<(), AppError> {
 /// Pushes the current branch to its upstream. Without one it goes to the same name on `origin` (or the
 /// first remote) and becomes the upstream. `force` overwrites the remote branch, but only if it is still
 /// where the last fetch saw it (`--force-with-lease`); the old tip is logged and kept so undo can put it back.
-pub fn push(repo: &Path, force: bool) -> Result<(), AppError> {
-    push_branch(repo, &current_branch(repo)?, &|_| Ok(()), force).map(drop)
+/// Returns the remote branch it went to ("origin/feat").
+pub fn push(repo: &Path, force: bool) -> Result<String, AppError> {
+    push_branch(repo, &current_branch(repo)?, &|_| Ok(()), force).map(|(r, b)| format!("{r}/{b}"))
 }
 
 /// Checks a remote URL before anything is pushed to it.

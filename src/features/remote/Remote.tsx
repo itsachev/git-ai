@@ -65,8 +65,9 @@ export function useSync(path: string, run: Run) {
   const pushOp = op("Push", "Pushing…", `Pushing ${target}…`, () => pushed, async () => {
         pushed = undefined;
         try {
-          await push(path);
-          pushed = `Pushed ${target}`;
+          const to = await push(path);
+          // No upstream before: this push created the remote branch.
+          pushed = cur?.upstream ? `Pushed ${target}` : `Created and pushed to branch ${to}`;
         } catch (e) {
           const code = (e as AppError).code;
           if (code !== "rejected" && code !== "rewritten") throw e;
