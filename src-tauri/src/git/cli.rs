@@ -33,6 +33,8 @@ fn command(repo: Option<&Path>, args: &[&str], env: &[(&str, &OsStr)]) -> Comman
         cmd.arg("-C").arg(repo);
     }
     cmd.args(args).env("GIT_TERMINAL_PROMPT", "0").env("LC_ALL", "C");
+    // A stalled HTTP transfer (under 1 byte/s for 60 s) fails instead of hanging forever; a slow one keeps going.
+    cmd.env("GIT_HTTP_LOW_SPEED_LIMIT", "1").env("GIT_HTTP_LOW_SPEED_TIME", "60");
     for (k, v) in env {
         cmd.env(k, v);
     }
@@ -419,6 +421,8 @@ fn net_error(e: AppError) -> AppError {
         ("stale_remote", "The remote branch changed since your last fetch. Fetch, check what's there, then force push again.")
     } else if has(&["[rejected]", "non-fast-forward", "fetch first"]) {
         ("rejected", "The remote has commits you don't have yet. Pull first, then push.")
+    } else if has(&["Operation too slow", "curl 28"]) {
+        ("network", "The connection stalled: nothing got through for a minute. Check your connection and try again.")
     } else if has(&["Authentication failed", "Permission denied", "could not read Username", "could not read Password", "Host key verification failed"]) {
         ("auth", "Signing in to the remote failed. Check your credentials or SSH key.")
     } else if has(&["Could not resolve host", "unable to access", "Connection timed out", "Connection refused", "Could not read from remote repository"]) {

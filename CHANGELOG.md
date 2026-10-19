@@ -14,6 +14,7 @@ What's new in each git-ai release. Newest first.
 
 ### Fixed
 
+- Push, pull and fetch over HTTPS no longer hang forever when the connection drops: after a minute with nothing getting through, they stop with a "connection stalled" message and a Try again button.
 - Checking out a remote branch that has no local copy now asks first, and says when the new local branch is created.
 - Choice dialogs no longer misplace the arrow on options without an icon, and show options in two columns when the window is wide enough.
 
