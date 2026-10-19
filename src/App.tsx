@@ -416,7 +416,7 @@ const SYNC_GIT: Record<string, string> = { Fetch: "git fetch --all --prune", Pul
 const PULL_REBASE_GIT = "git pull --rebase --autostash";
 
 /** The last recorded destructive step, for 30 minutes after it, with its undo one click away. */
-function UndoRibbon({ entry, onUndo }: { entry: OpEntry; onUndo: () => void }) {
+function UndoRibbon({ entry, onUndo, off }: { entry: OpEntry; onUndo: () => void; off: string }) {
   const [hidden, setHidden] = useState(false);
   const mins = Math.floor((Date.now() - Number(entry.id)) / 60_000);
   if (hidden || mins > 30) return null;
@@ -424,7 +424,7 @@ function UndoRibbon({ entry, onUndo }: { entry: OpEntry; onUndo: () => void }) {
     <div className="undo-ribbon" role="status">
       <Icon name="undo" />
       <span><strong>{opLabel(entry)}</strong> <small>{mins < 1 ? "just now" : `${mins} min ago`}{entry.backup && ". A snapshot of the files is kept"}</small></span>
-      <button className="small" onClick={onUndo}>{opLabel({ ...entry, op: `undo ${entry.op}` }).split(":")[0]}</button>
+      <button className="small" disabled={!!off} title={off || undefined} onClick={onUndo}>{opLabel({ ...entry, op: `undo ${entry.op}` }).split(":")[0]}</button>
       <button className="icon-btn" aria-label="Hide" title="Hide" onClick={() => setHidden(true)}><Icon name="close" /></button>
     </div>
   );
@@ -571,7 +571,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>
-        {log?.[0] && canUndo(log[0]) && <UndoRibbon key={log[0].id} entry={log[0]} onUndo={undoLast(log[0])} />}
+        {log?.[0] && canUndo(log[0]) && <UndoRibbon key={log[0].id} entry={log[0]} onUndo={undoLast(log[0])} off={paused} />}
         <Notice />
         <OpErrorDialog path={repo.path} />
         <NewBranchDialog path={path} />

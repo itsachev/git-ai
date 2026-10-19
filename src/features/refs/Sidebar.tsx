@@ -65,7 +65,7 @@ export function usePaused(path: string) {
   return op ? `Finish or abort the ${op} first` : "";
 }
 /** Actions that move HEAD, switch branches or touch the working tree: they can't run while an op is paused. */
-export const PAUSE_BLOCKED = /^(Switch|Merge|Rebase|New branch|Reset|Apply|Pop|Stash|Pull|Push|Cherry-pick|Revert)\b/;
+export const PAUSE_BLOCKED = /^(Switch|Merge|Rebase|New branch|Reset|Apply|Pop|Stash|Pull|Push|Cherry-pick|Revert|Undo|Redo)\b/;
 export const blockPaused = (actions: Action[], why: string): Action[] =>
   why ? actions.map(([a, fn, off]) => [a, fn, PAUSE_BLOCKED.test(a) ? why : off]) : actions;
 /** Menu actions for a branch, remote branch or tag by short name (shared by the sidebar and the graph's ref labels). */
@@ -430,7 +430,7 @@ export function Sidebar({ path }: { path: string }) {
                   <span>{opLabel(e)}</span>
                   <small>{new Date(Number(e.id)).toLocaleString()}</small>
                 </span>
-                {canUndo(e) && <button className="small" onClick={async () => (await confirmUndo(e)) && run(() => undo(path, e.id))}>Undo</button>}
+                {canUndo(e) && <button className="small" disabled={!!paused} title={paused || undefined} onClick={async () => (await confirmUndo(e)) && run(() => undo(path, e.id))}>Undo</button>}
               </li>
             ))}
           </ul>

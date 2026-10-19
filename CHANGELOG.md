@@ -4,6 +4,10 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Changed
+
+- While a merge or rebase is paused on conflicts, Undo is greyed out too (undo history, the Undo bar and the command palette), since undoing then would tangle with the paused operation.
+
 ## [0.2.0] - 2026-10-19
 
 ### Added
