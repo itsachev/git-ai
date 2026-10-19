@@ -854,6 +854,9 @@ export function opLabel(e: OpEntry): string {
   return (labels[e.op] ?? e.op).trimEnd();
 }
 
+/** False for entries with nothing to swap back (the undo of a stash drop, remote delete or force push). */
+export const canUndo = (e: OpEntry) => !!(e.backup || e.head || e.new_head);
+
 /** Asks before undoing `e`: it moves branches back, so commits made since can leave the branch. */
 export function confirmUndo(e: OpEntry) {
   const label = opLabel({ ...e, op: `undo ${e.op}` });

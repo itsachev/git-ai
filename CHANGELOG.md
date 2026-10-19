@@ -25,6 +25,7 @@ What's new in each git-ai release. Newest first.
 - Push, pull and fetch over HTTPS no longer hang forever when the connection drops: after a minute with nothing getting through, they stop with a "connection stalled" message and a Try again button.
 - Checking out a remote branch that has no local copy now asks first, and says when the new local branch is created.
 - Choice dialogs no longer misplace the arrow on options without an icon, and show options in two columns when the window is wide enough.
+- Undo history no longer offers an Undo button that always fails on steps that can't be reversed again (undoing a dropped stash, a deleted remote branch or a force push).
 
 ## [0.1.0] - 2026-10-17
 

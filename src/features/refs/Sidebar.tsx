@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, submoduleUpdate, submodules, undo } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
-import { confirmUndo, errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
+import { canUndo, confirmUndo, errorText, opLabel, opLogQuery, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
 import { openNewBranch } from "./NewBranch";
 import { openExplainStash, openWriteUp } from "./WriteUp";
@@ -416,7 +416,7 @@ export function Sidebar({ path }: { path: string }) {
                   <span>{opLabel(e)}</span>
                   <small>{new Date(Number(e.id)).toLocaleString()}</small>
                 </span>
-                <button className="small" onClick={async () => (await confirmUndo(e)) && run(() => undo(path, e.id))}>Undo</button>
+                {canUndo(e) && <button className="small" onClick={async () => (await confirmUndo(e)) && run(() => undo(path, e.id))}>Undo</button>}
               </li>
             ))}
           </ul>

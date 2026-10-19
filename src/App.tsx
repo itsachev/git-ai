@@ -11,7 +11,7 @@ import type { RepoInfo } from "./bindings/RepoInfo";
 import type { AppError } from "./bindings/AppError";
 import type { OpEntry } from "./bindings/OpEntry";
 import type { RefItem } from "./bindings/RefItem";
-import { Changes, Notice, OpErrorDialog, confirmUndo, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useOpBusy, useRun } from "./features/status/Changes";
+import { Changes, Notice, OpErrorDialog, canUndo, confirmUndo, opLabel, opLogQuery, pathsOf, statusQuery, undoHint, useOpBusy, useRun } from "./features/status/Changes";
 import { History } from "./features/graph/History";
 import { Sidebar, refsQuery, switchTo } from "./features/refs/Sidebar";
 import { NewBranchButton, NewBranchDialog, openNewBranch } from "./features/refs/NewBranch";
@@ -512,7 +512,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   if (changed) commands.push({ label: "Stash changes…", git: "git stash push -u -m <name>", run: () => openStashSave() });
   if (status?.staged.length) commands.push({ label: "Unstage all", git: "git reset", run: () => run(() => unstage(path, pathsOf(status.staged))) });
   // The label is what the new entry will be: undoing an undo is a redo.
-  if (log?.[0]) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: async () => (await confirmUndo(log[0])) && run(() => undo(path, log[0].id)) });
+  if (log?.[0] && canUndo(log[0])) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: async () => (await confirmUndo(log[0])) && run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
     if (b.name !== refs?.head) commands.push({ label: `Switch / Checkout ${b.name}`, git: `git switch ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
   const undoLast = (e: OpEntry) => async () => (await confirmUndo(e)) && run(() => undo(path, e.id));
@@ -570,7 +570,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <ThemeButton theme={theme} onChange={setTheme} />
           <SettingsButton />
         </header>
-        {log?.[0] && <UndoRibbon key={log[0].id} entry={log[0]} onUndo={undoLast(log[0])} />}
+        {log?.[0] && canUndo(log[0]) && <UndoRibbon key={log[0].id} entry={log[0]} onUndo={undoLast(log[0])} />}
         <Notice />
         <OpErrorDialog path={repo.path} />
         <NewBranchDialog path={path} />
