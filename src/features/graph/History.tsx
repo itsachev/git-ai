@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { aiExplainCommit, commitDetails, commitFileDiff, createTag, merge, revert, stashFileDiff } from "../../lib/ipc";
+import { aiExplainCommit, commitDetails, commitFileDiff, createTag, graphSearch, merge, revert, stashFileDiff } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import { DiffHead, FileLabel, Gutter, Half, PaneNote, errorText, lineNumbers, noContentNote, splitRows, useDiffView, useRun } from "../status/Changes";
 import { Icon } from "../../lib/icons";
@@ -55,6 +55,14 @@ export function History({ path }: { path: string }) {
   const d = details.data;
   const refs = useQuery(refsQuery(path)).data;
   const tip = refs?.local.find((b) => b.name === refs.head)?.oid;
+  // On open and after every branch switch, pick the current branch's tip; the graph scrolls it into view.
+  const pickedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!tip || pickedFor.current === refs?.head) return;
+    pickedFor.current = refs!.head;
+    graphSearch(path, opts, "Id", tip).then((h) => h[0] && setSel({ i: h[0][0], oid: h[0][1] }), () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refs?.head, tip]);
   // Rebase rewrites commits after `d` on the current branch: none if `d` is the tip or not on it.
   const noRebase = !d ? null : d.oid === tip ? "This is the newest commit: nothing after it to rebase" : !d.in_head ? "Not on the current branch" : null;
   // Keep the picked file only while the commit has it, else show the first file.

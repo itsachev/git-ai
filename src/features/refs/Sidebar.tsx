@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, submoduleUpdate, submodules, undo } from "../../lib/ipc";
@@ -245,6 +245,8 @@ export function Sidebar({ path }: { path: string }) {
         .from(gsap.utils.toArray<HTMLElement>(".refs > li", root.current).slice(0, 16), { opacity: 0, x: -10, stagger: 0.025 }, 0.2);
     });
   }, { scope: root, dependencies: [!!data], revertOnUpdate: true });
+  // Keep the current branch in view on open and after a switch.
+  useEffect(() => { root.current?.querySelector(".refs > li.cur")?.scrollIntoView({ block: "nearest" }); }, [data?.head]);
   const other = (to: string) => (!dragging || dragging === to ? null : to === data?.head ? dragging : dragging === data?.head ? to : null);
   const dnd = (name: string): DragProps => ({
     onDragStart: () => setDragging(name),
