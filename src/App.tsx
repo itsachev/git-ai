@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "./lib/motion";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -105,6 +105,9 @@ function RemoveRepoDialog({ path, missing, onClose, onDone }: { path: string | n
   );
 }
 
+/** A stable hue per repo name, so each tab keeps its colour across restarts. */
+const repoHue = (name: string) => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; };
+
 /** One tab per open repo, plus "+" back to the repository list. Middle-click closes a tab. */
 function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]; active: string; onSelect: (path: string) => void; onClose: (path: string) => void; onNew: () => void }) {
   // Many tabs scroll sideways: keep the active one in view.
@@ -112,9 +115,9 @@ function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]
   return (
     <nav className="tabs" aria-label="Open repositories">
       {tabs.map((t) => (
-        <div key={t.path} className="tab" aria-current={t.path === active ? "page" : undefined}
+        <div key={t.path} className="tab" aria-current={t.path === active ? "page" : undefined} style={{ "--hue": repoHue(t.name) } as CSSProperties}
           onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }} onAuxClick={(e) => { if (e.button === 1) onClose(t.path); }}>
-          <button className="tab-name" onClick={() => onSelect(t.path)} title={t.path}><Icon name="folder" /><span>{t.name}</span><TabSync path={t.path} live={t.path === active} /></button>
+          <button className="tab-name" onClick={() => onSelect(t.path)} title={t.path}><Icon name="folder" /><TabLabel name={t.name} path={t.path} live={t.path === active} /></button>
           <button className="icon-btn" onClick={() => onClose(t.path)} title="Close tab (Ctrl+W)" aria-label={`Close ${t.name}`}><Icon name="close" /></button>
         </div>
       ))}
@@ -123,18 +126,25 @@ function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]
   );
 }
 
-/** Commits to push/pull on the tab's current branch. Inactive tabs show their last cached refs, so no extra git work. */
-function TabSync({ path, live }: { path: string; live: boolean }) {
+/** Repo name, its checked-out branch, and commits to push/pull on it. Inactive tabs show their last cached refs, so no extra git work. */
+function TabLabel({ name, path, live }: { name: string; path: string; live: boolean }) {
   const refs = useQuery({ ...refsQuery(path), enabled: live }).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
-  if (!cur || !(cur.ahead || cur.behind)) return null;
-  const label = [cur.ahead && `${cur.ahead} to push`, cur.behind && `${cur.behind} to pull`].filter(Boolean).join(", ");
-  // key on the count: a changed number replays the pop-in.
+  const label = cur && [cur.ahead && `${cur.ahead} to push`, cur.behind && `${cur.behind} to pull`].filter(Boolean).join(", ");
   return (
-    <span className="tab-sync" title={label} aria-label={label}>
-      {cur.ahead > 0 && <b key={`a${cur.ahead}`} aria-hidden>↑{cur.ahead}</b>}
-      {cur.behind > 0 && <b key={`b${cur.behind}`} aria-hidden className="behind">↓{cur.behind}</b>}
-    </span>
+    <>
+      <span className="tab-txt">
+        <span>{name}</span>
+        {refs && <small>{refs.head ?? "detached HEAD"}</small>}
+      </span>
+      {/* key on the count: a changed number replays the pop-in. */}
+      {cur && label && (
+        <span className="tab-sync" title={label} aria-label={label}>
+          {cur.ahead > 0 && <b key={`a${cur.ahead}`} aria-hidden>↑{cur.ahead}</b>}
+          {cur.behind > 0 && <b key={`b${cur.behind}`} aria-hidden className="behind">↓{cur.behind}</b>}
+        </span>
+      )}
+    </>
   );
 }
 

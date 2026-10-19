@@ -434,42 +434,46 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 
 /* ---------- Repo tabs (App.tsx): one per open repo, above the shell ---------- */
 .workspace { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
-/* The bottom line is an inset shadow, not a border, so the active tab can paint over it (a border would sit outside the scroll clip). */
+/* Every tab spans the strip's full height and has its own edges: a hairline on the right and a 3px spine on the left
+   in the repo's hue (--hue from App.tsx), so each repo is recognisable by colour. The bottom line is an inset shadow, so
+   the active tab (paper, like the page under it) paints over it. */
 .tabs {
-  display: flex; align-items: flex-end; gap: 2px; padding: 0.3rem 0.4rem 0;
-  background: var(--sunken); box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; scrollbar-width: none;
+  display: flex; align-items: stretch; height: 3rem;
+  background: var(--sunken); box-shadow: inset 0 -1px 0 var(--line-strong); overflow-x: auto; scrollbar-width: none;
+  --hue-l: 0.55; --hue-c: 0.13; --hue-ink-l: 0.42;
 }
+:root[data-theme="dark"] .tabs { --hue-l: 0.72; --hue-c: 0.12; --hue-ink-l: 0.84; }
 .tab {
-  flex: 0 1 12rem; min-width: 7.5rem; display: flex; align-items: center; border-radius: var(--r) var(--r) 0 0;
-  color: var(--muted); transition: background-color 180ms var(--ease), color 180ms var(--ease); animation: rise 260ms var(--ease);
+  --h: oklch(var(--hue-l) var(--hue-c) var(--hue)); --h-ink: oklch(var(--hue-ink-l) 0.1 var(--hue));
+  flex: 0 1 13rem; min-width: 8rem; display: flex; align-items: center; color: var(--muted);
+  background: color-mix(in srgb, var(--h) 7%, var(--sunken));
+  box-shadow: inset -1px 0 0 var(--line-strong), inset 3px 0 0 color-mix(in srgb, var(--h) 45%, transparent);
+  transition: background-color 240ms var(--ease), box-shadow 240ms var(--ease), color 240ms var(--ease); animation: rise 260ms var(--ease);
 }
-/* Inactive tabs have no fill, so the strip reads as their box: span its full height (through the top padding) to center on it. */
-.tab:not([aria-current]) { align-self: stretch; margin-top: -0.3rem; }
-.tab:hover { background: var(--pick); color: var(--fg); }
-/* Active: filled with the accent. */
-.tab[aria-current] { background: var(--accent); color: var(--accent-ink); }
+.tab:hover:not([aria-current]) { background: color-mix(in srgb, var(--h) 14%, var(--sunken)); color: var(--fg); }
+.tab[aria-current] { background: var(--panel); color: var(--fg-hi); box-shadow: inset -1px 0 0 var(--line-strong), inset 3px 0 0 var(--h); }
 .tab-name {
-  flex: 1; min-width: 0; justify-content: flex-start; gap: 0.45rem; padding: 0 0.2rem 0 0.65rem;
-  color: inherit; background: none; box-shadow: none; border-radius: inherit;
+  flex: 1; min-width: 0; align-self: stretch; justify-content: flex-start; gap: 0.55rem; padding: 0 0.2rem 0 0.85rem;
+  color: inherit; background: none; box-shadow: none; border-radius: 0;
 }
 .tab-name:active:not(:disabled) { scale: 1; }
-.tab-name span { overflow: hidden; text-overflow: ellipsis; }
-.tab-name .icon { color: var(--faint); }
-.tab[aria-current] .tab-name { font-weight: 700; }
+.tab-name .icon { color: var(--h); }
+.tab-txt { min-width: 0; display: grid; text-align: left; line-height: 1.25; }
+.tab-txt > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-txt small { font: 500 0.7rem/1.2 var(--mono); letter-spacing: 0; color: var(--faint); }
+.tab[aria-current] .tab-txt span { font-weight: 700; }
+.tab[aria-current] .tab-txt small { color: var(--h-ink); }
 /* Push/pull counters: one capsule split into ↑ and ↓ halves; a changed count pops in. */
 .tab-sync { flex: none; display: inline-flex; margin-left: auto; border-radius: 999px; overflow: hidden; font-size: 0.72rem; line-height: 1.35; font-variant-numeric: tabular-nums; }
 .tab-sync b { padding: 0 0.4em; color: var(--accent-fg); background: color-mix(in srgb, var(--accent) 14%, transparent); animation: pop 380ms var(--spring); }
 .tab-sync b + b { box-shadow: inset 1px 0 0 color-mix(in srgb, currentColor 30%, transparent); }
 .tab-sync .behind { color: var(--fg); }
-.tab[aria-current] .tab-sync b { color: var(--accent-ink); background: rgb(255 255 255 / 0.2); }
-.tab[aria-current] :is(.tab-name .icon, .icon-btn) { color: var(--accent-ink); }
-.tab[aria-current] .icon-btn:hover:not(:disabled) { color: var(--accent-ink); background: rgb(255 255 255 / 0.18); }
 /* Close: on hover/focus and on the active tab where there is a mouse, always on touch. */
 .tab .icon-btn { flex: none; width: calc(var(--ctl) - 0.5rem); min-height: calc(var(--ctl) - 0.5rem); margin-right: 0.2rem; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms; }
 .tab:is(:hover, [aria-current]) .icon-btn, .tab .icon-btn:focus-visible { opacity: 1; }
 @media (hover: none) { .tab .icon-btn { opacity: 1; } }
 /* "+" stays in reach at the right edge while the tabs scroll under it. */
-.tab-new { position: sticky; right: 0; flex: none; align-self: center; width: calc(var(--ctl) - 0.25rem); min-height: calc(var(--ctl) - 0.25rem); background: var(--sunken); }
+.tab-new { position: sticky; right: 0; flex: none; width: 2.75rem; min-height: 0; border-radius: 0; background: var(--sunken); box-shadow: inset 0 -1px 0 var(--line-strong); }
 
 /* ---------- Repo shell: rail + stage ---------- */
 .shell { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }

@@ -11,7 +11,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Open a repository", "Home → Open repository", "Pick any folder that contains a .git folder. It is added to Recent, so next time it is one click away."],
     ["Create a repository", "Home → Create", "Starts a new, empty repository in a folder you pick (the folder is made if needed) and opens it."],
     ["Clone", "Home → Clone", "Copies a repository from a URL into a folder you choose, with live progress. Signed in to GitHub or GitLab, pick one of your own repos from a list instead of pasting the URL."],
-    ["Several repositories in tabs", "+ at the end of the tab bar · Ctrl+T", "Keep more than one repository open and switch with a click or Ctrl+Tab. Close a tab with its ×, a middle-click or Ctrl+W. Your tabs reopen the next time you start the app."],
+    ["Several repositories in tabs", "+ at the end of the tab bar · Ctrl+T", "Keep more than one repository open and switch with a click or Ctrl+Tab. Each tab has its own colour and shows the branch it's on. Close a tab with its ×, a middle-click or Ctrl+W. Your tabs reopen the next time you start the app."],
     ["Recent repositories", "Home → Recent", "Every repository you have opened, with a filter box. Folders that were deleted or moved outside the app are flagged."],
     ["Remove from the list", "Right-click a recent repo, or its ⋯ button", "Takes the repository off the list, or also moves its folder to the Recycle Bin / Trash. You are warned first, because unpushed work goes with the folder."],
     ["GitHub sign-in", "Home → Sign in to GitHub", "Connects your GitHub account so you can clone your repos from a list and create pull/merge requests. The token stays in your OS keychain."],
