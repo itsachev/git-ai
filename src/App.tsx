@@ -126,7 +126,7 @@ function RepoTabs({ tabs, active, onSelect, onClose, onNew }: { tabs: RepoInfo[]
   );
 }
 
-/** Repo name, its checked-out branch, and commits to push/pull on it. Inactive tabs show their last cached refs, so no extra git work. */
+/** Repo name and commits to push/pull on its checked-out branch. Inactive tabs show their last cached refs, so no extra git work. */
 function TabLabel({ name, path, live }: { name: string; path: string; live: boolean }) {
   const refs = useQuery({ ...refsQuery(path), enabled: live }).data;
   const cur = refs?.local.find((b) => b.name === refs.head);
@@ -135,7 +135,6 @@ function TabLabel({ name, path, live }: { name: string; path: string; live: bool
     <>
       <span className="tab-txt">
         <span>{name}</span>
-        {refs && <small>{refs.head ?? "detached HEAD"}</small>}
       </span>
       {/* key on the count: a changed number replays the pop-in. */}
       {cur && label && (
