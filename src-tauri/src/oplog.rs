@@ -718,7 +718,9 @@ On main: one
 ");
         cli::checkout(p, "main", false, false).unwrap();
 
-        // b.txt differs between branches, so a plain switch refuses; carry brings the edit and the new file along.
+        // Any change stops a plain switch, even one git could carry; carry brings the edit and the new file along.
+        fs::write(dir.join("new.txt"), "new").unwrap();
+        assert_eq!(cli::checkout(p, "feat", false, false).unwrap_err().code, "dirty");
         fs::write(dir.join("b.txt"), "b
 mine
 ").unwrap();

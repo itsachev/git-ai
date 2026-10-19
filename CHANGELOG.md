@@ -4,6 +4,18 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Changed
+
+- Double-clicking a local branch (or right-click → Switch / Checkout) switches to it straight away again, even when its remote has newer commits. To bring those in, check out the remote branch or use Switch / Checkout origin/… in the branch's menu.
+- Checkout is now called Switch / Checkout everywhere (branch menus, graph labels, command palette).
+- "Create pull request" is now "Create pull/merge request" everywhere, since it opens a merge request on GitLab.
+- Switching branches stops whenever you have uncommitted changes, and asks whether to bring them along or stash them. Before, changes that didn't clash were moved to the other branch without a word.
+
+### Fixed
+
+- Checking out a remote branch that has no local copy now asks first, and says when the new local branch is created.
+- Choice dialogs no longer misplace the arrow on options without an icon, and show options in two columns when the window is wide enough.
+
 ## [0.1.0] - 2026-10-17
 
 First release. Windows only for now: macOS and Linux installers will follow once the macOS app is code-signed and the Linux build is tested.

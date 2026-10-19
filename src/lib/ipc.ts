@@ -28,7 +28,7 @@ import type { ResetMode } from "../bindings/ResetMode";
 import type { ReflogEntry } from "../bindings/ReflogEntry";
 import type { Submodule } from "../bindings/Submodule";
 
-// Rejections get a `title` naming what failed ("Failed to check out main"), shown by OpErrorDialog.
+// Rejections get a `title` naming what failed ("Failed to switch to main"), shown by OpErrorDialog.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Args = any;
 const short = (rev: string) => (/^[0-9a-f]{40}$/.test(rev) ? rev.slice(0, 7) : rev);
@@ -39,7 +39,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   commit: (a) => (a.amend ? "Failed to amend the commit" : "Failed to commit"),
   apply_lines: () => "Failed to update the selected lines",
   undo: () => "Failed to undo",
-  checkout: (a) => `Failed to check out ${a.name}`,
+  checkout: (a) => `Failed to switch to ${a.name}`,
   create_branch: (a) => `Failed to create branch ${a.name}`,
   delete_branch: (a) => `Failed to delete branch ${a.name}`,
   merge: (a) => (a.cherryPick ? `Failed to cherry-pick ${short(a.rev)}` : `Failed to merge ${short(a.rev)}`),
@@ -79,7 +79,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   init_repo: () => "Failed to create the repository",
   ai_commit_message: () => "Failed to write a commit message",
   ai_explain_commit: (a) => `Failed to explain ${short(a.oid)}`,
-  create_pr: () => "Failed to open the pull request",
+  create_pr: () => "Failed to open the pull/merge request",
   ai_explain_stash: () => "Failed to explain the stash",
   ai_write_range: (a) => a.kind === "pr" ? "Failed to write a PR description" : a.kind === "explain" ? "Failed to explain the branch" : "Failed to write a changelog",
 };

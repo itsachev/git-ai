@@ -486,7 +486,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
     { label: "Keyboard shortcuts", keys: "Ctrl+/", run: () => show("shortcuts") },
     { label: "Toggle branches", keys: "Ctrl+B", git: "git branch -a", run: () => setSide((v) => !v) },
     { label: "New branch", keys: "Ctrl+Shift+B", git: "git switch -c <name>", run: () => openNewBranch() },
-    { label: "Create pull request…", git: "gh pr create", run: () => openWriteUp("pr") },
+    { label: "Create pull/merge request…", git: "gh pr create", run: () => openWriteUp("pr") },
     { label: "Write changelog (AI)", run: () => openWriteUp("changelog") },
     { label: "Explain current branch (AI)", run: () => openWriteUp("explain") },
     { label: "Compare branches…", git: "git diff <branch>...<other>", run: () => openCompare(refs?.head ?? "HEAD", refs?.local.find((b) => b.name !== refs.head)?.name ?? "") },
@@ -505,7 +505,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   // The label is what the new entry will be: undoing an undo is a redo.
   if (log?.[0]) commands.push({ label: opLabel({ ...log[0], op: `undo ${log[0].op}` }), git: undoHint(log[0]), run: async () => (await confirmUndo(log[0])) && run(() => undo(path, log[0].id)) });
   for (const b of refs?.local ?? [])
-    if (b.name !== refs?.head) commands.push({ label: `Checkout ${b.name}`, git: `git switch ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
+    if (b.name !== refs?.head) commands.push({ label: `Switch / Checkout ${b.name}`, git: `git switch ${b.name}`, run: () => run(() => switchTo(path, b.name, false)) });
   const undoLast = (e: OpEntry) => async () => (await confirmUndo(e)) && run(() => undo(path, e.id));
   const cur = refs?.local.find((b) => b.name === refs.head);
   commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, ...tabCommands);

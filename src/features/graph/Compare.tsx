@@ -9,7 +9,7 @@ import { RefOptions } from "../refs/WriteUp";
 import { Icon } from "../../lib/icons";
 
 // Every file that differs between two branches, tags, commits or the working copy (""), and each file's diff.
-// `since`: start from where the two split, so only what `to` added shows (like a pull request).
+// `since`: start from where the two split, so only what `to` added shows (like a pull/merge request).
 // Opened from branch and tag menus, a commit row's menu, Ctrl+click on a second commit, and the palette.
 type State = { from: string; to: string; since: boolean };
 let state: State | null = null;
@@ -105,7 +105,7 @@ function Body({ path, initial }: { path: string; initial: State }) {
           <span>
             <strong>Only what {name(to)} added</strong>
             <small className="muted">{useSince
-              ? `Starts where the two split, like a pull request. Changes made on ${name(from)} since then are left out.`
+              ? `Starts where the two split, like a pull/merge request. Changes made on ${name(from)} since then are left out.`
               : `Every difference between the two, whichever side made it.`}</small>
           </span>
         </label>

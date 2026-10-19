@@ -925,12 +925,18 @@ pub fn stash_branch(repo: &Path, index: usize, oid: &str, branch: &str) -> Resul
 }
 
 /// Switches to a local branch, or with `track` creates a local branch tracking the remote branch `name`.
-/// Git refuses (code "dirty", no data lost) when local changes would be overwritten. With `carry`, the
+/// Refuses (code "dirty", no data lost) while there are uncommitted changes. With `carry`, the
 /// changes are stashed, the branch switched, and the stash popped on top.
 pub fn checkout(repo: &Path, name: &str, track: bool, carry: bool) -> Result<(), AppError> {
     ref_arg(name)?;
     let args: &[&str] = if track { &["switch", "-q", "--track", name] } else { &["switch", "-q", name] };
     if !carry {
+        // Any uncommitted change stops the switch, not just the ones git would overwrite: switching never
+        // silently moves edits to another branch.
+        let s = status(repo)?;
+        if !(s.staged.is_empty() && s.unstaged.is_empty() && s.conflicted.is_empty()) {
+            return Err(AppError::new("dirty", "You have uncommitted changes. Commit or stash them, then switch."));
+        }
         return git(repo, args).map(drop);
     }
     switch_carrying(repo, args, name)

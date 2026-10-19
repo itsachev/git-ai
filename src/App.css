@@ -1254,7 +1254,9 @@ dialog.alert .choices { margin: 1.1rem 0 0; }
 dialog.alert input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; }
 dialog.alert .modal-text { color: var(--muted); line-height: 1.55; text-wrap: pretty; }
 dialog.alert .dialog-actions { position: static; margin: 1.4rem 0 0; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; }
-dialog.modal.alert:has(.choices) { width: min(32rem, 100vw - 2rem); }
+/* Two columns of options when the window has room, one on narrow windows. */
+dialog.modal.alert:has(.choices) { width: min(46rem, 100vw - 2rem); }
+dialog.alert .choices { grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr)); }
 /* choose(): one raised card per option: tone icon tile, label over a muted hint, an arrow that leans in on hover.
    The suggested option carries a tone ring so the eye lands there first. */
 .choices { display: grid; gap: 0.55rem; margin-bottom: 1.1rem; }
@@ -1270,11 +1272,14 @@ dialog.modal.alert:has(.choices) { width: min(32rem, 100vw - 2rem); }
   border-color: color-mix(in srgb, var(--tone) 70%, var(--line)); background: color-mix(in srgb, var(--tone) 6%, var(--panel));
   box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--tone) 45%, transparent);
 }
+/* No icon tile: body and arrow take the first two columns. */
+.choices .choice:not(:has(.choice-icon)) { grid-template-columns: minmax(0, 1fr) auto; }
 .choice-icon {
   display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 11px;
   color: var(--tone); background: color-mix(in srgb, var(--tone) 13%, transparent);
 }
-.choice-body { display: grid; gap: 0.2rem; min-width: 0; }
+/* `anywhere`: long branch names ("origin/feature/x") break instead of widening the card past its column. */
+.choice-body { display: grid; gap: 0.2rem; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .choice-body strong { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; font-size: 0.98rem; }
 .choice-body .muted { font-size: 0.86rem; line-height: 1.4; white-space: normal; text-wrap: pretty; }
 .choices .choice.tone-danger strong { color: var(--danger); }
