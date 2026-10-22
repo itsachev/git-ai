@@ -96,11 +96,11 @@ export function Shortcuts({ commands }: { commands: Command[] }) {
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => {
       const words = SplitText.create(".sc-title", { type: "words", wordsClass: "w", mask: "words", aria: "auto" }).words;
-      gsap.timeline({ defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
-        .from(".sc-eyebrow", { opacity: 0, y: 8, duration: 0.5 })
-        .from(words, { yPercent: 110, stagger: 0.055, duration: 0.9 }, 0.05)
+      gsap.timeline({ defaults: { ease: "expo.out", duration: 0, clearProps: CLEAN } })
+        .from(".sc-eyebrow", { opacity: 0, y: 8, duration: 0 })
+        .from(words, { yPercent: 110, stagger: 0.055, duration: 0 }, 0.05)
         .from(".sc-lede, .sc-tools", { opacity: 0, y: 12, stagger: 0.08 }, 0.25)
-        .from(".sc-hero-keys .sc-cap, .sc-hero-keys .sc-plus", { opacity: 0, y: -18, stagger: 0.07, ease: "back.out(2.2)", duration: 0.6 }, 0.2)
+        .from(".sc-hero-keys .sc-cap, .sc-hero-keys .sc-plus", { opacity: 0, y: -18, stagger: 0.07, ease: "back.out(2.2)", duration: 0 }, 0.2)
         .from(".sc-area", { opacity: 0, y: 18, stagger: 0.06 }, 0.35);
     });
   }, { scope: root });

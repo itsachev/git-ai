@@ -10,6 +10,7 @@ What's new in each git-ai release. Newest first.
 
 ### Changed
 
+- Animations outside the home screen now finish instantly, so views, menus, dialogs and toasts appear without waiting.
 - While a merge or rebase is paused on conflicts, Undo is greyed out too (undo history, the Undo bar and the command palette), since undoing then would tangle with the paused operation.
 
 ### Fixed

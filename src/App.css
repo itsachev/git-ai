@@ -1744,6 +1744,10 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, dialog[open] { animation: none !important; transition: none !important; }
 }
+/* Instant motion outside the home screen: durations zeroed, delays and end states kept. */
+:not(.home, .home *), :not(.home *)::before, :not(.home *)::after, :not(.home *)::backdrop {
+  animation-duration: 0s !important; transition-duration: 0s !important;
+}
 
 /* ---------- New branch dialog (features/refs/NewBranch.tsx) ---------- */
 .new-branch-dialog form, .stash-save-dialog form { display: grid; gap: 1.1rem; }
