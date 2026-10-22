@@ -12,6 +12,7 @@ What's new in each git-ai release. Newest first.
 
 - Animations outside the home screen now finish instantly, so views, menus, dialogs and toasts appear without waiting.
 - Right-click menus have a cleaner look: the item under the pointer gets a tinted highlight, and delete or reset actions sit apart in red below a single divider.
+- Dialogs have a calmer, more refined look: frosted glass over a lightly blurred page, soft depth, a diagonal colour gradient across the background, a gradient stripe along the top, a frosted header, a quiet tinted icon, settings-style switch rows grouped into one card, and a lighter button bar. Dialog buttons and switches have gradient fills and animated hover effects: a lift, a glow, and a light sweep across the main button.
 - While a merge or rebase is paused on conflicts, Undo is greyed out too (undo history, the Undo bar and the command palette), since undoing then would tangle with the paused operation.
 
 ### Fixed

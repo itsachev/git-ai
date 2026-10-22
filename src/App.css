@@ -1228,7 +1228,7 @@ dialog[open] { opacity: 1; scale: 1; translate: 0 0; }
 /* Tinted by the modal's tone where ::backdrop inherits custom properties (Chromium 122+, Safari 17.4+); plain umber elsewhere. */
 dialog::backdrop {
   background: color-mix(in srgb, color-mix(in srgb, var(--tone, rgb(24 18 10)) 22%, rgb(24 18 10)) 42%, transparent);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0;
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); opacity: 0;
   transition: opacity 220ms var(--ease), display 220ms allow-discrete, overlay 220ms allow-discrete;
 }
 dialog[open]::backdrop { opacity: 1; }
@@ -1248,19 +1248,29 @@ dialog.modal {
   /* Sized to the content: a form-sized default; long forms and the big modals opt into wider tiers below. */
   width: min(34rem, 100vw - 2rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--pad);
   /* No stable scrollbar gutter: the edge-to-edge action dock can't paint into it and would stop short on the right. */
-  border-radius: 20px; scroll-padding: 6rem 0 5rem;
-  /* A stone sheet breathing the tone, not a white page: white fields and cards sit on it as the layer above. */
-  --sheet: color-mix(in oklab, var(--tone) 5%, var(--sheet-base));
+  border-radius: 16px; scroll-padding: 6rem 0 5rem;
+  /* A flat stone sheet with the faintest breath of the tone: white fields and cards sit on it as the layer above. */
+  --sheet: color-mix(in oklab, var(--tone) 2.5%, var(--sheet-base));
+  /* The tone's partner for gradients: mixed in oklch toward sea-glass, so it lifts and leans in hue. */
+  --tone2: color-mix(in oklch, var(--tone) 60%, #6fd3c4);
+  /* A gradient stripe along the top edge (the tone running into its partner, then out) over the sheet's own light:
+     a diagonal from a tone-lit top-left corner, through clear stone, into a partner-tinted bottom-right, with a
+     soft lift down from the top. Scroll attachment: it stays put on the dialog box while the content scrolls. */
   background:
-    radial-gradient(130% 10rem at 0 0, color-mix(in srgb, var(--tone) 18%, transparent), transparent 72%) no-repeat,
-    var(--sheet);
-  border-color: color-mix(in srgb, var(--tone) 30%, var(--line));
-  /* Lit top rim, then the drop and a long tone glow underneath. */
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), var(--shadow), 0 40px 90px -24px color-mix(in srgb, var(--tone) 34%, transparent);
+    linear-gradient(90deg, var(--tone), var(--tone2) 45%, transparent 85%) top / 100% 3px no-repeat,
+    linear-gradient(180deg, var(--lift, rgb(255 255 255 / 0.35)), transparent 9rem),
+    linear-gradient(155deg, color-mix(in srgb, var(--tone) 15%, transparent), transparent 40%, transparent 60%, color-mix(in srgb, var(--tone2) 14%, transparent)),
+    color-mix(in srgb, var(--sheet) 72%, transparent);
+  /* Glass: the lightly blurred page shows through, frosted harder here so the sheet still reads as one surface. */
+  -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6);
+  border-color: var(--line-strong);
+  /* Lit top rim, then a tight contact shadow and a long soft drop: depth from light, not colour. */
+  /* A light inner rim, the glass edge catching light, inside the hairline border. */
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7), inset 0 0 0 1px rgb(255 255 255 / 0.3), 0 1px 2px rgb(40 30 15 / 0.06), 0 8px 16px -6px rgb(40 30 15 / 0.08), 0 32px 64px -16px rgb(40 30 15 / 0.22);
 }
-:root[data-theme="dark"] dialog.modal { box-shadow: inset 0 1px 0 rgb(255 245 230 / 0.06), var(--shadow), 0 40px 90px -24px color-mix(in srgb, var(--tone) 30%, transparent); }
+:root[data-theme="dark"] dialog.modal { --lift: rgb(255 245 230 / 0.035); box-shadow: inset 0 1px 0 rgb(255 245 230 / 0.09), inset 0 0 0 1px rgb(255 245 230 / 0.04), 0 0 0 0.5px rgb(0 0 0 / 0.6), 0 32px 64px -16px rgb(0 0 0 / 0.6); }
 /* Keep the scrollbar inside the rounded corners: the track is square, so inset it by the radius. */
-dialog.modal::-webkit-scrollbar-track { margin-block: 20px; }
+dialog.modal::-webkit-scrollbar-track { margin-block: 16px; }
 dialog.modal.tone-accent { --tone: var(--accent); }
 dialog.modal.tone-warn { --tone: var(--mod); }
 dialog.modal.tone-danger { --tone: var(--danger); }
@@ -1270,10 +1280,8 @@ dialog.modal:is(.rebase-dialog, .write-up, .setup) { width: min(46rem, 100vw - 2
    runs flush with the badge's left edge, and the buttons sit on the panel. */
 /* No reserved scrollbar gutter: it made the right padding wider than the left. */
 dialog.modal.alert { width: min(28rem, 100vw - 2rem); scrollbar-gutter: auto; }
-dialog.alert .modal-head { position: static; margin: 0 0 0.6rem; padding: 0; background: none; border: 0; }
-/* Static head: its dot field anchors to the dialog's top edge instead. */
-dialog.alert .modal-head::before { inset: 0 0 auto; height: 8rem; }
-dialog.alert .modal-head h2 { font-size: 1.2rem; line-height: 1.3; }
+dialog.alert .modal-head { position: static; margin: 0 0 0.6rem; padding: 0; background: none; border: 0; box-shadow: none; }
+dialog.alert .modal-head h2 { font-size: 1.15rem; line-height: 1.3; }
 /* Options read as a list of ways forward, one per row. */
 dialog.alert .choices { margin: 1.1rem 0 0; }
 dialog.alert input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; }
@@ -1355,31 +1363,24 @@ dialog.alert .choices { grid-template-columns: repeat(auto-fit, minmax(min(19rem
   position: sticky; top: calc(-1 * var(--pad)); z-index: 2;
   display: flex; gap: 0.9rem; align-items: center;
   margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 1.1rem; padding: var(--pad) var(--pad) 1rem;
-  /* Opaque (content scrolls under it): the tone glow over the sheet, closed by a tone hairline that fades
-     out to the right, like a branch lane leaving the badge. */
+  /* Frosted, not opaque: the sheet's gradient runs on unbroken behind it, and content scrolling under it blurs
+     away. The top stripe is redrawn on top (the frost would dim the sheet's), closed by one neutral hairline. */
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--tone) 45%, transparent), color-mix(in srgb, var(--line) 60%, transparent) 55%) bottom / 100% 1px no-repeat,
-    radial-gradient(130% 10rem at 0 0, color-mix(in srgb, var(--tone) 18%, transparent), transparent 72%) no-repeat,
-    var(--sheet, var(--panel));
+    linear-gradient(90deg, var(--tone), var(--tone2, var(--tone)) 45%, transparent 85%) top / 100% 3px no-repeat,
+    color-mix(in srgb, var(--sheet, var(--panel)) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 var(--line);
 }
-/* A dot grid (commit nodes on a lattice) in the top right, masked to fade toward the title. Static paint. */
-.modal-head::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tone) 42%, transparent) 1px, transparent 1.4px) 0 0 / 13px 13px;
-  -webkit-mask-image: radial-gradient(85% 130% at 100% 0, #000, transparent 75%); mask-image: radial-gradient(85% 130% at 100% 0, #000, transparent 75%);
-  opacity: 0.7;
-}
-.modal-head h2 { font-size: 1.45rem; font-weight: 720; letter-spacing: -0.035em; line-height: 1.15; overflow-wrap: anywhere; text-wrap: balance; }
-.modal-head p { margin: 0.2rem 0 0; font-size: 0.92rem; line-height: 1.4; }
-/* Solid tone squircle: lit top lip, a soft ring of the tone, and its glow below. */
+.modal-head h2 { font-size: 1.3rem; font-weight: 680; letter-spacing: -0.028em; line-height: 1.2; overflow-wrap: anywhere; text-wrap: balance; }
+.modal-head p { margin: 0.15rem 0 0; font-size: 0.9rem; line-height: 1.4; }
+/* A quiet tone tile: tinted ground, tone-coloured glyph, a hairline ring. Says the modal's mood without shouting. */
 .modal-badge {
-  display: grid; place-items: center; flex: none; width: 2.75rem; height: 2.75rem; border-radius: 14px;
-  color: #fff; background: radial-gradient(120% 90% at 30% 0, color-mix(in srgb, var(--tone) 72%, white), var(--tone) 60%);
-  box-shadow: inset 0 1px rgb(255 255 255 / 0.4), inset 0 -2px rgb(0 0 0 / 0.14), 0 0 0 1px color-mix(in srgb, var(--tone) 70%, black),
-    0 0 0 5px color-mix(in srgb, var(--tone) 13%, transparent), 0 8px 20px -4px color-mix(in srgb, var(--tone) 50%, transparent);
+  display: grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem; border-radius: 11px;
+  color: var(--tone); background: linear-gradient(135deg, color-mix(in oklab, var(--tone) 16%, var(--panel)), color-mix(in oklab, var(--tone2, var(--tone)) 6%, var(--panel)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 22%, transparent), 0 1px 2px rgb(40 30 15 / 0.06);
 }
-:root[data-theme="dark"] .modal-badge { background: radial-gradient(120% 90% at 30% 0, color-mix(in srgb, var(--tone) 70%, white), color-mix(in srgb, var(--tone) 72%, black) 70%); }
-.modal-badge .icon { width: 1.35rem; height: 1.35rem; }
+:root[data-theme="dark"] .modal-badge { color: color-mix(in oklab, var(--tone) 70%, white); background: color-mix(in oklab, var(--tone) 18%, var(--panel)); }
+.modal-badge .icon { width: 1.25rem; height: 1.25rem; }
 dialog.modal[open] .modal-badge { animation: pop 380ms var(--spring) 80ms backwards; }
 dialog.modal.tone-danger[open] .modal-badge .icon { animation: nudge 420ms var(--ease) 380ms; }
 /* Cards: About's feature groups and Settings' sections are paper lifted off the stone sheet. */
@@ -1553,18 +1554,56 @@ dialog.modal[open] .settings-card { animation: rise 460ms var(--ease) backwards;
 dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em; color: var(--fg-hi); }
 .modal-text { margin: 0 0 0.75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
-/* The action dock: a deeper stone shelf across the modal's foot, so the way out reads as its own place. */
+/* The action dock: a faintly deeper strip across the modal's foot behind one hairline, so the way out reads as its own place. */
 .modal .dialog-actions {
-  position: sticky; bottom: calc(-1 * var(--pad)); z-index: 2; gap: 0.6rem;
-  margin: 1.4rem calc(-1 * var(--pad)) calc(-1 * var(--pad)); padding: 0.9rem var(--pad);
-  background: color-mix(in srgb, color-mix(in oklab, var(--sunken) 55%, var(--sheet, var(--panel))) 90%, transparent);
+  position: sticky; bottom: calc(-1 * var(--pad)); z-index: 2; gap: 0.5rem;
+  margin: 1.4rem calc(-1 * var(--pad)) calc(-1 * var(--pad)); padding: 0.85rem var(--pad);
+  background: color-mix(in srgb, color-mix(in oklab, var(--sunken) 28%, var(--sheet, var(--panel))) 92%, transparent);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 var(--line), inset 0 2px 6px -4px rgb(40 30 15 / 0.12);
+  box-shadow: inset 0 1px 0 var(--line);
 }
-.modal .dialog-actions > button { min-height: calc(var(--ctl) + 0.35rem); padding: 0 1.1rem; border-radius: 10px; font-weight: 600; }
+.modal .dialog-actions > button { min-height: calc(var(--ctl) + 0.3rem); padding: 0 1rem; border-radius: 9px; font-weight: 600; font-size: 0.94rem; }
 /* Beside a filled action, the others step back to an outline on the shelf. */
-.modal .dialog-actions > button:not(.primary, .danger) { color: var(--fg); background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
-.modal .dialog-actions > button:not(.primary, .danger):hover:not(:disabled) { background: var(--panel); box-shadow: inset 0 0 0 1px var(--line-strong), 0 1px 2px rgb(40 30 15 / 0.08); }
+/* Dock buttons: a lit gradient body, a wash layer (::before) that fades in on hover since gradients can't
+   transition, and (filled ones) a light sheen (::after) that sweeps across once. Text sits above both. */
+.modal .dialog-actions > button { position: relative; isolation: isolate; overflow: hidden; }
+.modal .dialog-actions > button::before, .modal .dialog-actions > button::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+}
+.modal .dialog-actions > button::before { opacity: 0; transition: opacity 220ms var(--ease); }
+.modal .dialog-actions > button:hover:not(:disabled)::before { opacity: 1; }
+/* Secondary: paper with a gradient hairline edge (border-box layer); hover tints edge, wash and text toward the accent. */
+.modal .dialog-actions > button:not(.primary, .danger) {
+  color: var(--fg); border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, var(--panel), color-mix(in oklab, var(--raised) 60%, var(--panel))) padding-box,
+    linear-gradient(180deg, var(--line), var(--line-strong)) border-box;
+  box-shadow: 0 1px 2px rgb(40 30 15 / 0.06);
+}
+.modal .dialog-actions > button:not(.primary, .danger)::before {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
+}
+.modal .dialog-actions > button:not(.primary, .danger):hover:not(:disabled) {
+  color: var(--accent-fg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 6px 16px -8px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.modal .dialog-actions > button:not(.primary, .danger):hover:not(:disabled):not(:active) { translate: 0 -1px; }
+/* Filled: a vertical gradient of the fill (lifted top, deepened foot) with a slight hue lean, like a lit key. */
+.modal .dialog-actions > button:is(.primary, .danger) {
+  --hi: color-mix(in oklab, var(--fill) 75%, white);
+  --lo: color-mix(in oklab, var(--fill) 85%, black);
+  background: linear-gradient(170deg, var(--hi), var(--fill) 50%, var(--lo));
+}
+.modal .dialog-actions > button:is(.primary, .danger)::before { background: linear-gradient(170deg, color-mix(in oklab, var(--hi) 80%, white), var(--hi) 55%, var(--fill)); }
+.modal .dialog-actions > button:is(.primary, .danger)::after {
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.35) 50%, transparent 65%); translate: -120% 0;
+}
+.modal .dialog-actions > button:is(.primary, .danger):hover:not(:disabled) {
+  background: linear-gradient(170deg, var(--hi), var(--fill) 50%, var(--lo));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), inset 0 -2px 0 rgb(0 0 0 / 0.16),
+    0 0 0 1px color-mix(in srgb, var(--fill) 75%, black), 0 12px 26px -10px color-mix(in srgb, var(--fill) 75%, transparent);
+}
+.modal .dialog-actions > button:is(.primary, .danger):hover:not(:disabled)::after { translate: 120% 0; transition: translate 750ms var(--ease); }
 dialog.modal[open] .dialog-actions > button { animation: rise 420ms var(--ease) 140ms backwards; }
 @media (max-width: 30rem) { .modal .dialog-actions button { flex: 1; } }
 /* Near the top, full width minus a gutter on phones. Backdrop clicks close it via the global handler in main.tsx. */
@@ -1752,6 +1791,13 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 :not(.home, .home *), :not(.home *)::before, :not(.home *)::after, :not(.home *)::backdrop {
   animation-duration: 0s !important; transition-duration: 0s !important;
 }
+/* Except hover feedback in modals: it never makes anyone wait. One duration for every property these transition;
+   the sheen sweeps slower, and only on the way in (it snaps back on leave). */
+@media (prefers-reduced-motion: no-preference) {
+  dialog.modal .dialog-actions > button, dialog.modal .dialog-actions > button::before,
+  dialog.modal .nb-toggle, dialog.modal .nb-toggle input, dialog.modal .nb-toggle input::before, dialog.modal .nb-toggle input::after { transition-duration: 220ms !important; }
+  dialog.modal .dialog-actions > button:hover::after { transition-duration: 750ms !important; }
+}
 
 /* ---------- New branch dialog (features/refs/NewBranch.tsx) ---------- */
 .new-branch-dialog form, .stash-save-dialog form { display: grid; gap: 1.1rem; }
@@ -1850,25 +1896,53 @@ button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--ac
 .nb-commit .c-oid { color: var(--accent-fg); font-size: 0.85rem; }
 .nb-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nb-commit small { grid-column: 2; font-size: 0.8rem; }
-.nb-toggle { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); }
-.nb-toggle span { display: grid; }
-.nb-toggle small { font-size: 0.82rem; }
+/* Settings-style row: label and hint on the left, the switch on the right. Paper card on the sheet; an "on" row
+   picks up a hairline of its colour. Consecutive rows merge into one grouped card with dividers. */
+.nb-toggle {
+  --on: var(--accent);
+  display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.75rem 0.9rem; border-radius: 12px; background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgb(40 30 15 / 0.04);
+  transition: box-shadow 200ms var(--ease), background-color 200ms var(--ease);
+}
+.nb-toggle.danger { --on: var(--danger); }
+.nb-toggle:hover { background-color: color-mix(in oklab, var(--raised) 45%, var(--panel)); }
+/* On: a wash of its colour gathers toward the switch. */
+.nb-toggle:has(input:checked) {
+  background-image: linear-gradient(90deg, transparent 35%, color-mix(in srgb, var(--on) 8%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on) 35%, var(--line)), 0 1px 2px rgb(40 30 15 / 0.04);
+}
+.nb-toggle:has(+ .nb-toggle) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* 1.1rem: the modal forms' grid gap; -1px overlaps the two hairlines into one divider. */
+.nb-toggle + .nb-toggle { margin-top: calc(-1.1rem - 1px); border-top-left-radius: 0; border-top-right-radius: 0; }
+.nb-toggle span { display: grid; gap: 0.15rem; flex: 1; min-width: 0; }
+.nb-toggle strong { font-size: 0.94rem; font-weight: 600; color: var(--fg-hi); }
+.nb-toggle small { font-size: 0.82rem; line-height: 1.45; text-wrap: pretty; }
 /* Checkbox drawn as a switch. */
 .nb-toggle input {
   appearance: none; flex: none; width: 2.3rem; height: 1.35rem; min-height: 0; padding: 0; border-radius: 999px;
-  background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line-strong); position: relative; transition: background-color 160ms;
+  background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line-strong); position: relative; transition: box-shadow 160ms var(--ease);
 }
+/* The "on" fill: a gradient of its colour on a layer that fades in (gradients can't transition), plus a soft glow. */
+.nb-toggle input::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity 180ms var(--ease);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--on) 70%, white), var(--on) 55%, color-mix(in oklab, var(--on) 85%, black));
+}
+.nb-toggle input:checked::before { opacity: 1; }
+.nb-toggle input:checked { box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--on) 60%, transparent); }
+.nb-toggle:hover input:not(:checked) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on) 45%, var(--line-strong)); }
 .nb-toggle input::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.35rem - 4px); aspect-ratio: 1; border-radius: 50%;
   background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); transition: translate 220ms var(--spring);
 }
-.nb-toggle input:checked { background: var(--accent); box-shadow: none; }
 .nb-toggle input:checked::after { translate: 0.95rem 0; }
+/* The command preview: a terminal line, recessed into the sheet, the prompt in the accent. */
 .nb-cmd {
-  display: block; padding: 0.5rem 0.7rem; border-radius: 8px; font: 0.82rem var(--mono); letter-spacing: 0;
-  color: var(--muted); background: var(--sunken); overflow-x: auto; white-space: nowrap;
+  display: block; padding: 0.6rem 0.8rem; border-radius: 10px; font: 0.8rem/1.4 var(--mono); letter-spacing: 0;
+  color: var(--muted); background: color-mix(in oklab, var(--sunken) 55%, transparent);
+  box-shadow: inset 0 1px 2px rgb(40 30 15 / 0.06), inset 0 0 0 1px var(--line); overflow-x: auto; white-space: nowrap;
 }
-.nb-cmd::before { content: "$ "; color: var(--faint); }
+.nb-cmd::before { content: "$ "; color: var(--accent-fg); font-weight: 600; }
 
 /* AI write-up dialog (features/refs/WriteUp.tsx), built on the New branch styles. */
 
@@ -2104,4 +2178,3 @@ button:disabled, .palette li.muted { cursor: default; }
 
 /* Push dialog (features/remote/Remote.tsx), built on the New branch styles. */
 .push-target { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
-.nb-toggle.danger input:checked { background: var(--danger); }
