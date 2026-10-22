@@ -509,8 +509,22 @@ pub fn pull(repo: &Path, rebase: bool) -> Result<(), AppError> {
 /// first remote) and becomes the upstream. `force` overwrites the remote branch, but only if it is still
 /// where the last fetch saw it (`--force-with-lease`); the old tip is logged and kept so undo can put it back.
 /// Returns the remote branch it went to ("origin/feat").
-pub fn push(repo: &Path, force: bool) -> Result<String, AppError> {
-    push_branch(repo, &current_branch(repo)?, &|_| Ok(()), force).map(|(r, b)| format!("{r}/{b}"))
+pub fn push(repo: &Path, force: bool, opts: &PushOpts) -> Result<String, AppError> {
+    push_branch(repo, &current_branch(repo)?, &|_| Ok(()), force, opts).map(|(r, b)| format!("{r}/{b}"))
+}
+
+/// The Push dialog's choices; the default is a plain push as described on `push`.
+#[derive(Debug, Clone, Default, Deserialize, TS)]
+#[ts(export)]
+pub struct PushOpts {
+    /// None = the upstream's remote, else `origin` (or the first remote).
+    pub remote: Option<String>,
+    /// Branch name on the remote. None = the upstream's when pushing to its remote, else the local name.
+    pub branch: Option<String>,
+    /// Set the pushed branch as the upstream (`-u`). None = only when there is no upstream yet.
+    pub track: Option<bool>,
+    /// Also push every tag (`--tags`).
+    pub tags: bool,
 }
 
 /// Checks a remote URL before anything is pushed to it.
@@ -524,13 +538,24 @@ fn current_branch(repo: &Path) -> Result<String, AppError> {
 }
 
 /// Pushes local `branch` as `push` does; returns the remote and the branch name there.
-fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool) -> Result<(String, String), AppError> {
+fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool, opts: &PushOpts) -> Result<(String, String), AppError> {
     let config = |key: &str| git(repo, &["config", "--get", &format!("branch.{branch}.{key}")]).ok().map(|s| s.trim().to_string());
     let src = format!("refs/heads/{branch}");
-    let (remote, dst, new) = match (config("remote"), config("merge")) {
-        (Some(remote), Some(dst)) => (remote, dst, false),
-        _ => (default_remote(repo)?, src.clone(), true),
+    let upstream = config("remote").zip(config("merge"));
+    let remote = match (&opts.remote, &upstream) {
+        (Some(r), _) => r.clone(),
+        (None, Some((r, _))) => r.clone(),
+        _ => default_remote(repo)?,
     };
+    let dst = match (&opts.branch, &upstream) {
+        (Some(b), _) => {
+            ref_arg(b)?;
+            format!("refs/heads/{b}")
+        }
+        (None, Some((r, d))) if *r == remote => d.clone(),
+        _ => src.clone(),
+    };
+    let new = opts.track.unwrap_or(upstream.is_none());
     ref_arg(&remote)?;
     check(git(repo, &["remote", "get-url", "--", &remote])?.trim())?;
     let short = dst.strip_prefix("refs/heads/").unwrap_or(&dst).to_string();
@@ -542,6 +567,9 @@ fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool) -> Resul
     let mut args = vec!["push", "-q", &remote, &spec];
     if new {
         args.insert(2, "-u");
+    }
+    if opts.tags {
+        args.insert(2, "--tags");
     }
     if force {
         args.insert(2, &lease);
@@ -583,7 +611,7 @@ pub fn pr_branches(repo: &Path, head: &str, base: &str, check: UrlCheck) -> Resu
             let b = if head.is_empty() { current_branch(repo)? } else { head.to_string() };
             rev(repo, &format!("refs/heads/{b}"))
                 .map_err(|_| AppError::new("not_branch", format!("'{b}' isn't a branch. Pick a branch to open the pull request from.")))?;
-            push_branch(repo, &b, check, false)?
+            push_branch(repo, &b, check, false, &PushOpts::default())?
         }
     };
     let base = remote_branch(base).map_or_else(|| base.to_string(), |(_, b)| b);

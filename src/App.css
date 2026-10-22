@@ -1243,7 +1243,8 @@ dialog.modal {
   --tone: var(--accent); --pad: clamp(1.2rem, 2.5vw, 1.9rem);
   /* Sized to the content: a form-sized default; long forms and the big modals opt into wider tiers below. */
   width: min(34rem, 100vw - 2rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--pad);
-  border-radius: 20px; scrollbar-gutter: stable; scroll-padding: 6rem 0 5rem;
+  /* No stable scrollbar gutter: the edge-to-edge action dock can't paint into it and would stop short on the right. */
+  border-radius: 20px; scroll-padding: 6rem 0 5rem;
   /* A stone sheet breathing the tone, not a white page: white fields and cards sit on it as the layer above. */
   --sheet: color-mix(in oklab, var(--tone) 5%, var(--sheet-base));
   background:
@@ -2092,3 +2093,7 @@ button, a[href], summary, select, label:has(input), input[type="checkbox"], inpu
 [role="button"], [role="checkbox"], [role="option"], [role="tab"], [role="menuitem"],
 .grow, .palette li, .refs .name { cursor: pointer; }
 button:disabled, .palette li.muted { cursor: default; }
+
+/* Push dialog (features/remote/Remote.tsx), built on the New branch styles. */
+.push-target { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
+.nb-toggle.danger input:checked { background: var(--danger); }

@@ -445,10 +445,10 @@ On main: one
         };
         let top = || super::entries(a, 20).unwrap()[0].clone();
 
-        assert_eq!(cli::push(a, false).unwrap_err().code, "no_remote");
+        assert_eq!(cli::push(a, false, &Default::default()).unwrap_err().code, "no_remote");
         git(a, &["remote", "add", "origin", bare_s]).unwrap();
         commit(a, "a.txt", "one");
-        cli::push(a, false).unwrap();
+        cli::push(a, false, &Default::default()).unwrap();
         assert_eq!(git(a, &["config", "branch.main.merge"]).unwrap().trim(), "refs/heads/main");
 
         // A second clone pushes first, so a's push is rejected until it pulls (a merge, undoable).
@@ -457,10 +457,10 @@ On main: one
             git(&b, &["config", kv[0], kv[1]]).unwrap();
         }
         commit(&b, "b.txt", "from b");
-        cli::push(&b, false).unwrap();
+        cli::push(&b, false, &Default::default()).unwrap();
         commit(a, "c.txt", "from a");
         let before = cli::rev(a, "HEAD").unwrap();
-        assert_eq!(cli::push(a, false).unwrap_err().code, "rejected");
+        assert_eq!(cli::push(a, false, &Default::default()).unwrap_err().code, "rejected");
         // Upstream-only fetch (auto fetch) moves origin/main like a full fetch.
         cli::fetch_upstream(a).unwrap();
         assert_eq!(cli::rev(a, "origin/main").unwrap(), cli::rev(&b, "HEAD").unwrap());
@@ -472,12 +472,20 @@ On main: one
         assert_eq!(cli::rev(a, "HEAD").unwrap(), before);
         git(a, &["reset", "-q", "--hard"]).unwrap();
         cli::pull(a, false).unwrap();
-        cli::push(a, false).unwrap();
+        cli::push(a, false, &Default::default()).unwrap();
 
         // Tag push.
         cli::create_tag(a, "v1", "HEAD", "").unwrap();
         cli::push_tag(a, "v1").unwrap();
         assert_eq!(cli::rev(&bare, "refs/tags/v1").unwrap(), cli::rev(a, "HEAD").unwrap());
+
+        // Push dialog options: another branch name, all tags, upstream left as it was.
+        cli::create_tag(a, "v2", "HEAD", "").unwrap();
+        let opts = cli::PushOpts { remote: Some("origin".into()), branch: Some("copy".into()), track: Some(false), tags: true };
+        assert_eq!(cli::push(a, false, &opts).unwrap(), "origin/copy");
+        assert_eq!(cli::rev(&bare, "refs/heads/copy").unwrap(), cli::rev(a, "HEAD").unwrap());
+        assert!(cli::rev(&bare, "refs/tags/v2").is_ok());
+        assert_eq!(git(a, &["config", "branch.main.merge"]).unwrap().trim(), "refs/heads/main");
 
         // PR target: a local branch is pushed (and tracks), a remote branch is used as is.
         cli::create_branch(a, "pr", None, false).unwrap();
@@ -508,18 +516,18 @@ On main: one
         // Force push: refused while a hasn't seen b's commit (lease), then overwrites; undo puts b's tip back.
         git(&b, &["pull", "-q", "--no-rebase"]).unwrap();
         commit(&b, "d.txt", "from b again");
-        cli::push(&b, false).unwrap();
+        cli::push(&b, false, &Default::default()).unwrap();
         let theirs = cli::rev(&b, "HEAD").unwrap();
         commit(a, "e.txt", "rewritten");
         // Someone else pushed: a plain "rejected" (pull is the fix).
-        assert_eq!(cli::push(a, false).unwrap_err().code, "rejected");
-        assert_eq!(cli::push(a, true).unwrap_err().code, "stale_remote");
+        assert_eq!(cli::push(a, false, &Default::default()).unwrap_err().code, "rejected");
+        assert_eq!(cli::push(a, true, &Default::default()).unwrap_err().code, "stale_remote");
         cli::fetch(a).unwrap();
-        cli::push(a, true).unwrap();
+        cli::push(a, true, &Default::default()).unwrap();
         assert_eq!(cli::rev(&bare, "refs/heads/main").unwrap(), cli::rev(a, "HEAD").unwrap());
         // a rewrote what it pushed: "rewritten" (force push is the fix). Nothing is pushed.
         git(a, &["commit", "-q", "--amend", "-m", "rewritten again"]).unwrap();
-        assert_eq!(cli::push(a, false).unwrap_err().code, "rewritten");
+        assert_eq!(cli::push(a, false, &Default::default()).unwrap_err().code, "rewritten");
         git(a, &["reset", "-q", "--hard", "HEAD@{1}"]).unwrap();
         assert_eq!(top().op, "force push");
         super::undo(a, &top().id).unwrap();

@@ -4,9 +4,17 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+
+- Push now opens a dialog first: pick the remote and the branch name there, choose whether to track it, push all tags, or force push. Push after commit still pushes straight away.
+
 ### Changed
 
 - While a merge or rebase is paused on conflicts, Undo is greyed out too (undo history, the Undo bar and the command palette), since undoing then would tangle with the paused operation.
+
+### Fixed
+
+- The button bar at the bottom of dialogs now reaches the dialog's right edge instead of stopping a little short.
 
 ## [0.2.0] - 2026-10-19
 

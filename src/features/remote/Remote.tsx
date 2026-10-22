@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -12,6 +12,7 @@ import { RefMenu, refsQuery, remotesQuery, showMenu, usePaused } from "../refs/S
 import { Icon, type IconName } from "../../lib/icons";
 import { Brand, Local, ModalHead, Remote as RemoteName, choose, confirm, prompt, type Choice } from "../../lib/modal";
 import type { AppError } from "../../bindings/AppError";
+import type { PushOpts } from "../../bindings/PushOpts";
 
 export type Sync = ReturnType<typeof useSync>;
 const PULL_KEY = "pull-mode";
@@ -50,37 +51,42 @@ export function useSync(path: string, run: Run) {
   const pullMerge = op("Pull", "Pulling…", <>Pulling {upstream} into {refs?.head ? head : "your branch"}…</>, <>Pulled {upstream}</>, () => pull(path), cur?.behind ?? 0);
   const pullRebase = op("Pull", "Pulling…", <>Pulling {upstream} with rebase…</>, <>Rebased onto {upstream}</>, () => pull(path, true), cur?.behind ?? 0);
   // Pull-then-push or force push, when a plain push can't land. `mine` (rebased/amended) picks the suggestion; undefined suggests neither.
-  const pushChoice = async (title: React.ReactNode, message: React.ReactNode, mine?: boolean) => {
+  const forcePush = async (to: React.ReactNode, opts?: PushOpts) => {
+    if (!(await confirm(<>Force push {to}?</>, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
+    await push(path, true, opts);
+    pushed = <>Force pushed {to}</>;
+  };
+  const pushChoice = async (title: React.ReactNode, message: React.ReactNode, mine?: boolean, opts?: PushOpts) => {
     const pullThenPush: Choice = { label: "Pull, then push", icon: "pull", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: mine === false };
     const force: Choice = { label: "Force push", icon: "push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase, amend or moving the branch back. Undo history can put them back.", suggested: mine };
     const choices = mine ? [force, pullThenPush] : [pullThenPush, force];
     const i = await choose(title, message, choices, "push", "warn");
     if (i < 0) return;
     if (choices[i] === force) {
-      if (!(await confirm(<>Force push {target}?</>, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
-      await push(path, true);
-      pushed = <>Force pushed {target}</>;
+      await forcePush(target, opts);
     } else {
       await pull(path);
-      await push(path);
+      await push(path, false, opts);
       pushed = <>Pulled and pushed {target}</>;
     }
   };
-  const pushOp = op("Push", "Pushing…", <>Pushing {target}…</>, () => pushed, async () => {
+  // `opts` from the Push dialog; none = a plain push to the upstream (or origin for a new branch).
+  const pushWith = (opts?: PushOpts) => op("Push", "Pushing…", <>Pushing {target}…</>, () => pushed, async () => {
         pushed = undefined;
         try {
-          const to = await push(path);
-          // No upstream before: this push created the remote branch.
-          pushed = cur?.upstream ? <>Pushed {target}</> : <>Created and pushed to branch <RemoteName name={to} /></>;
+          const to = await push(path, false, opts);
+          // Not on the remote before: this push created the remote branch.
+          pushed = refs?.remote.some((r) => r.name === to) ? <>Pushed {head} to <RemoteName name={to} /></> : <>Created and pushed to branch <RemoteName name={to} /></>;
         } catch (e) {
           const code = (e as AppError).code;
           if (code !== "rejected" && code !== "rewritten") throw e;
           // "rewritten": the branch was rebased or amended after its last push, so force push is the likely fix.
-          await pushChoice("Push rejected", errorText(e), code === "rewritten");
+          await pushChoice("Push rejected", errorText(e), code === "rewritten", opts);
         }
       }, cur?.ahead ?? 0,
         // No upstream: ahead is unknown (0), but the branch exists only here.
         ...(cur && !cur.upstream ? ["new", `${cur.name} isn't on the remote yet. Push publishes it.`] as const : []));
+  const pushOp = pushWith();
   // Why Push is off, or "" when it can run. An upstream with 0 ahead is level with (or behind) the remote.
   // No upstream: nothing new when a branch on the remote Push uses (origin, else the first; as cli.rs
   // `default_remote`) already points at this tip, e.g. a branch just made from main.
@@ -117,6 +123,22 @@ export function useSync(path: string, run: Run) {
       [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote");
     if (v && await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`)) await pushOp.go();
   };
+  // The Push button: the dialog first, then a force push, the pull / force push choice (behind only, to the
+  // upstream), or a plain push with the picked options.
+  const upRemote = cur?.upstream && remoteList?.map((r) => r.name).filter((r) => cur.upstream!.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0];
+  const pushDialog = async () => {
+    if (!cur || !remoteList?.length) return;
+    const a = await askPush({
+      branch: cur.name, remotes: remoteList.map((r) => r.name), ahead: cur.ahead, behind: cur.behind, upstream: cur.upstream ?? null,
+      remote: upRemote || pushTo!, to: upRemote ? cur.upstream!.slice(upRemote.length + 1) : cur.name,
+    });
+    if (!a) return;
+    const { force, ...opts } = a;
+    const to = <>{head} to <RemoteName name={`${opts.remote}/${opts.branch}`} /></>;
+    if (force) return op("Push", "Pushing…", <>Force pushing {to}…</>, () => <>Force pushed {to}</>, () => push(path, true, opts)).go();
+    if (behindOnly && `${opts.remote}/${opts.branch}` === cur.upstream && !opts.tags) return rewindOp.go();
+    return pushWith(opts).go();
+  };
   return {
     busy, rebase, pickPull,
     // For "Push after commit": skips `pushOff`, whose refs predate the commit just made.
@@ -126,8 +148,8 @@ export function useSync(path: string, run: Run) {
     ops: [
       op("Fetch", "Fetching…", "Fetching from all remotes…", "Fetched all remotes", () => fetchAll(path)),
       { ...(rebase ? pullRebase : pullMerge), off: pullOff },
-      behindOnly ? { ...rewindOp, off: paused, badge: paused ? "" : rewindOp.badge }
-        : { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushOp.go() },
+      behindOnly ? { ...rewindOp, off: paused, badge: paused ? "" : rewindOp.badge, go: () => paused || busy ? Promise.resolve() : pushDialog() }
+        : { ...pushOp, badge: pushOff ? "" : pushOp.badge, off: pushOff, go: () => pushOff || busy ? Promise.resolve() : remoteList?.length === 0 ? firstPush() : pushDialog() },
     ],
   };
 }
@@ -166,31 +188,128 @@ export const SYNC_KEYS: Record<string, string> = { Fetch: "Ctrl+Shift+F", Pull: 
 export function SyncButtons({ sync, children }: { sync: Sync; children?: React.ReactNode }) {
   const pullPop = useRef<HTMLDivElement>(null);
   return (
-    <span className="sync">
-      {sync.ops.map((o) => (
-        <Fragment key={o.label}>
-          <button disabled={!!sync.busy || !!o.off} onClick={o.go} aria-busy={sync.busy === o.doing}
-            title={o.off || `${o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"}` : o.label} (${SYNC_KEYS[o.label]})${o.label === "Pull" ? "\nRight-click to change" : ""}`}
-            onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
-            <Icon name={o.label.toLowerCase() as IconName} />
-            <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label === "Pull" && sync.rebase ? "Pull (rebase)" : o.label}</span>
-            {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
-          </button>
-          {o.label === "Pull" && (
-            <button className="split-menu"disabled={!!sync.busy} aria-label="Pull options" title="Pull options"
-              aria-haspopup="menu" onClick={(e) => showMenu(pullPop.current, e)}>
-              <Icon name="chevron" />
+    <>
+      <span className="sync">
+        {sync.ops.map((o) => (
+          <Fragment key={o.label}>
+            <button disabled={!!sync.busy || !!o.off} onClick={o.go} aria-busy={sync.busy === o.doing}
+              title={o.off || `${o.label === "Pull" ? `Pull with ${sync.rebase ? "rebase" : "merge"}` : o.label} (${SYNC_KEYS[o.label]})${o.label === "Pull" ? "\nRight-click to change" : ""}`}
+              onContextMenu={o.label === "Pull" ? (e) => showMenu(pullPop.current, e) : undefined}>
+              <Icon name={o.label.toLowerCase() as IconName} />
+              <span className="btn-label">{sync.busy === o.doing ? o.doing : o.label === "Pull" && sync.rebase ? "Pull (rebase)" : o.label}</span>
+              {o.badge && <span className="count" title={o.hint}>{o.badge}</span>}
             </button>
-          )}
-        </Fragment>
-      ))}
-      {/* Picking a mode only sets the button's default; the button itself pulls. */}
-      <RefMenu pop={pullPop} label="Pull" actions={[
-        [`${sync.rebase ? "" : "✓ "}Pull (merge)`, () => sync.pickPull(false)],
-        [`${sync.rebase ? "✓ " : ""}Pull with rebase`, () => sync.pickPull(true)],
-      ]} />
-      {children}
-    </span>
+            {o.label === "Pull" && (
+              <button className="split-menu"disabled={!!sync.busy} aria-label="Pull options" title="Pull options"
+                aria-haspopup="menu" onClick={(e) => showMenu(pullPop.current, e)}>
+                <Icon name="chevron" />
+              </button>
+            )}
+          </Fragment>
+        ))}
+        {/* Picking a mode only sets the button's default; the button itself pulls. */}
+        <RefMenu pop={pullPop} label="Pull" actions={[
+          [`${sync.rebase ? "" : "✓ "}Pull (merge)`, () => sync.pickPull(false)],
+          [`${sync.rebase ? "✓ " : ""}Pull with rebase`, () => sync.pickPull(true)],
+        ]} />
+        {children}
+      </span>
+      {/* Outside .sync, whose toolbar button styles would restyle the dialog buttons. */}
+      <PushDialog />
+    </>
+  );
+}
+
+// Push dialog: where the current branch goes and how. `remote` / `to` are the defaults (upstream, else origin + same name).
+type PushAsk = { branch: string; remotes: string[]; remote: string; to: string; upstream: string | null; ahead: number; behind: number };
+type PushAnswer = PushOpts & { remote: string; branch: string; force: boolean };
+let pushAsk: (PushAsk & { resolve: (a: PushAnswer | null) => void }) | null = null;
+const pushSubs = new Set<() => void>();
+const answerPush = (a: PushAnswer | null) => { pushAsk?.resolve(a); pushAsk = null; pushSubs.forEach((f) => f()); };
+/** Resolves the picked options, or null on Cancel or Esc. */
+function askPush(ask: PushAsk) {
+  pushAsk?.resolve(null);
+  return new Promise<PushAnswer | null>((resolve) => { pushAsk = { ...ask, resolve }; pushSubs.forEach((f) => f()); });
+}
+
+function PushDialog() {
+  const cur = useSyncExternalStore((f) => { pushSubs.add(f); return () => { pushSubs.delete(f); }; }, () => pushAsk);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current;
+    if (cur && !d?.open) d?.showModal();
+    if (!cur && d?.open) d.close();
+  }, [cur]);
+  useEffect(() => () => answerPush(null), []);
+  return (
+    <dialog ref={dialog} className="modal new-branch-dialog" aria-labelledby="push-title" onCancel={(e) => { e.preventDefault(); answerPush(null); }}>
+      {cur && <PushForm key={cur.branch + cur.remote + cur.to} ask={cur} />}
+    </dialog>
+  );
+}
+
+function PushForm({ ask }: { ask: PushAsk }) {
+  const [remote, setRemote] = useState(ask.remote);
+  const [to, setTo] = useState(ask.to);
+  const [track, setTrack] = useState(!ask.upstream);
+  const [tags, setTags] = useState(false);
+  const [force, setForce] = useState(false);
+  const dst = to.trim();
+  const target = `${remote}/${dst}`;
+  const toUpstream = target === ask.upstream;
+  const bad = !dst || /[\s~^:?*[\\]|\.\.|^[-/.]|[/.]$|\.lock$/.test(dst);
+  const n = ask.ahead;
+  // Pushing to the upstream already tracks it: no switch, and no -u.
+  const setsUpstream = track && !toUpstream;
+  const cmd = `git push${force ? " --force-with-lease" : ""}${setsUpstream ? " -u" : ""}${tags ? " --tags" : ""} ${remote} ${ask.branch}${dst && dst !== ask.branch ? `:${dst}` : ""}`;
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (!bad) answerPush({ remote, branch: dst, track: setsUpstream, tags, force }); }}>
+      <ModalHead id="push-title" icon="push" title={<>Push <Local name={ask.branch} /></>}
+        sub={!ask.upstream ? "Not on a remote yet. Pushing publishes it."
+          : toUpstream ? `${n ? `${n} commit${n === 1 ? "" : "s"} to push` : "No new commits"}${ask.behind ? `, ${ask.behind} on the remote you don't have` : ""}.`
+          : <>Tracks <RemoteName name={ask.upstream} /></>} />
+      <div className="push-target">
+        <div className="nb-field">
+          <label htmlFor="push-remote">Remote</label>
+          <div className="select">
+            <select id="push-remote" value={remote} onChange={(e) => setRemote(e.target.value)}>
+              {ask.remotes.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <Icon name="chevron" />
+          </div>
+        </div>
+        <div className="nb-field">
+          <label htmlFor="push-to">Branch on the remote</label>
+          <input id="push-to" autoFocus spellCheck={false} autoComplete="off" value={to} onChange={(e) => setTo(e.target.value.replace(/\s/g, "-"))} aria-invalid={!!dst && bad} />
+        </div>
+      </div>
+      {!toUpstream && <label className="nb-toggle">
+        <input type="checkbox" role="switch" checked={track} onChange={(e) => setTrack(e.target.checked)} />
+        <span>
+          <strong>Track it</strong>
+          <small className="muted">{track ? <>Pull and Push use <RemoteName name={target} /> from now on.</> : ask.upstream ? <>Keeps tracking <RemoteName name={ask.upstream} />.</> : "Push without setting an upstream."}</small>
+        </span>
+      </label>}
+      <label className="nb-toggle">
+        <input type="checkbox" role="switch" checked={tags} onChange={(e) => setTags(e.target.checked)} />
+        <span>
+          <strong>Push all tags</strong>
+          <small className="muted">Sends every local tag the remote doesn't have yet.</small>
+        </span>
+      </label>
+      <label className="nb-toggle danger">
+        <input type="checkbox" role="switch" checked={force} onChange={(e) => setForce(e.target.checked)} />
+        <span>
+          <strong>Force push</strong>
+          <small className="muted">Replaces the remote branch with yours, only if nobody pushed since your last fetch. Undo history can put it back.</small>
+        </span>
+      </label>
+      <code className="nb-cmd" title="What git-ai runs">{cmd}</code>
+      <div className="dialog-actions">
+        <button type="button" onClick={() => answerPush(null)}>Cancel</button>
+        <button className={force ? "danger" : "primary"} disabled={bad}>{force ? "Force push" : "Push"}</button>
+      </div>
+    </form>
   );
 }
 
