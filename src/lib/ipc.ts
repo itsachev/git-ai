@@ -116,6 +116,8 @@ export const applyLines = (path: string, file: string, op: LineOp, lines: number
 /** Newest first, already-undone entries left out. */
 export const opLog = (path: string) => invoke<OpEntry[]>("op_log", { path });
 export const undo = (path: string, id: string) => invoke<void>("undo", { path, id });
+/** Removes the entry (and the ones it undid) from the history; its backup goes with it. */
+export const forgetOp = (path: string, id: string) => invoke<void>("forget_op", { path, id });
 /** null = binary or over 1 MB. `ws`: ignore whitespace changes (then the lines don't match what `applyLines` takes). */
 export const fileDiff = (path: string, file: string, staged: boolean, ws = false) =>
   invoke<string | null>("file_diff", { path, file, staged, ws });

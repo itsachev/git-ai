@@ -37,6 +37,7 @@ pub fn run() {
             commands::apply_lines,
             commands::op_log,
             commands::undo,
+            commands::forget_op,
             commands::graph_rows,
             commands::graph_search,
             commands::tracked_files,

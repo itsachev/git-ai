@@ -171,6 +171,12 @@ pub fn op_log(path: String) -> Result<Vec<oplog::OpEntry>, AppError> {
     oplog::entries(Path::new(&path), 500)
 }
 
+#[tauri::command(async)]
+pub fn forget_op(path: String, id: String) -> Result<(), AppError> {
+    let _op = serial();
+    oplog::forget(Path::new(&path), &id)
+}
+
 /// Async: undoing a remote branch delete pushes.
 #[tauri::command]
 pub async fn undo(path: String, id: String) -> Result<(), AppError> {

@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, submoduleUpdate, submodules, undo } from "../../lib/ipc";
+import { checkout, mergedRefs, deleteBranch, deleteRemoteBranch, deleteTag, merge, pushTag, rebaseOnto, refs, remoteRemove, remoteSet, remotes, renameBranch, resetTo, setUpstream, stash, stashBranch, stashRename, stashSave, submoduleUpdate, submodules, undo, forgetOp } from "../../lib/ipc";
 import type { AppError } from "../../bindings/AppError";
 import type { RefItem } from "../../bindings/RefItem";
 import { canUndo, confirmUndo, errorText, opLabel, opLogQuery, statusQuery, useRun } from "../status/Changes";
@@ -429,20 +429,38 @@ export function Sidebar({ path }: { path: string }) {
         </summary>
         {log && (
           <ul className="refs ops">
-            {log.filter((e) => opLabel(e).toLowerCase().includes(f)).map((e) => (
-              <li key={e.id}>
-                <span className="name">
-                  <span>{opLabel(e)}</span>
-                  <small>{new Date(Number(e.id)).toLocaleString()}</small>
-                </span>
-                {canUndo(e) && <button className="small" disabled={!!paused} title={paused || undefined} onClick={async () => (await confirmUndo(e)) && run(() => undo(path, e.id))}>Undo</button>}
-              </li>
-            ))}
+            {log.filter((e) => opLabel(e).toLowerCase().includes(f)).map((e) => {
+              const doUndo = async () => (await confirmUndo(e)) && run(() => undo(path, e.id));
+              const acts: Action[] = [
+                ...(canUndo(e) ? [["Undo", doUndo] as Action] : []),
+                ["Delete", async () => {
+                  if (await confirm("Delete from undo history", `Delete "${opLabel(e)}"? It can't be undone any more, and its backup is removed.`, "Delete", "danger"))
+                    run(() => forgetOp(path, e.id));
+                }],
+              ];
+              return <OpRow key={e.id} label={opLabel(e)} time={new Date(Number(e.id)).toLocaleString()} actions={blockPaused(acts, paused)}
+                undo={canUndo(e) ? doUndo : undefined} paused={paused} />;
+            })}
           </ul>
         )}
       </details>
       <RefMenu pop={dropPop} label="Drop branch" actions={dropActions} />
     </section>
+  );
+}
+
+/** An undo history entry: Undo button, right-click menu (Undo, Delete). */
+function OpRow({ label, time, actions, undo, paused }: { label: string; time: string; actions: Action[]; undo?: () => void; paused: string }) {
+  const pop = useRef<HTMLDivElement>(null);
+  return (
+    <li onContextMenu={(e) => showMenu(pop.current, e)}>
+      <span className="name">
+        <span>{label}</span>
+        <small>{time}</small>
+      </span>
+      {undo && <button className="small" disabled={!!paused} title={paused || undefined} onClick={undo}>Undo</button>}
+      <RefMenu pop={pop} label={label} actions={actions} />
+    </li>
   );
 }
 

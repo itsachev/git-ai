@@ -222,6 +222,32 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
     record(repo, u)
 }
 
+/// Removes one entry from the history for good, with the entries it undid (else they'd show again),
+/// and deletes their backup/kept refs.
+pub fn forget(repo: &Path, id: &str) -> Result<(), AppError> {
+    let path = git_ai_dir(repo)?.join(LOG);
+    let text = fs::read_to_string(&path).unwrap_or_default();
+    let all: Vec<(&str, Option<OpEntry>)> = text.lines().map(|l| (l, serde_json::from_str(l).ok())).collect();
+    let mut gone = vec![id.to_string()];
+    let mut next = Some(id.to_string());
+    while let Some(cur) = next.take() {
+        next = all.iter().filter_map(|(_, e)| e.as_ref()).find(|e| e.id == cur).and_then(|e| e.undoes.clone());
+        gone.extend(next.clone());
+    }
+    let kept: String = all
+        .iter()
+        .filter(|(_, e)| !e.as_ref().is_some_and(|e| gone.contains(&e.id)))
+        .map(|(l, _)| format!("{l}\n"))
+        .collect();
+    let tmp = path.with_extension("jsonl.tmp");
+    fs::write(&tmp, kept).map_err(io)?;
+    fs::rename(&tmp, &path).map_err(io)?;
+    // `delete <ref>` with no old value is a no-op when the ref doesn't exist.
+    let refs: String = gone.iter().flat_map(|g| [format!("delete refs/git-ai/backup/{g}\n"), format!("delete refs/git-ai/kept/{g}\n")]).collect();
+    git_input(repo, &["update-ref", "--stdin"], &refs)?;
+    Ok(())
+}
+
 pub(crate) fn git_ai_dir(repo: &Path) -> Result<PathBuf, AppError> {
     let dir = PathBuf::from(git(repo, &["rev-parse", "--absolute-git-dir"])?.trim()).join("git-ai");
     fs::create_dir_all(&dir).map_err(io)?;
@@ -611,6 +637,17 @@ On main: one
         let new = super::OpEntry::new("discard", None, None);
         let id = new.id.clone();
         super::record(p, new).unwrap();
+        let ids: Vec<_> = super::entries(p, 20).unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(ids, [id.clone()]);
+        assert_eq!(git(p, &["for-each-ref", "refs/git-ai/"]).unwrap(), "");
+
+        // Forget: the entry, the ones it undid (so they don't reappear) and their backups go.
+        fs::write(dir.join("a.txt"), "edit\n").unwrap();
+        cli::discard(p, &["a.txt".into()]).unwrap();
+        let discard = super::entries(p, 1).unwrap()[0].id.clone();
+        super::undo(p, &discard).unwrap();
+        let undo = super::entries(p, 1).unwrap()[0].id.clone();
+        super::forget(p, &undo).unwrap();
         let ids: Vec<_> = super::entries(p, 20).unwrap().into_iter().map(|e| e.id).collect();
         assert_eq!(ids, [id]);
         assert_eq!(git(p, &["for-each-ref", "refs/git-ai/"]).unwrap(), "");
