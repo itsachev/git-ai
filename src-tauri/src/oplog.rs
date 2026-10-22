@@ -17,14 +17,15 @@ const LOG: &str = "oplog.jsonl";
 pub struct OpEntry {
     /// Unix time in ms, also the backup ref name.
     pub id: String,
-    /// "discard", "amend", "merge", "cherry-pick", "abort <op>", "delete branch", "delete tag",
-    /// "drop stash", "pull", "delete remote branch", "force push", or "undo <op>" for the undo of an op.
+    /// "discard", "commit", "amend", "merge", "cherry-pick", "abort <op>", "create branch", "delete branch",
+    /// "create tag", "delete tag", "drop stash", "pull", "push", "delete remote branch", "force push",
+    /// "undo <op>" for the undo of an op, or a `note` ("switch", "fetch", ...).
     pub op: String,
     /// HEAD (or `ref_name`) before the op; None = the ref didn't exist.
     pub head: Option<String>,
     /// HEAD (or `ref_name`) after the op, when the op moved it; None = deleted. Undo moves it back.
     pub new_head: Option<String>,
-    /// The ref `head`/`new_head` belong to, when not HEAD (e.g. "refs/heads/feature").
+    /// The ref `head`/`new_head` belong to, when not HEAD (e.g. "refs/heads/feature"). For a `note`, just the name shown.
     #[serde(default)]
     pub ref_name: Option<String>,
     #[serde(default)]
@@ -94,6 +95,14 @@ pub(crate) fn snapshot(repo: &Path, op: &str, paths: &[String]) -> Result<OpEntr
     e.paths = paths.to_vec();
     e.backup = Some(backup);
     Ok(e)
+}
+
+/// Logs an op undo can't reverse (switch, fetch, ...), so the history shows every action. `name` = what it
+/// acted on ("" = nothing). Best effort: the op itself already succeeded.
+pub fn note(repo: &Path, op: &str, name: &str) {
+    let mut e = OpEntry::new(op, None, None);
+    e.ref_name = (!name.is_empty()).then(|| name.to_string());
+    let _ = record(repo, e);
 }
 
 pub fn record(repo: &Path, e: OpEntry) -> Result<(), AppError> {
@@ -184,9 +193,11 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
         let msg = git(repo, &["log", "-1", "--format=%s", oid])?;
         git(repo, &["stash", "store", "-m", msg.trim(), oid])?;
         OpEntry::new(&op, None, None)
-    } else if let ("delete remote branch" | "force push", Some(oid), Some(r)) = (e.op.as_str(), &e.head, &e.ref_name) {
-        // A force push is undone by force-pushing the old tip back, only while the remote is still at ours.
-        crate::git::cli::restore_remote_branch(repo, r.strip_prefix("refs/remotes/").unwrap_or(r), oid, e.new_head.as_deref())?;
+    } else if let ("delete remote branch" | "force push" | "push", Some(r)) = (e.op.as_str(), &e.ref_name) {
+        // A push is undone by force-pushing the old tip back, only while the remote is still at ours.
+        // No old tip: the push created the remote branch, and the "" oid deletes it.
+        let old = e.head.as_deref().unwrap_or("");
+        crate::git::cli::restore_remote_branch(repo, r.strip_prefix("refs/remotes/").unwrap_or(r), old, e.new_head.as_deref())?;
         // Not undoable itself (no refs to swap back); delete or force push again instead.
         OpEntry::new(&op, None, None)
     } else if e.head.is_some() || e.new_head.is_some() {
@@ -196,10 +207,15 @@ pub fn undo(repo: &Path, id: &str) -> Result<(), AppError> {
         // refuses when they'd be overwritten. Amend and soft/mixed resets left their changes in the
         // index / working tree, so the same mode puts HEAD (and index) back without touching files.
         let mode = match e.op.trim_start_matches("undo ") {
-            "amend" | "reset --soft" => "--soft",
+            "commit" | "amend" | "reset --soft" => "--soft",
             "reset --mixed" => "--mixed",
             _ => "--keep",
         };
+        // Undoing "create branch" on the checked-out branch would leave HEAD pointing at nothing.
+        if e.head.is_none() && r != "HEAD" && git(repo, &["symbolic-ref", "-q", "HEAD"]).is_ok_and(|h| h.trim() == r) {
+            let name = r.strip_prefix("refs/heads/").unwrap_or(r);
+            return Err(AppError::new("current", format!("{name} is checked out. Switch to another branch first, then undo.")));
+        }
         let res = match (&e.head, &e.new_head) {
             (Some(old), Some(new)) if r == "HEAD" && git(repo, &["rev-parse", "HEAD"])?.trim() == new => {
                 git(repo, &["reset", "-q", mode, old]).map_err(|_| dirty())?;
@@ -512,6 +528,11 @@ On main: one
         assert_eq!(cli::rev(&bare, "refs/heads/copy").unwrap(), cli::rev(a, "HEAD").unwrap());
         assert!(cli::rev(&bare, "refs/tags/v2").is_ok());
         assert_eq!(git(a, &["config", "branch.main.merge"]).unwrap().trim(), "refs/heads/main");
+        // That push created origin/copy, so its undo deletes it there.
+        let pushed = super::entries(a, 1).unwrap()[0].clone();
+        assert_eq!((pushed.op.as_str(), pushed.head.as_deref()), ("push", None));
+        super::undo(a, &pushed.id).unwrap();
+        assert!(cli::rev(&bare, "refs/heads/copy").is_err());
 
         // PR target: a local branch is pushed (and tracks), a remote branch is used as is.
         cli::create_branch(a, "pr", None, false).unwrap();
@@ -625,7 +646,8 @@ On main: one
         let p = dir.as_path();
         fs::write(dir.join("a.txt"), "a\n").unwrap();
         cli::stage(p, &["a.txt".into()]).unwrap();
-        cli::commit(p, "c", false).unwrap();
+        // Raw git: a logged commit would sit before the old entry, and prune only checks the first line.
+        git(p, &["commit", "-q", "-m", "c"]).unwrap();
         let head = cli::rev(p, "HEAD").unwrap();
         for r in ["refs/git-ai/backup/1000", "refs/git-ai/kept/1000"] {
             git(p, &["update-ref", r, &head]).unwrap();
@@ -722,10 +744,26 @@ On main: one
         cli::stage(p, &files(&["a.txt"])).unwrap();
         cli::commit(p, "on feat", false).unwrap();
         let tip = cli::rev(p, "feat").unwrap();
+        // A plain commit is logged: undo puts HEAD back with the change staged, redo puts it back.
+        let c = super::entries(p, 1).unwrap()[0].clone();
+        assert_eq!(c.op, "commit");
+        super::undo(p, &c.id).unwrap();
+        assert_ne!(cli::rev(p, "HEAD").unwrap(), tip);
+        assert_eq!(cli::status(p).unwrap().staged.len(), 1);
+        super::undo(p, &super::entries(p, 1).unwrap()[0].id).unwrap();
+        assert_eq!(cli::rev(p, "HEAD").unwrap(), tip);
+        // Undoing "create branch" is refused while it is checked out.
+        let created = super::entries(p, 20).unwrap().into_iter().find(|e| e.op == "create branch").unwrap();
+        assert_eq!(created.ref_name.as_deref(), Some("refs/heads/feat"));
+        assert_eq!(super::undo(p, &created.id).unwrap_err().code, "current");
         // Start point: a branch made on feat from base points at base, and HEAD stays put.
         cli::create_branch(p, "off-base", Some(&base), false).unwrap();
         assert_eq!(cli::rev(p, "off-base").unwrap(), cli::rev(p, &base).unwrap());
         assert_eq!(cli::rev(p, "HEAD").unwrap(), tip);
+        // Elsewhere, undoing "create branch" deletes it.
+        super::undo(p, &super::entries(p, 1).unwrap()[0].id).unwrap();
+        assert!(cli::rev(p, "refs/heads/off-base").is_err());
+        cli::create_branch(p, "off-base", Some(&base), false).unwrap();
         cli::delete_branch(p, "off-base", false).unwrap();
         cli::checkout(p, &base, false, false).unwrap();
         assert_eq!(cli::delete_branch(p, "feat", false).unwrap_err().code, "not_merged");

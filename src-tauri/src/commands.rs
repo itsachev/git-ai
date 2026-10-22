@@ -284,7 +284,9 @@ pub fn merged_refs(path: String) -> Result<Vec<String>, AppError> {
 #[tauri::command(async)]
 pub fn checkout(path: String, name: String, track: bool, carry: bool) -> Result<(), AppError> {
     let _op = serial();
-    cli::checkout(Path::new(&path), &name, track, carry)
+    cli::checkout(Path::new(&path), &name, track, carry)?;
+    oplog::note(Path::new(&path), "switch", &name);
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -325,13 +327,17 @@ pub fn revert(path: String, rev: String) -> Result<(), AppError> {
 #[tauri::command(async)]
 pub fn rename_branch(path: String, name: String, new_name: String) -> Result<(), AppError> {
     let _op = serial();
-    cli::rename_branch(Path::new(&path), &name, &new_name)
+    cli::rename_branch(Path::new(&path), &name, &new_name)?;
+    oplog::note(Path::new(&path), "rename branch", &format!("{name} to {new_name}"));
+    Ok(())
 }
 
 #[tauri::command(async)]
 pub fn set_upstream(path: String, branch: String, upstream: Option<String>) -> Result<(), AppError> {
     let _op = serial();
-    cli::set_upstream(Path::new(&path), &branch, upstream.as_deref())
+    cli::set_upstream(Path::new(&path), &branch, upstream.as_deref())?;
+    oplog::note(Path::new(&path), if upstream.is_some() { "set upstream" } else { "stop tracking" }, &branch);
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -342,19 +348,25 @@ pub fn remotes(path: String) -> Result<Vec<cli::Remote>, AppError> {
 #[tauri::command(async)]
 pub fn remote_set(path: String, name: String, url: String, edit: bool) -> Result<(), AppError> {
     let _op = serial();
-    cli::remote_set(Path::new(&path), &name, &url, edit)
+    cli::remote_set(Path::new(&path), &name, &url, edit)?;
+    oplog::note(Path::new(&path), if edit { "edit remote" } else { "add remote" }, &name);
+    Ok(())
 }
 
 #[tauri::command(async)]
 pub fn remote_remove(path: String, name: String) -> Result<(), AppError> {
     let _op = serial();
-    cli::remote_remove(Path::new(&path), &name)
+    cli::remote_remove(Path::new(&path), &name)?;
+    oplog::note(Path::new(&path), "remove remote", &name);
+    Ok(())
 }
 
 #[tauri::command(async)]
 pub fn ignore(path: String, pattern: String) -> Result<(), AppError> {
     let _op = serial();
-    cli::ignore(Path::new(&path), &pattern)
+    cli::ignore(Path::new(&path), &pattern)?;
+    oplog::note(Path::new(&path), "ignore", &pattern);
+    Ok(())
 }
 
 /// Creates an empty repository in `dir`, then opens it like `open_repo`.
@@ -391,19 +403,28 @@ pub fn delete_tag(path: String, name: String) -> Result<(), AppError> {
 #[tauri::command(async)]
 pub fn stash_save(path: String, message: String, mode: cli::StashMode, keep: bool, paths: Vec<String>) -> Result<(), AppError> {
     let _op = serial();
-    cli::stash_save(Path::new(&path), &message, mode, keep, &paths)
+    cli::stash_save(Path::new(&path), &message, mode, keep, &paths)?;
+    oplog::note(Path::new(&path), "stash", message.trim());
+    Ok(())
 }
 
 #[tauri::command(async)]
 pub fn stash(path: String, op: cli::StashOp, index: usize, oid: String) -> Result<(), AppError> {
     let _op = serial();
-    cli::stash(Path::new(&path), op, index, &oid)
+    cli::stash(Path::new(&path), op, index, &oid)?;
+    // Pop and Drop already log the drop.
+    if matches!(op, cli::StashOp::Apply) {
+        oplog::note(Path::new(&path), "apply stash", "");
+    }
+    Ok(())
 }
 
 #[tauri::command(async)]
 pub fn stash_rename(path: String, index: usize, oid: String, message: String) -> Result<(), AppError> {
     let _op = serial();
-    cli::stash_rename(Path::new(&path), index, &oid, &message)
+    cli::stash_rename(Path::new(&path), index, &oid, &message)?;
+    oplog::note(Path::new(&path), "rename stash", message.trim());
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -416,7 +437,9 @@ pub fn stash_branch(path: String, index: usize, oid: String, branch: String) -> 
 
 #[tauri::command]
 pub async fn fetch(path: String) -> Result<(), AppError> {
-    cli::fetch(Path::new(&path))
+    cli::fetch(Path::new(&path))?;
+    oplog::note(Path::new(&path), "fetch", "");
+    Ok(())
 }
 
 #[tauri::command]
@@ -436,7 +459,9 @@ pub async fn push(path: String, force: bool, opts: Option<cli::PushOpts>) -> Res
 
 #[tauri::command]
 pub async fn push_tag(path: String, name: String) -> Result<(), AppError> {
-    cli::push_tag(Path::new(&path), &name)
+    cli::push_tag(Path::new(&path), &name)?;
+    oplog::note(Path::new(&path), "push tag", &name);
+    Ok(())
 }
 
 #[tauri::command]

@@ -843,6 +843,7 @@ export function opLabel(e: OpEntry): string {
   const name = e.ref_name?.replace(/^refs\/(heads|tags|remotes)\//, "") ?? "";
   const labels: Record<string, string> = {
     discard: `Discard ${what}`,
+    commit: "Commit",
     amend: "Amend commit",
     merge: "Merge",
     rebase: "Rebase",
@@ -852,17 +853,34 @@ export function opLabel(e: OpEntry): string {
     "reset --soft": "Reset branch (soft)",
     "reset --mixed": "Reset branch (mixed)",
     "reset --hard": e.backup ? `Reset branch (hard, backup of ${what})` : "Reset branch (hard)",
+    "create branch": `Create branch ${name}`,
     "delete branch": `Delete branch ${name}`,
+    "create tag": `Create tag ${name}`,
     "delete tag": `Delete tag ${name}`,
     "drop stash": "Drop stash",
+    push: `Push ${name}`,
     "force push": `Force push ${name}`,
+    // Logged only, nothing to undo.
+    switch: `Switch to ${name}`,
+    "rename branch": `Rename branch ${name}`,
+    "set upstream": `Set upstream of ${name}`,
+    "stop tracking": `Stop tracking for ${name}`,
+    "add remote": `Add remote ${name}`,
+    "edit remote": `Edit remote ${name}`,
+    "remove remote": `Remove remote ${name}`,
+    ignore: `Ignore ${name}`,
+    stash: `Stash ${name}`,
+    "apply stash": "Apply stash",
+    "rename stash": `Rename stash to ${name}`,
+    fetch: "Fetch",
+    "push tag": `Push tag ${name}`,
   };
   if (e.op.startsWith("take ")) return `${e.op[0].toUpperCase()}${e.op.slice(1)} for ${what}`;
   if (e.op.startsWith("abort ")) return `Abort ${e.op.slice(6)} (backup of ${what})`;
   return (labels[e.op] ?? e.op).trimEnd();
 }
 
-/** False for entries with nothing to swap back (the undo of a stash drop, remote delete or force push). */
+/** False for entries with nothing to swap back (switch, fetch and other logged-only actions; the undo of a stash drop or push). */
 export const canUndo = (e: OpEntry) => !!(e.backup || e.head || e.new_head);
 
 /** Asks before undoing `e`: it moves branches back, so commits made since can leave the branch. */
@@ -882,6 +900,7 @@ export function undoHint(e: OpEntry): string | undefined {
   const r = e.ref_name ?? "HEAD";
   // Remote branch ops are undone by pushing the old tip back ("refs/remotes/origin/feat" -> origin, feat).
   const remote = r.match(/^refs\/remotes\/([^/]+)\/(.+)$/);
+  if (remote && !e.head && e.new_head) return `git push --force-with-lease=${remote[2]}:${short(e.new_head)} ${remote[1]} :refs/heads/${remote[2]}`;
   if (remote && e.head) return `git push ${e.new_head ? `--force-with-lease=${remote[2]}:${short(e.new_head)} ` : ""}${remote[1]} ${short(e.head)}:refs/heads/${remote[2]}`;
   if (!e.head) return e.new_head ? `git update-ref -d ${r}` : undefined;
   return r === "HEAD" ? `git reset --keep ${short(e.head)}` : `git update-ref ${r} ${short(e.head)}`;

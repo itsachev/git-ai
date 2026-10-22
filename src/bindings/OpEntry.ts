@@ -9,8 +9,9 @@ export type OpEntry = {
  */
 id: string, 
 /**
- * "discard", "amend", "merge", "cherry-pick", "abort <op>", "delete branch", "delete tag",
- * "drop stash", "pull", "delete remote branch", "force push", or "undo <op>" for the undo of an op.
+ * "discard", "commit", "amend", "merge", "cherry-pick", "abort <op>", "create branch", "delete branch",
+ * "create tag", "delete tag", "drop stash", "pull", "push", "delete remote branch", "force push",
+ * "undo <op>" for the undo of an op, or a `note` ("switch", "fetch", ...).
  */
 op: string, 
 /**
@@ -22,7 +23,7 @@ head: string | null,
  */
 new_head: string | null, 
 /**
- * The ref `head`/`new_head` belong to, when not HEAD (e.g. "refs/heads/feature").
+ * The ref `head`/`new_head` belong to, when not HEAD (e.g. "refs/heads/feature"). For a `note`, just the name shown.
  */
 ref_name: string | null, paths: Array<string>, 
 /**

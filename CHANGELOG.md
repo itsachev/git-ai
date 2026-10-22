@@ -8,6 +8,7 @@ What's new in each git-ai release. Newest first.
 
 - Push now opens a dialog first: pick the remote and the branch name there, choose whether to track it, push all tags, or force push. Push after commit still pushes straight away.
 - Right-click an entry in Undo history to undo it or delete it from the history (its backup is removed too).
+- Undo history now records every action. Commits, pushes, new branches and new tags can be undone: undoing a commit keeps its changes staged, and undoing a push puts the remote branch back where it was (or removes it if the push created it). Switching branches, fetching, stashing, renaming branches, remote and upstream changes, ignoring files and pushing tags are listed too, for reference.
 
 ### Changed
 

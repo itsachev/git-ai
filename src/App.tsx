@@ -324,7 +324,7 @@ function App() {
       <section className="home-intro">
         <p className="brand"><Mark /> <Brand /></p>
         <h1>Git that explains itself.</h1>
-        <p className="lede">Local-first. Discards, branch deletes and merges are recorded, so each one can be undone.</p>
+        <p className="lede">Local-first. Every action is recorded in Undo history, and commits, pushes, merges, discards and deletes can be undone.</p>
         <div className="tiles" onPointerMove={(e) => {
           const t = (e.target as HTMLElement).closest<HTMLElement>(".tile"), r = t?.getBoundingClientRect();
           if (t && r) { t.style.setProperty("--mx", `${e.clientX - r.left}px`); t.style.setProperty("--my", `${e.clientY - r.top}px`); }

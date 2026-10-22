@@ -171,13 +171,13 @@ pub fn discard(repo: &Path, paths: &[String]) -> Result<(), AppError> {
     Ok(())
 }
 
-/// With `amend`, or when it finishes a merge/cherry-pick, HEAD before and after is logged so the commit
-/// can be undone. An empty message while an op is in progress uses git's prepared message.
+/// HEAD before and after is logged as "commit" (or "amend", or the merge/cherry-pick it finishes) so the
+/// commit can be undone. An empty message while an op is in progress uses git's prepared message.
 /// Returns a note for the user when a rebase dropped the commit (see `continue_rebase`).
 pub fn commit(repo: &Path, message: &str, amend: bool) -> Result<Option<String>, AppError> {
     let op = if amend { Some("amend".to_string()) } else { crate::git::read::operation(repo)? };
     let Some(op) = op else {
-        return git(repo, &["commit", "-q", "-m", message]).map(|_| None);
+        return log_head_move(repo, "commit", || git(repo, &["commit", "-q", "-m", message]).map(drop)).map(|_| None);
     };
     if op == "rebase" {
         return continue_rebase(repo);
@@ -560,8 +560,9 @@ fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool, opts: &P
     check(git(repo, &["remote", "get-url", "--", &remote])?.trim())?;
     let short = dst.strip_prefix("refs/heads/").unwrap_or(&dst).to_string();
     let tracking = format!("refs/remotes/{remote}/{short}");
-    // Expected remote tip for the lease: what the last fetch saw ("" = must not exist yet).
-    let old = if force { rev(repo, &tracking).ok() } else { None };
+    // Expected remote tip for the lease: what the last fetch saw ("" = must not exist yet). Also logged for undo.
+    // ponytail: a remote branch that exists but was never fetched logs as new, so undo would delete it.
+    let old = rev(repo, &tracking).ok();
     let lease = format!("--force-with-lease={dst}:{}", old.as_deref().unwrap_or(""));
     let spec = format!("{src}:{dst}");
     let mut args = vec!["push", "-q", &remote, &spec];
@@ -588,14 +589,15 @@ fn push_branch(repo: &Path, branch: &str, check: UrlCheck, force: bool, opts: &P
             e
         }
     })?;
-    if let Some(old) = old {
-        let new_tip = rev(repo, &src)?;
-        if old != new_tip {
-            let mut e = crate::oplog::OpEntry::new("force push", Some(old.clone()), Some(new_tip));
-            git(repo, &["update-ref", &format!("refs/git-ai/kept/{}", e.id), &old])?;
-            e.ref_name = Some(tracking);
-            crate::oplog::record(repo, e)?;
+    let new_tip = rev(repo, &src)?;
+    if old.as_ref() != Some(&new_tip) {
+        let mut e = crate::oplog::OpEntry::new(if force { "force push" } else { "push" }, old.clone(), Some(new_tip));
+        // A plain push only added commits; a force push may have dropped some, keep them for undo.
+        if let (true, Some(old)) = (force, &old) {
+            git(repo, &["update-ref", &format!("refs/git-ai/kept/{}", e.id), old])?;
         }
+        e.ref_name = Some(tracking);
+        crate::oplog::record(repo, e)?;
     }
     Ok((remote, short))
 }
@@ -826,12 +828,20 @@ pub fn write_resolved(repo: &Path, path: &str, text: &str) -> Result<(), AppErro
     git(repo, &["add", "--", path]).map(drop)
 }
 
-/// Tag at `target` (a commit oid or ref): annotated when `message` isn't empty, else lightweight.
+/// Tag at `target` (a commit oid or ref): annotated when `message` isn't empty, else lightweight. Logged so undo can delete it.
 pub fn create_tag(repo: &Path, name: &str, target: &str, message: &str) -> Result<(), AppError> {
     ref_arg(name)?;
     ref_arg(target)?;
     let args: &[&str] = if message.trim().is_empty() { &["tag", name, target] } else { &["tag", "-a", "-m", message, name, target] };
-    git(repo, args).map(drop)
+    git(repo, args)?;
+    log_new_ref(repo, "create tag", &format!("refs/tags/{name}"))
+}
+
+/// Logs a ref an op created, so undo can delete it again.
+fn log_new_ref(repo: &Path, op: &str, full: &str) -> Result<(), AppError> {
+    let mut e = crate::oplog::OpEntry::new(op, None, Some(rev(repo, full)?));
+    e.ref_name = Some(full.to_string());
+    crate::oplog::record(repo, e)
 }
 
 /// The tag (object) oid is logged so undo can recreate it.
@@ -1012,7 +1022,7 @@ fn switch_carrying(repo: &Path, args: &[&str], name: &str) -> Result<(), AppErro
     Err(AppError::new("clash", format!("Your changes clash with {name}, so nothing was switched. Commit or stash them first, then switch.")))
 }
 
-/// New branch at HEAD, optionally switched to.
+/// New branch at HEAD, optionally switched to. Logged so undo can delete it.
 /// `from` is the start point (branch, remote branch, tag or commit); None = HEAD. A branch started
 /// from a remote branch doesn't track it: its first push sets the upstream.
 pub fn create_branch(repo: &Path, name: &str, from: Option<&str>, checkout: bool) -> Result<(), AppError> {
@@ -1029,9 +1039,10 @@ pub fn create_branch(repo: &Path, name: &str, from: Option<&str>, checkout: bool
             if e.code == "clash" {
                 let _ = git(repo, &["branch", "-q", "-D", name]);
             }
-        }),
-        r => r.map(drop),
+        })?,
+        r => r.map(drop)?,
     }
+    log_new_ref(repo, "create branch", &format!("refs/heads/{name}"))
 }
 
 /// Deletes a local branch; its tip is logged so undo can recreate it. Without `force`, git refuses
