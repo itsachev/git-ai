@@ -91,7 +91,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["Fix by hand", "Conflicted file → Open in…", "Opens the file in your editor of choice; once you fix and save it, it is marked resolved."],
   ]],
   ["undo", "Undo", [
-    ["Undo history", "Sidebar → Undo history, or Ctrl+K → Undo", "Discards, branch and tag deletes, merges, rebases, pulls, amends and conflict picks are recorded. Undo puts your branches back exactly where they were. Merge, rebase, force push and undo ask first."],
+    ["Undo history", "Sidebar → Undo history, or Ctrl+K → Undo", "Discards, branch and tag deletes, merges, rebases, pulls, amends and conflict picks are recorded. Undo puts your branches back exactly where they were. Merge, rebase, force push and undo ask first. Right-click an entry to undo it or delete it from the history."],
     ["Backups before discarding", "Automatic", "Discarded file content is saved before it goes, so undoing a discard brings the content back too."],
   ]],
   ["command", "Everywhere", [
