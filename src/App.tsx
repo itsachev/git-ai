@@ -467,7 +467,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   // when its refs arrive). The branch chips keep their own CSS pop.
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => {
-      gsap.timeline({ defaults: { ease: "expo.out", duration: 0, clearProps: CLEAN } })
+      gsap.timeline({ defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
         .from(".rail-head > *, .views button", { opacity: 0, x: -14, stagger: 0.04 })
         .from(".toolbar > :not(.branch-chip)", { opacity: 0, y: -8, stagger: 0.03 }, 0.05);
     });

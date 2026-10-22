@@ -263,7 +263,7 @@ export function Sidebar({ path }: { path: string }) {
   useGSAP(() => {
     if (!root.current) return;
     gsap.matchMedia().add(MOTION, () => {
-      gsap.timeline({ defaults: { ease: "expo.out", duration: 0, clearProps: CLEAN } })
+      gsap.timeline({ defaults: { ease: "expo.out", duration: 0.7, clearProps: CLEAN } })
         .from(root.current!.children, { opacity: 0, x: -14, stagger: 0.05 }, 0.1)
         .from(gsap.utils.toArray<HTMLElement>(".refs > li", root.current).slice(0, 16), { opacity: 0, x: -10, stagger: 0.025 }, 0.2);
     });
