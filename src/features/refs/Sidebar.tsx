@@ -203,10 +203,15 @@ export function useRefActions(path: string) {
 export function showMenu(el: HTMLElement | null, e: React.MouseEvent<HTMLElement>) {
   e.preventDefault();
   if (!el) return;
-  const r = e.type === "contextmenu" || e.type === "drop" ?{ left: e.clientX, bottom: e.clientY } : e.currentTarget.getBoundingClientRect();
+  const at = e.type === "contextmenu" || e.type === "drop";
+  const r = at ? { left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY } : e.currentTarget.getBoundingClientRect();
   el.showPopover();
-  el.style.left = `${Math.max(4, Math.min(r.left, innerWidth - el.offsetWidth - 4))}px`;
-  el.style.top = `${Math.max(4, Math.min(r.bottom, innerHeight - el.offsetHeight - 4))}px`;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  // No room below or right of the pointer: open upward / leftward from it instead of covering it.
+  const up = r.bottom + h > innerHeight - 4 && r.top - h >= 4, left = at && r.left + w > innerWidth - 4;
+  el.style.setProperty("--origin", `${up ? "bottom" : "top"} ${left ? "right" : "left"}`);
+  el.style.left = `${Math.max(4, Math.min(left ? r.left - w : r.left, innerWidth - w - 4))}px`;
+  el.style.top = `${Math.max(4, Math.min(up ? r.top - h : r.bottom, innerHeight - h - 4))}px`;
   el.querySelector("button")?.focus();
 }
 
@@ -218,7 +223,7 @@ export function RefMenu({ pop, label, actions }: { pop: React.RefObject<HTMLDivE
   return (
     <div ref={pop} popover="auto" className="row-menu" role="menu" aria-label={label} onKeyDown={menuKeys}>
       {sorted.map(([a, fn, off], i) => (
-        <button key={a} role="menuitem" className={risky(a) ? "risky" : undefined} style={{ "--i": i } as React.CSSProperties} disabled={!!off}
+        <button key={a} role="menuitem" className={risky(a) ? "risky" : undefined} style={{ "--i": i } as React.CSSProperties} disabled={!!off} title={!off && a.length > 30 ? a : undefined}
           onClick={(e) => { e.stopPropagation(); pop.current!.hidePopover(); fn(); }}>{a}{off && <small>{off}</small>}</button>
       ))}
     </div>

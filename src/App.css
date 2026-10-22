@@ -669,58 +669,61 @@ button.account-chip:hover:not(:disabled) > .icon { color: var(--accent); scale: 
 .refs .more { position: absolute; right: 0.2rem; width: 1.7rem; min-height: 1.7rem; opacity: 0; transition: opacity 160ms, background-color 180ms, color 180ms, scale 200ms var(--spring); }
 .refs li:hover .more, .refs li:focus-within .more { opacity: 1; }
 @media (hover: none) { .refs .more { opacity: 1; } }
-/* Context menu: a glass sheet, items as quiet rows whose label lights in an accent gradient, destructive actions sunk into a red group at the bottom. Radii are concentric:
-   12px sheet - 4px padding = 8px items. Opens with a short drop plus a staggered unfurl of its items. */
+/* Context menu: a frosted paper sheet. Items are quiet rows; the hovered or focused one gets a tinted pill with a
+   short accent tick at its left edge. Destructive actions sink into a red group under one separator.
+   Radii are concentric: 12px sheet - 5px padding = 7px items. Opens with a short drop from the pointer. */
 .row-menu {
-  position: fixed; inset: auto; margin: 0; padding: 4px; min-width: 13rem; max-width: min(20rem, calc(100vw - 8px)); color: var(--fg);
-  /* An accent glow pooled in the top-left corner (where the pointer opened it), fading over the glass. */
-  background:
-    radial-gradient(110% 70% at 0% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 65%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 40%),
-    var(--glass);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8); backdrop-filter: blur(28px) saturate(1.8);
+  position: fixed; inset: auto; margin: 0; padding: 5px; min-width: 13.5rem; max-width: min(22rem, calc(100vw - 8px));
+  max-height: calc(100vh - 8px); overflow-y: auto; overscroll-behavior: contain; color: var(--fg);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.05), transparent 3rem), var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
   border: 0; border-radius: 12px;
-  box-shadow: var(--shadow), 0 0 0 0.5px var(--line-strong), inset 0 0.5px 0 rgb(255 255 255 / 0.5);
-  transform-origin: top left; opacity: 0; scale: 0.96; translate: 0 -4px;
-  transition: opacity 140ms var(--ease), scale 240ms var(--spring), translate 240ms var(--ease), display 140ms allow-discrete, overlay 140ms allow-discrete;
+  box-shadow: 0 0 0 0.5px var(--line-strong), inset 0 0.5px 0 rgb(255 255 255 / 0.6),
+    0 2px 4px rgb(40 30 15 / 0.06), 0 12px 32px -6px rgb(40 30 15 / 0.2);
+  transform-origin: var(--origin, top left); opacity: 0; scale: 0.97; translate: 0 -3px;
+  transition: opacity 120ms var(--ease), scale 200ms var(--ease), translate 200ms var(--ease), display 120ms allow-discrete, overlay 120ms allow-discrete;
 }
-:root[data-theme="dark"] .row-menu { box-shadow: var(--shadow), 0 0 0 0.5px var(--line-strong), inset 0 0.5px 0 rgb(255 245 230 / 0.08); }
+:root[data-theme="dark"] .row-menu {
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.7), inset 0 0 0 0.5px var(--line-strong), inset 0 0.5px 0 rgb(255 245 230 / 0.1),
+    0 16px 40px -6px rgb(0 0 0 / 0.6);
+}
 .row-menu:popover-open { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; opacity: 1; scale: 1; translate: 0; }
-@starting-style { .row-menu:popover-open { opacity: 0; scale: 0.96; translate: 0 -4px; } }
+@starting-style { .row-menu:popover-open { opacity: 0; scale: 0.97; translate: 0 -3px; } }
 .row-menu button {
-  justify-content: flex-start; min-height: calc(var(--ctl) - 0.15rem); padding: 0 0.7rem; border-radius: 8px;
+  position: relative; justify-content: flex-start; min-height: calc(var(--ctl) - 0.2rem); padding: 0 0.7rem 0 0.8rem; border-radius: 7px;
   color: inherit; background: none; box-shadow: none; font-size: 0.875rem; font-weight: 500; letter-spacing: -0.006em;
+  /* Long branch or file names end in an ellipsis instead of pushing out of the sheet; the full text is in the title. */
+  overflow: hidden; text-overflow: ellipsis; display: block; text-align: left; line-height: calc(var(--ctl) - 0.2rem);
+  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+}
+.row-menu button::after {
+  content: ""; position: absolute; left: 3px; top: 50%; width: 3px; height: 0.9rem; border-radius: 2px;
+  background: var(--accent); opacity: 0; translate: -3px -50%; transition: opacity 120ms var(--ease), translate 160ms var(--ease);
 }
 .row-menu button:active:not(:disabled) { scale: 1; filter: none; }
-/* Hover: no fill, the label itself lights up in an accent gradient. */
 .row-menu button:hover:not(:disabled), .row-menu button:focus-visible {
-  outline: none; box-shadow: none; color: transparent; -webkit-background-clip: text; background-clip: text;
-  background-image: linear-gradient(90deg, var(--accent-fg), color-mix(in oklch, var(--accent-fg) 55%, var(--fg-hi)));
+  outline: none; box-shadow: none; color: var(--fg-hi); background: color-mix(in srgb, var(--accent) 11%, transparent);
 }
-/* A hairline between every two items, inset to the label. */
-.row-menu button { position: relative; }
-.row-menu button + button::before {
-  content: ""; position: absolute; top: -1px; left: 0.7rem; right: 0.7rem; height: 1px; pointer-events: none;
-  background: color-mix(in srgb, var(--line) 55%, transparent);
-}
-/* Destructive group: brick text, a gap and a red-led line above the first, a red text gradient on hover. */
+.row-menu button:is(:hover:not(:disabled), :focus-visible)::after { opacity: 1; translate: 0 -50%; }
+.row-menu button:active:not(:disabled) { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+/* Destructive group: brick text, one hairline above it, a red pill and tick on hover. */
 .row-menu button.risky { color: var(--danger); }
-.row-menu button:not(.risky) + button.risky { margin-top: 4px; }
+.row-menu button.risky::after { background: var(--danger); }
+.row-menu button:not(.risky) + button.risky { margin-top: 9px; overflow: visible; }
 .row-menu button:not(.risky) + button.risky::before {
-  top: -3px; background: linear-gradient(90deg, color-mix(in srgb, var(--danger) 30%, transparent), color-mix(in srgb, var(--line) 55%, transparent) 45%);
+  content: ""; position: absolute; top: -5px; left: 0.5rem; right: 0.5rem; height: 1px; pointer-events: none; background: var(--line-strong);
 }
+.row-menu button.risky:is(:hover:not(:disabled), :focus-visible) { color: var(--danger); background: color-mix(in srgb, var(--danger) 11%, transparent); }
+.row-menu button.risky:active:not(:disabled) { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 .row-menu button.risky:disabled { color: var(--faint); }
-.row-menu button.risky:is(:hover:not(:disabled), :focus-visible) {
-  background-image: linear-gradient(90deg, var(--danger), color-mix(in oklch, var(--danger) 55%, var(--fg-hi)));
-}
 @media (prefers-reduced-motion: no-preference) {
-  .row-menu:popover-open > button { animation: menu-item 220ms var(--ease) backwards; animation-delay: calc(min(var(--i, 0), 8) * 14ms + 30ms); }
+  .row-menu:popover-open > button { animation: menu-item 180ms var(--ease) backwards; animation-delay: calc(min(var(--i, 0), 8) * 12ms + 20ms); }
 }
-@keyframes menu-item { from { opacity: 0; translate: 0 -3px; } }
+@keyframes menu-item { from { opacity: 0; translate: 0 -2px; } }
 @media (prefers-reduced-motion: reduce) { .row-menu { scale: 1; translate: 0; } @starting-style { .row-menu:popover-open { scale: 1; translate: 0; } } }
 /* Disabled item with a reason: the reason sits under the label, so it reads without hover (and on touch). */
-.row-menu button:has(small) { flex-direction: column; align-items: flex-start; gap: 0.05rem; padding-block: 0.4rem; opacity: 1; color: var(--faint); }
-.row-menu button small { max-width: 15rem; white-space: normal; text-align: left; font-size: 0.76rem; line-height: 1.35; color: var(--muted); }
+.row-menu button:has(small) { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; padding-block: 0.45rem; line-height: 1.3; opacity: 1; color: var(--faint); white-space: normal; }
+.row-menu button small { max-width: 18rem; white-space: normal; text-align: left; font-size: 0.76rem; font-weight: 400; line-height: 1.35; color: var(--muted); }
 /* Undo history: label over its time, Undo always visible. */
 .ops .name { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0.3rem 0.25rem 0.3rem 1.6rem; font-family: inherit; }
 .ops .name small { color: var(--muted); font-size: 0.74rem; }
@@ -1022,6 +1025,7 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
   border-left: 1px solid color-mix(in srgb, var(--tool-ink) 22%, transparent);
 }
 .editor-menu { transform-origin: top right; min-width: 12rem; }
+.editor-menu button { display: flex; align-items: center; }
 .editor-menu .check { display: inline-flex; width: 1.1rem; margin-right: 0.2rem; }
 /* Conflict view: regions between the markers. */
 .diff .ours, .legend .ours { background: color-mix(in srgb, var(--info) 16%, var(--panel)); }

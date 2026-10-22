@@ -11,10 +11,12 @@ What's new in each git-ai release. Newest first.
 ### Changed
 
 - Animations outside the home screen now finish instantly, so views, menus, dialogs and toasts appear without waiting.
+- Right-click menus have a cleaner look: the item under the pointer gets a tinted highlight, and delete or reset actions sit apart in red below a single divider.
 - While a merge or rebase is paused on conflicts, Undo is greyed out too (undo history, the Undo bar and the command palette), since undoing then would tangle with the paused operation.
 
 ### Fixed
 
+- Right-click menus near the bottom or right edge of the window now open above or beside the pointer instead of covering it, and long branch or file names in them end in "…" instead of spilling out of the menu.
 - The button bar at the bottom of dialogs now reaches the dialog's right edge instead of stopping a little short.
 
 ## [0.2.0] - 2026-10-19
