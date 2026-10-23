@@ -1938,6 +1938,10 @@ button.chip[aria-pressed="true"] { color: var(--accent-fg); background: var(--ac
   box-shadow: inset 0 1px 2px rgb(40 30 15 / 0.06), inset 0 0 0 1px var(--line); overflow-x: auto; white-space: nowrap;
 }
 .nb-cmd::before { content: "$ "; color: var(--accent-fg); font-weight: 600; }
+/* The shared confirm/prompt dialog: the command line sits above the buttons; each option of `choose` shows its own. */
+.alert .nb-cmd { margin-bottom: 0.9rem; }
+.choice-git { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 0.74rem var(--mono); letter-spacing: 0; color: var(--faint); }
+.choice-git::before { content: "$ "; color: var(--accent-fg); }
 
 /* AI write-up dialog (features/refs/WriteUp.tsx), built on the New branch styles. */
 

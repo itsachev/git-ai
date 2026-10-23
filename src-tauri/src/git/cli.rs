@@ -419,6 +419,9 @@ fn net_error(e: AppError) -> AppError {
     let has = |pats: &[&str]| pats.iter().any(|p| m.contains(p));
     let (code, text) = if has(&["(stale info)"]) {
         ("stale_remote", "The remote branch changed since your last fetch. Fetch, check what's there, then force push again.")
+    } else if has(&["(already exists)"]) {
+        // Only tags: a branch that exists is "non-fast-forward" instead.
+        ("tag_exists", "The remote already has a tag with this name, on a different commit.")
     } else if has(&["[rejected]", "non-fast-forward", "fetch first"]) {
         ("rejected", "The remote has commits you don't have yet. Pull first, then push.")
     } else if has(&["Operation too slow", "curl 28"]) {
@@ -621,10 +624,14 @@ pub fn pr_branches(repo: &Path, head: &str, base: &str, check: UrlCheck) -> Resu
     Ok((url, head, base))
 }
 
-/// Pushes one tag to `origin` (or the first remote).
-pub fn push_tag(repo: &Path, name: &str) -> Result<(), AppError> {
+/// Pushes one tag to `origin` (or the first remote). `force` replaces a same-named tag there.
+// ponytail: the replaced remote tag isn't logged for undo (remote tags have no local tracking ref); ls-remote it first if that matters.
+pub fn push_tag(repo: &Path, name: &str, force: bool) -> Result<(), AppError> {
     ref_arg(name)?;
-    git_net(repo, &["push", "-q", &default_remote(repo)?, &format!("refs/tags/{name}")]).map(drop)
+    let spec = format!("refs/tags/{name}");
+    let remote = default_remote(repo)?;
+    let args: &[&str] = if force { &["push", "-q", "--force", &remote, &spec] } else { &["push", "-q", &remote, &spec] };
+    git_net(repo, args).map(drop)
 }
 
 #[derive(Debug, Serialize, TS)]

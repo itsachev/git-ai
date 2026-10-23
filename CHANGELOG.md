@@ -8,6 +8,7 @@ What's new in each git-ai release. Newest first.
 
 - Push now opens a dialog first: pick the remote and the branch name there, choose whether to track it, push all tags, or force push. Push after commit still pushes straight away.
 - Right-click an entry in Undo history to undo it or delete it from the history (its backup is removed too).
+- Confirmation and input dialogs now show the git command they run (like Push, New branch and Stash already did): merge, rebase, reset, revert, delete branch or tag, rename, track, remotes, stashes, discard, abort, undo, interactive rebase, Git LFS and Clone. Dialogs with several options show the command under each one.
 - Undo history now records every action. Commits, pushes, new branches and new tags can be undone: undoing a commit keeps its changes staged, and undoing a push puts the remote branch back where it was (or removes it if the push created it). Switching branches, fetching, stashing, renaming branches, remote and upstream changes, ignoring files and pushing tags are listed too, for reference.
 
 ### Changed
@@ -18,6 +19,7 @@ What's new in each git-ai release. Newest first.
 
 ### Fixed
 
+- Pushing a tag that the remote already has on a different commit no longer says to pull first. It now asks whether to replace the remote's tag (force push). With no remote set up yet, it asks for one first, like Push does.
 - Right-click menus near the bottom or right edge of the window now open above or beside the pointer instead of covering it, and long branch or file names in them end in "…" instead of spilling out of the menu.
 - The button bar at the bottom of dialogs now reaches the dialog's right edge instead of stopping a little short.
 - Dialogs with nothing between their title and buttons, like Explain stash, no longer show an empty strip there.

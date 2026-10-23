@@ -24,9 +24,10 @@ export async function switchTo(path: string, name: string, track: boolean) {
   } catch (e) {
     if ((e as AppError).code !== "dirty") throw e;
     const to = track ? <Remote name={name} /> : <Local name={name} />;
+    const sw = `git switch ${track ? "--track " : ""}${name}`;
     const pick = await choose("Bring your changes along?", <>You have uncommitted changes, so nothing was switched. Bring them to {to}, or stash them first?</>, [
-      { label: "Switch and bring changes", hint: <>Stashes them, switches, and puts them back on {to}. If they clash, nothing is switched and your changes stay here.</> },
-      { label: "Stash and switch", hint: <>Parks them in Stashes and switches to a clean {to}. Apply or Pop the stash later to get them back.</> },
+      { label: "Switch and bring changes", hint: <>Stashes them, switches, and puts them back on {to}. If they clash, nothing is switched and your changes stay here.</>, git: `git stash push -u && ${sw} && git stash pop` },
+      { label: "Stash and switch", hint: <>Parks them in Stashes and switches to a clean {to}. Apply or Pop the stash later to get them back.</>, git: `git stash push -u -m "before switching to ${name}" && ${sw}` },
     ]);
     if (pick === 0) await checkout(path, name, track, true);
     if (pick === 1) {
@@ -39,10 +40,13 @@ export async function switchTo(path: string, name: string, track: boolean) {
 export const refsQuery = (path: string) => ({ queryKey: ["refs", path], queryFn: () => refs(path) });
 export const remotesQuery = (path: string) => ({ queryKey: ["remotes", path], queryFn: () => remotes(path) });
 
-export const confirmMerge = (from: React.ReactNode, into: React.ReactNode) =>
-  confirm("Merge", <>Merge {from} into {into}? Undo history (sidebar) can reverse it.</>, "Merge");
-export const confirmRebase = (branch: React.ReactNode, onto: React.ReactNode) =>
-  confirm("Rebase", <>Rebase {branch} onto {onto}? Its commits are rewritten on top of {onto}; if it was pushed, the next push needs Force push. Undo history (sidebar) can reverse it.</>, "Rebase");
+/** `rev`: what git gets, for the dialog's command line. */
+export const confirmMerge = (from: React.ReactNode, into: React.ReactNode, rev: string) =>
+  confirm("Merge", <>Merge {from} into {into}? Undo history (sidebar) can reverse it.</>, "Merge", "warn", `git merge --no-edit ${rev}`);
+export const confirmRebase = (branch: React.ReactNode, onto: React.ReactNode, rev: string) =>
+  confirm("Rebase", <>Rebase {branch} onto {onto}? Its commits are rewritten on top of {onto}; if it was pushed, the next push needs Force push. Undo history (sidebar) can reverse it.</>, "Rebase", "warn", `git rebase --autostash ${rev}`);
+/** "origin/feat" -> the command that deletes it on the remote. */
+const pushDelete = (r: string) => `git push ${r.slice(0, r.indexOf("/"))} --delete ${r.slice(r.indexOf("/") + 1)}`;
 
 /** Deletes local branch `name`, asking before force-deleting an unmerged one. False when the user backs out. */
 async function deleteLocal(path: string, name: string) {
@@ -50,7 +54,7 @@ async function deleteLocal(path: string, name: string) {
     await deleteBranch(path, name, false);
   } catch (e) {
     if ((e as AppError).code !== "not_merged") throw e;
-    if (!(await confirm("Delete unmerged branch", `${errorText(e)} Delete it anyway?`, "Delete anyway", "danger"))) return false;
+    if (!(await confirm("Delete unmerged branch", `${errorText(e)} Delete it anyway?`, "Delete anyway", "danger", `git branch -D ${name}`))) return false;
     await deleteBranch(path, name, true);
   }
   return true;
@@ -74,6 +78,32 @@ export function useRefActions(path: string) {
   const merged = useQuery({ queryKey: ["merged", path], queryFn: () => mergedRefs(path) }).data;
   const run = useRun();
   const paused = usePaused(path);
+  const remoteList = useQuery(remotesQuery(path)).data;
+  /** Pushes tag `name` like Push does a branch: asks for a remote when there is none, and offers to
+   *  replace the remote's tag when it points elsewhere (git refuses a plain push then). */
+  async function pushTagTo(name: string) {
+    let to = remoteList?.find((r) => r.name === "origin")?.name ?? remoteList?.[0]?.name;
+    if (!to) {
+      const v = await prompt("Push to a new remote", <>Tag <b>{name}</b> has nowhere to go yet. Paste the URL of the repository to push to.</>,
+        [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote",
+        (v) => `git remote add ${v[0] || "<name>"} ${v[1] || "<url>"} && git push ${v[0] || "<name>"} refs/tags/${name}`);
+      if (!v || !(await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`))) return;
+      to = v[0];
+    }
+    let taken = false;
+    await run(async () => {
+      try {
+        await pushTag(path, name);
+      } catch (e) {
+        if ((e as AppError).code !== "tag_exists") throw e;
+        taken = true;
+      }
+    }, () => (taken ? undefined : `Pushed tag ${name}`), `Pushing tag ${name} to ${to}…`);
+    if (taken && await confirm(<>Replace tag <b>{name}</b> on {to}?</>,
+      `${to} already has a tag ${name} on a different commit. Force push moves it to yours; anyone who fetched the old one keeps it until they fetch tags with --force. Undo history can't put the old tag back.`,
+      "Force push", "danger", `git push --force ${to} refs/tags/${name}`))
+      run(() => pushTag(path, name, true), `Force pushed tag ${name}`, `Force pushing tag ${name} to ${to}…`);
+  }
   /** `ontoOnly`: just the merge/rebase actions (for branch drag and drop). */
   return (name: string, ontoOnly = false) => blockPaused(all(name, ontoOnly), paused);
   function all(name: string, ontoOnly: boolean): Action[] {
@@ -86,8 +116,8 @@ export function useRefActions(path: string) {
     // Merge/rebase need a current branch that isn't this one, and do nothing when it already has all of this one.
     const done = merged?.includes(name) ? `${head} already has everything in ${name}` : undefined;
     const onto: Action[] = head && head !== name ? [
-      [`Merge ${name} into ${head}`, async () => (await confirmMerge(ref(name), <Local name={head} />)) && run(() => merge(path, name, false), <>Merged {ref(name)} into <Local name={head} /></>), done],
-      [`Rebase ${head} onto ${name}`, async () => (await confirmRebase(<Local name={head} />, ref(name))) && run(() => rebaseOnto(path, name), <>Rebased <Local name={head} /> onto {ref(name)}</>), done],
+      [`Merge ${name} into ${head}`, async () => (await confirmMerge(ref(name), <Local name={head} />, name)) && run(() => merge(path, name, false), <>Merged {ref(name)} into <Local name={head} /></>), done],
+      [`Rebase ${head} onto ${name}`, async () => (await confirmRebase(<Local name={head} />, ref(name), name)) && run(() => rebaseOnto(path, name), <>Rebased <Local name={head} /> onto {ref(name)}</>), done],
     ] : [];
     if (ontoOnly) return onto;
     // A branch: what it has that the current one doesn't. A tag: what the current branch added since it.
@@ -109,7 +139,7 @@ export function useRefActions(path: string) {
       return async () => {
         if (!local) {
           const msg = <>Create local branch <Local name={short} /> tracking <Remote name={name} /> and switch to it?</>;
-          if ((await choose(<>Switch / Checkout <Remote name={name} /></>, msg, [{ label: "Switch / Checkout", tone: "accent" }], "branch")) !== 0) return;
+          if ((await choose(<>Switch / Checkout <Remote name={name} /></>, msg, [{ label: "Switch / Checkout", tone: "accent", git: `git switch --track ${name}` }], "branch")) !== 0) return;
           return run(() => switchTo(path, name, true), <>Created <Local name={short} /> from <Remote name={name} /> and switched to it</>);
         }
         if (!newer) return run(() => switchTo(path, short, false));
@@ -119,15 +149,16 @@ export function useRefActions(path: string) {
         const loc = <Local name={short} />, rem = <Remote name={name} />;
         const lose = tracks ? <>its {own} commit{own === 1 ? "" : "s"} not on {rem}</> : <>any commits not on {rem}</>;
         const msg = <>{rem} has {behind} that your local {loc} doesn't. What should {loc} do?</>;
+        const then = sw ? `git switch ${short} && ` : "";
         const pick = await choose(<>Switch / Checkout {rem}</>, msg, [
-          { label: sw ? <>Switch and {own ? <>merge {rem}</> : "fast-forward"}</> : own ? <>Merge {rem}</> : "Fast-forward", hint: own ? <>Merges {rem} into {loc}; your commits stay.</> : <>Moves {loc} up to {rem}.</> },
-          { label: <>Recreate {loc} from {rem}</>, tone: own ? "danger" : "accent", hint: own ? <>Resets {loc} to {rem}, dropping {lose}. Undo history can reverse it.</> : <>Resets {loc} to {rem}.</> },
-          { label: head === short ? <>Keep {loc} as is</> : <>Switch to {loc} as is</>, hint: <>Leaves {loc} where it is; Pull later.</> },
+          { label: sw ? <>Switch and {own ? <>merge {rem}</> : "fast-forward"}</> : own ? <>Merge {rem}</> : "Fast-forward", hint: own ? <>Merges {rem} into {loc}; your commits stay.</> : <>Moves {loc} up to {rem}.</>, git: `${then}git merge --no-edit ${name}` },
+          { label: <>Recreate {loc} from {rem}</>, tone: own ? "danger" : "accent", hint: own ? <>Resets {loc} to {rem}, dropping {lose}. Undo history can reverse it.</> : <>Resets {loc} to {rem}.</>, git: `${then}git reset --keep ${name}` },
+          { label: head === short ? <>Keep {loc} as is</> : <>Switch to {loc} as is</>, hint: <>Leaves {loc} where it is; Pull later.</>, git: sw ? `git switch ${short}` : undefined },
           { label: "New branch from here…", hint: <>Starts a new local branch at {rem}.</> },
         ], "branch");
         if (pick === 3) return openNewBranch(name);
         if (pick < 0) return;
-        if (pick === 1 && own && !(await confirm(<>Recreate {loc}?</>, <>{loc} is reset to {rem}, dropping {lose}. Undo history (sidebar) can reverse it.</>, "Recreate", "danger"))) return;
+        if (pick === 1 && own && !(await confirm(<>Recreate {loc}?</>, <>{loc} is reset to {rem}, dropping {lose}. Undo history (sidebar) can reverse it.</>, "Recreate", "danger", `${then}git reset --keep ${name}`))) return;
         run(async () => {
           if (head !== short) await switchTo(path, short, false);
           if (pick === 0) await merge(path, name, false);
@@ -142,7 +173,7 @@ export function useRefActions(path: string) {
       const up = data.local.find((b) => b.name === name)!;
       const sync: Action[] = up.upstream && up.behind > 0 ? [[`Switch / Checkout ${up.upstream}`, checkoutRemote(up.upstream)]] : [];
       const rename: Action = ["Rename", async () => {
-        const v = await prompt(<>Rename <Local name={name} /></>, "", [{ label: "New name", value: name }], "Rename");
+        const v = await prompt(<>Rename <Local name={name} /></>, "", [{ label: "New name", value: name }], "Rename", "branch", (v) => `git branch -m ${name} ${v[0] || "<new-name>"}`);
         if (v && v[0] !== name) run(() => renameBranch(path, name, v[0]), <>Renamed <Local name={name} /> to <Local name={v[0]} /></>);
       }];
       // Same-named remote branches first: that's almost always the one.
@@ -151,8 +182,8 @@ export function useRefActions(path: string) {
         .sort((a, b) => Number(short(b) === name) - Number(short(a) === name));
       const track: Action = [up.upstream ? "Change tracked branch" : "Track remote branch", async () => {
         const me = <Local name={name} />;
-        const opts = [...candidates.map((r) => ({ label: <Remote name={r} />, hint: <>Pull and Push use <Remote name={r} />.</> })),
-          ...(up.upstream ? [{ label: "Stop tracking", hint: <>{me} keeps its commits; Push publishes it again.</>, tone: "warn" as const }] : [])];
+        const opts = [...candidates.map((r) => ({ label: <Remote name={r} />, hint: <>Pull and Push use <Remote name={r} />.</>, git: `git branch --set-upstream-to=${r} ${name}` })),
+          ...(up.upstream ? [{ label: "Stop tracking", hint: <>{me} keeps its commits; Push publishes it again.</>, tone: "warn" as const, git: `git branch --unset-upstream ${name}` }] : [])];
         const i = await choose(<>What should {me} track?</>, up.upstream ? <>It tracks <Remote name={up.upstream} /> now.</> : <>{me} doesn't track a remote branch yet.</>, opts, "remote");
         if (i < 0) return;
         const to = i < candidates.length ? candidates[i] : null;
@@ -164,8 +195,8 @@ export function useRefActions(path: string) {
       // Switch / Checkout (and double-click) just switches; being behind is Pull's job. The sync item offers the choices.
       return [["Switch / Checkout", () => run(() => switchTo(path, name, false))], ...sync, branchOff, ...compare, pr, explain, ...onto, rename, track, ["Delete", async () => {
         const msg = <>Delete branch <Local name={name} />? Undo history (sidebar) can restore it.</>;
-        const alsoRemote = remote ? await confirmCheck("Delete branch", msg, "Delete", <span>Also delete <Remote name={remote} /> on the remote</span>, "danger")
-          : (await confirm("Delete branch", msg, "Delete", "danger")) ? false : null;
+        const alsoRemote = remote ? await confirmCheck("Delete branch", msg, "Delete", <span>Also delete <Remote name={remote} /> on the remote</span>, "danger", (_, c) => `git branch -d ${name}${c ? ` && ${pushDelete(remote)}` : ""}`)
+          : (await confirm("Delete branch", msg, "Delete", "danger", `git branch -d ${name}`)) ? false : null;
         if (alsoRemote === null) return;
         let deleted = false;
         run(async () => {
@@ -182,8 +213,8 @@ export function useRefActions(path: string) {
       const offerLocal = local && local !== head ? local : undefined;
       return [["Switch / Checkout", checkoutRemote(name)], branchOff, ...compare, ...onto, ["Delete", async () => {
         const msg = <>Delete branch <Remote name={name} /> on the remote? Undo history (sidebar) can push it back.</>;
-        const alsoLocal = offerLocal ? await confirmCheck("Delete remote branch", msg, "Delete", <span>Also delete local branch <Local name={offerLocal} /></span>, "danger")
-          : (await confirm("Delete remote branch", msg, "Delete", "danger")) ? false : null;
+        const alsoLocal = offerLocal ? await confirmCheck("Delete remote branch", msg, "Delete", <span>Also delete local branch <Local name={offerLocal} /></span>, "danger", (_, c) => `${pushDelete(name)}${c ? ` && git branch -d ${offerLocal}` : ""}`)
+          : (await confirm("Delete remote branch", msg, "Delete", "danger", pushDelete(name))) ? false : null;
         if (alsoLocal === null) return;
         let both = false;
         run(async () => {
@@ -192,8 +223,8 @@ export function useRefActions(path: string) {
         }, () => (both ? <>Deleted <Remote name={name} /> on the remote and <Local name={offerLocal!} /></> : <>Deleted <Remote name={name} /> on the remote</>));
       }]];
     }
-    return [branchOff, ...compare, ["Changelog since this tag (AI)", () => openWriteUp("changelog", name)], ["Push", () => run(() => pushTag(path, name), `Pushed tag ${name}`)], ["Delete", async () => {
-      if (await confirm("Delete tag", `Delete tag ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger"))
+    return [branchOff, ...compare, ["Changelog since this tag (AI)", () => openWriteUp("changelog", name)], ["Push", () => pushTagTo(name)], ["Delete", async () => {
+      if (await confirm("Delete tag", `Delete tag ${name}? Undo history (sidebar) can restore it.`, "Delete", "danger", `git tag -d ${name}`))
         run(() => deleteTag(path, name));
     }]];
   }
@@ -304,18 +335,18 @@ export function Sidebar({ path }: { path: string }) {
   }
   async function addRemote() {
     const v = await prompt("Add remote", "Fetch from it right after to see its branches.",
-      [{ label: "Name", value: groups.size ? "" : "origin", placeholder: "upstream" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add remote", "remote");
+      [{ label: "Name", value: groups.size ? "" : "origin", placeholder: "upstream" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add remote", "remote", (v) => `git remote add ${v[0] || "<name>"} ${v[1] || "<url>"}`);
     if (v) run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`);
   }
   const remoteActions = (name: string): Action[] => {
     const url = remoteList?.find((r) => r.name === name)?.url ?? "";
     return [
       ["Edit URL", async () => {
-        const v = await prompt(`URL of ${name}`, "", [{ label: "URL", value: url }], "Save", "remote");
+        const v = await prompt(`URL of ${name}`, "", [{ label: "URL", value: url }], "Save", "remote", (v) => `git remote set-url ${name} ${v[0] || "<url>"}`);
         if (v && v[0] !== url) run(() => remoteSet(path, name, v[0], true), `${name} now points at ${v[0]}`);
       }],
       ["Remove", async () => {
-        if (await confirm("Remove remote", `Remove ${name} (${url})? Its remote branches disappear here and local branches stop tracking it. Nothing changes on the server; add it again with the same URL to get it back.`, "Remove", "danger"))
+        if (await confirm("Remove remote", `Remove ${name} (${url})? Its remote branches disappear here and local branches stop tracking it. Nothing changes on the server; add it again with the same URL to get it back.`, "Remove", "danger", `git remote remove ${name}`))
           run(() => remoteRemove(path, name), `Removed remote ${name}`);
       }],
     ];
@@ -324,17 +355,18 @@ export function Sidebar({ path }: { path: string }) {
   // Stash names read "On main: wip" / "WIP on main: abc subject"; renaming keeps the "On main:" part.
   async function renameStash(i: number, s: RefItem) {
     const m = /^(?:WIP on|On) ([^:]+): (.*)$/s.exec(s.name);
-    const v = await prompt("Rename stash", "It moves to the top of the list.", [{ label: "Name", value: m ? m[2] : s.name }], "Rename", "stash");
+    const v = await prompt("Rename stash", "It moves to the top of the list.", [{ label: "Name", value: m ? m[2] : s.name }], "Rename", "stash",
+      (v) => `git stash store -m "${m ? `On ${m[1]}: ` : ""}${v[0]}" ${s.oid.slice(0, 7)} && git stash drop stash@{${i + 1}}`);
     if (v?.[0] && v[0] !== (m ? m[2] : s.name)) run(() => stashRename(path, i, s.oid, m ? `On ${m[1]}: ${v[0]}` : v[0]), `Renamed the stash to “${v[0]}”`);
   }
   async function branchFromStash(i: number, s: RefItem) {
     const v = await prompt("New branch from stash",
       "Starts at the commit the stash was made on, so its changes fit. The stash is applied there, then dropped.",
-      [{ label: "Branch name", placeholder: "feature/…" }], "Create branch", "branch");
+      [{ label: "Branch name", placeholder: "feature/…" }], "Create branch", "branch", (v) => `git stash branch ${v[0] || "<name>"} stash@{${i}}`);
     if (v?.[0]) run(() => stashBranch(path, i, s.oid, v[0]), <>Created and switched to <Local name={v[0]} /> with the stash applied</>);
   }
   async function dropStash(i: number, s: RefItem) {
-    if (await confirm("Drop stash", `Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, "Drop", "danger"))
+    if (await confirm("Drop stash", `Drop stash "${s.name}"? Undo history (sidebar) can restore it.`, "Drop", "danger", `git stash drop stash@{${i}}`))
       run(() => stash(path, "Drop", i, s.oid));
   }
 

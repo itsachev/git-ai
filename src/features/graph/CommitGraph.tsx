@@ -166,10 +166,10 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
       const i = await choose(<>Reset {tgt} to {at}</>, r.head
         ? <>{tgt} already points at “{r.summary}”, so only your uncommitted changes are affected. What should happen to them?</>
         : <>Moves {tgt} to “{r.summary}”. Commits after it leave {tgt}; Undo history (sidebar) can bring them back. What happens to the files?</>,
-        RESETS.map(([label, hint, tone]) => ({ label, hint, tone })), "branch");
+        RESETS.map(([label, hint, tone, mode]) => ({ label, hint, tone, git: `git reset --${mode.toLowerCase()} ${at}` })), "branch");
       if (i < 0) return;
       const [label, hint, tone, mode] = RESETS[i];
-      if (await confirm(<>{label} reset {tgt} to {at}?</>, `${hint} Undo history (sidebar) can reverse it.`, `${label} reset`, tone === "danger" ? "danger" : "warn"))
+      if (await confirm(<>{label} reset {tgt} to {at}?</>, `${hint} Undo history (sidebar) can reverse it.`, `${label} reset`, tone === "danger" ? "danger" : "warn", `git reset --${mode.toLowerCase()} ${at}`))
         run(() => resetTo(path, r.oid, mode), <>Reset {tgt} to {at} ({mode.toLowerCase()})</>);
     }];
   }
@@ -186,8 +186,8 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
     // Unlabeled commit: the same actions, by commit id.
     const own: Action[] = [["New branch from here", () => openNewBranch(r.oid)], ...(branch && !r.head ? [
       ["Compare with a branch", () => openCompare(r.oid, branch, false)],
-      [`Merge ${at} into ${branch}`, async () => (await confirmMerge(at, <Local name={branch} />)) && run(() => merge(path, r.oid, false), <>Merged {at} into <Local name={branch} /></>), done],
-      [`Rebase ${branch} onto ${at}`, async () => (await confirmRebase(<Local name={branch} />, at)) && run(() => rebaseOnto(path, r.oid), <>Rebased <Local name={branch} /> onto {at}</>), done],
+      [`Merge ${at} into ${branch}`, async () => (await confirmMerge(at, <Local name={branch} />, at)) && run(() => merge(path, r.oid, false), <>Merged {at} into <Local name={branch} /></>), done],
+      [`Rebase ${branch} onto ${at}`, async () => (await confirmRebase(<Local name={branch} />, at, at)) && run(() => rebaseOnto(path, r.oid), <>Rebased <Local name={branch} /> onto {at}</>), done],
     ] as Action[] : [])];
     flushSync(() => { setMenu(blockPaused([...(ref ? refActions(ref) : own), resetAction(r)], paused)); setMenuLabel(ref ?? at); });
     showMenu(menuPop.current, e);

@@ -79,6 +79,7 @@ function Body({ path, initial }: { path: string; initial: string }) {
           <input aria-label="Pattern to track" placeholder="*.psd" value={pattern} onChange={(e) => setPattern(e.target.value)} autoFocus />
           <button className="primary" disabled={!pattern.trim()}>Track</button>
         </form>
+        <code className="nb-cmd" title="What git-ai runs">{`git lfs track "${pattern.trim() || "<pattern>"}"`}</code>
       </section>
       <section className="setting">
         <h3>Files</h3>
@@ -88,6 +89,7 @@ function Body({ path, initial }: { path: string; initial: string }) {
           await run(() => lfsPull(path), "Downloaded LFS files");
           setPulling(false);
         }}>{pulling ? "Downloading…" : "Download LFS files"}</button>
+        <code className="nb-cmd" title="What git-ai runs">git lfs pull</code>
       </section>
     </>
   );

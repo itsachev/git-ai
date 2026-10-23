@@ -215,7 +215,8 @@ export const pull = (path: string, rebase = false) => invoke<void>("pull", { pat
  *  `force` overwrites the remote branch if it's still where the last fetch saw it (else code "stale_remote"); undoable. */
 /** Returns the remote branch pushed to, e.g. "origin/feat". `opts`: the Push dialog's remote, branch name, tracking and tags. */
 export const push = (path: string, force = false, opts?: PushOpts) => invoke<string>("push", { path, force, opts });
-export const pushTag = (path: string, name: string) => invoke<void>("push_tag", { path, name });
+/** `force` replaces a same-named tag on the remote (refused as "tag_exists" otherwise). */
+export const pushTag = (path: string, name: string, force = false) => invoke<void>("push_tag", { path, name, force });
 /** `name` is the remote branch, e.g. "origin/feat". Undo pushes it back. */
 export const deleteRemoteBranch = (path: string, name: string) => invoke<void>("delete_remote_branch", { path, name });
 /** Clones `url` into `dest` (missing or empty folder) and opens it. Progress comes as "clone-progress" events (git's lines). */

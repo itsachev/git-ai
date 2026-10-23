@@ -518,8 +518,17 @@ On main: one
 
         // Tag push.
         cli::create_tag(a, "v1", "HEAD", "").unwrap();
-        cli::push_tag(a, "v1").unwrap();
+        cli::push_tag(a, "v1", false).unwrap();
         assert_eq!(cli::rev(&bare, "refs/tags/v1").unwrap(), cli::rev(a, "HEAD").unwrap());
+        // The tag moved here: a plain push is refused as tag_exists, force replaces it.
+        let tip = cli::rev(a, "HEAD").unwrap();
+        commit(a, "d.txt", "after v1");
+        git(a, &["tag", "-f", "v1"]).unwrap();
+        assert_eq!(cli::push_tag(a, "v1", false).unwrap_err().code, "tag_exists");
+        assert_eq!(cli::rev(&bare, "refs/tags/v1").unwrap(), tip);
+        cli::push_tag(a, "v1", true).unwrap();
+        assert_eq!(cli::rev(&bare, "refs/tags/v1").unwrap(), cli::rev(a, "HEAD").unwrap());
+        cli::push(a, false, &Default::default()).unwrap();
 
         // Push dialog options: another branch name, all tags, upstream left as it was.
         cli::create_tag(a, "v2", "HEAD", "").unwrap();

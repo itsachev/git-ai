@@ -30,8 +30,14 @@ export type Run = (op: () => Promise<unknown>, done?: React.ReactNode | (() => R
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
 export const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
-const confirmDiscard = (what: string) =>
-  confirm("Discard changes", `Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, "Discard", "danger");
+const confirmDiscard = (what: string, git: string) =>
+  confirm("Discard changes", `Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, "Discard", "danger", git);
+/** What discarding `files` runs: restore for tracked files, clean for untracked ones. */
+const discardGit = (files: FileChange[]) => {
+  const q = (fs: FileChange[]) => pathsOf(fs).map((p) => (/\s/.test(p) ? `"${p}"` : p)).join(" ");
+  const tracked = files.filter((f) => f.kind !== "?"), untracked = files.filter((f) => f.kind === "?");
+  return [tracked.length && `git restore --worktree -- ${q(tracked)}`, untracked.length && `git clean -f -- ${q(untracked)}`].filter(Boolean).join(" && ");
+};
 
 /** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
  * A failure shows in `OpErrorDialog` until OK. */
@@ -178,7 +184,7 @@ export function Changes({ path, push }: { path: string; push: () => Promise<unkn
   const hadConflict = useRef(new Set<string>());
 
   async function discardFiles(files: FileChange[]) {
-    if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`)) run(() => discard(path, pathsOf(files)));
+    if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`, discardGit(files))) run(() => discard(path, pathsOf(files)));
   }
 
   if (error) return <p className="error" role="alert">{errorText(error)}</p>;
@@ -212,7 +218,7 @@ export function Changes({ path, push }: { path: string; push: () => Promise<unkn
                 : `${finishLabel(data.operation)[0].toUpperCase() + finishLabel(data.operation).slice(1)} below.`}
             </span>
             <button className="small" onClick={async () => {
-              if (await confirm(`Abort the ${data.operation}?`, "Changed files are backed up first (Undo history).", "Abort"))
+              if (await confirm(`Abort the ${data.operation}?`, "Changed files are backed up first (Undo history).", "Abort", "warn", `git ${data.operation} --abort`))
                 run(() => abortOp(path));
             }}>Abort</button>
           </div>
@@ -741,7 +747,7 @@ function Diff({ path, sel, kind, run }: DiffProps) {
   // Ignoring whitespace, the lines shown aren't the ones git would stage: no line or hunk picking then.
   const ops: [LineOp, string][] = ws ? [] : sel.staged ? [["Unstage", "Unstage"]] : [["Stage", "Stage"], ["Discard", "Discard"]];
   async function apply(op: LineOp, lines: number[], what: string) {
-    if (op === "Discard" && !(await confirmDiscard(`${what} in ${file}`))) return;
+    if (op === "Discard" && !(await confirmDiscard(`${what} in ${file}`, `git apply --reverse <the picked lines of ${file}>`))) return;
     run(() => applyLines(path, file, op, lines));
   }
   function hunkLines(h: number) {
@@ -874,6 +880,7 @@ export function opLabel(e: OpEntry): string {
     "rename stash": `Rename stash to ${name}`,
     fetch: "Fetch",
     "push tag": `Push tag ${name}`,
+    "force push tag": `Force push tag ${name}`,
   };
   if (e.op.startsWith("take ")) return `${e.op[0].toUpperCase()}${e.op.slice(1)} for ${what}`;
   if (e.op.startsWith("abort ")) return `Abort ${e.op.slice(6)} (backup of ${what})`;
@@ -890,7 +897,7 @@ export function confirmUndo(e: OpEntry) {
   const r = e.ref_name ?? "", n = r.replace(/^refs\/(heads|tags|remotes)\//, "");
   const ref = r.startsWith("refs/remotes/") ? <Remote name={n} /> : r.startsWith("refs/heads/") ? <Local name={n} /> : <b>{n}</b>;
   const title = n && label.endsWith(` ${n}`) ? <>{label.slice(0, -n.length)}{ref}?</> : `${label}?`;
-  return confirm(title, "Branches go back to where they were before it. Undoing again puts them back.", "Undo");
+  return confirm(title, "Branches go back to where they were before it. Undoing again puts them back.", "Undo", "warn", undoHint(e));
 }
 
 /** Roughly what undoing `e` runs, for the palette's terminal hint. */

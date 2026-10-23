@@ -152,6 +152,7 @@ function Form({ path, base }: { path: string; base: string }) {
       {problem && rows && <p className="nb-hint error">{problem}</p>}
       {hasChanges && <p className="nb-hint">Your uncommitted changes are stashed during the rebase and put back after.</p>}
       <p className="nb-hint">Rewrites history: don't rebase commits others already pulled. Undo history can put the branch back.</p>
+      <code className="nb-cmd" title="What git-ai runs">{`git rebase -i${hasChanges ? " --autostash" : ""} ${base.slice(0, 7)}`}</code>
 
       <div className="dialog-actions">
         <button type="button" onClick={close}>Cancel</button>

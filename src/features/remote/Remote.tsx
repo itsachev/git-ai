@@ -51,14 +51,16 @@ export function useSync(path: string, run: Run) {
   const pullMerge = op("Pull", "Pulling…", <>Pulling {upstream} into {refs?.head ? head : "your branch"}…</>, <>Pulled {upstream}</>, () => pull(path), cur?.behind ?? 0);
   const pullRebase = op("Pull", "Pulling…", <>Pulling {upstream} with rebase…</>, <>Rebased onto {upstream}</>, () => pull(path, true), cur?.behind ?? 0);
   // Pull-then-push or force push, when a plain push can't land. `mine` (rebased/amended) picks the suggestion; undefined suggests neither.
+  // The dialogs' command line for a push with `o` (none = to the upstream).
+  const pushGit = (force: boolean, o?: PushOpts) => `git push${force ? " --force-with-lease" : ""}${o?.tags ? " --tags" : ""}${o?.remote ? ` ${o.remote} ${refs?.head}${o.branch && o.branch !== refs?.head ? `:${o.branch}` : ""}` : ""}`;
   const forcePush = async (to: React.ReactNode, opts?: PushOpts) => {
-    if (!(await confirm(<>Force push {to}?</>, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger"))) return;
+    if (!(await confirm(<>Force push {to}?</>, "The remote's commits that you don't have are replaced with yours. Undo history (sidebar) can push them back.", "Force push", "danger", pushGit(true, opts)))) return;
     await push(path, true, opts);
     pushed = <>Force pushed {to}</>;
   };
   const pushChoice = async (title: React.ReactNode, message: React.ReactNode, mine?: boolean, opts?: PushOpts) => {
-    const pullThenPush: Choice = { label: "Pull, then push", icon: "pull", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: mine === false };
-    const force: Choice = { label: "Force push", icon: "push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase, amend or moving the branch back. Undo history can put them back.", suggested: mine };
+    const pullThenPush: Choice = { label: "Pull, then push", icon: "pull", hint: "Brings the remote's new commits into your branch, then pushes. Right when someone else pushed.", suggested: mine === false, git: `git pull --no-rebase && ${pushGit(false, opts)}` };
+    const force: Choice = { label: "Force push", icon: "push", tone: "danger", hint: "Replaces the remote's commits with yours. Right after a rebase, amend or moving the branch back. Undo history can put them back.", suggested: mine, git: pushGit(true, opts) };
     const choices = mine ? [force, pullThenPush] : [pullThenPush, force];
     const i = await choose(title, message, choices, "push", "warn");
     if (i < 0) return;
@@ -120,7 +122,8 @@ export function useSync(path: string, run: Run) {
   // No remote yet: the first push asks where to, adds it as origin, then pushes (and sets the upstream).
   const firstPush = async () => {
     const v = await prompt("Push to a new remote", <>{cur ? <Local name={cur.name} /> : "This branch"} has nowhere to go yet. Paste the URL of the repository to push to, for example an empty one you just made on GitHub.</>,
-      [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote");
+      [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote",
+      (v) => `git remote add ${v[0] || "<name>"} ${v[1] || "<url>"} && git push -u ${v[0] || "<name>"} ${cur?.name ?? "HEAD"}`);
     if (v && await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`)) await pushOp.go();
   };
   // The Push button: the dialog first, then a force push, the pull / force push choice (behind only, to the
@@ -380,6 +383,7 @@ export function CloneDialog({ onCloned, onClose }: { onCloned: (repo: RepoInfo) 
           </div>
           <p className="clone-path">{parent.trim() && folder.trim() && <>Clones into <code>{`${parent.trim().replace(/[\/\\]+$/, "")}/${folder.trim()}`}</code></>}</p>
         </fieldset>
+        <code className="nb-cmd" title="What git-ai runs">{`git clone --recurse-submodules ${url.trim() || "<url>"} ${parent.trim() && folder.trim() ? `"${parent.trim().replace(/[\/\\]+$/, "")}/${folder.trim()}"` : "<folder>"}`}</code>
         {error && <p className="error" role="alert">{error}</p>}
         <p className="muted progress" role="status">{progress}</p>
         <div className="dialog-actions">

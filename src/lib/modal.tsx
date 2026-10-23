@@ -26,11 +26,13 @@ export const Local = ({ name }: { name: React.ReactNode }) => <b className="name
 export const Remote = ({ name }: { name: React.ReactNode }) => <b className="name-remote">{name}</b>;
 
 // In-app replacement for the native confirm box, so confirms look like every other modal.
-/** One option of `choose`: `hint` is a plain line under the label; `suggested` tags the likely right pick. */
-export type Choice = { label: React.ReactNode; hint?: React.ReactNode; tone?: Tone; suggested?: boolean; icon?: IconName };
+/** One option of `choose`: `hint` is a plain line under the label; `suggested` tags the likely right pick; `git` is what it runs. */
+export type Choice = { label: React.ReactNode; hint?: React.ReactNode; tone?: Tone; suggested?: boolean; icon?: IconName; git?: string };
+/** What the OK button runs, shown as a `$ git …` line; a function follows the fields and checkbox as they change. */
+export type Git = string | ((values: string[], checked: boolean) => string);
 /** A text field of `prompt`. */
 export type Field = { label: string; value?: string; placeholder?: string };
-type Ask = { title: React.ReactNode; message: React.ReactNode; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; check?: React.ReactNode; resolve: (i: number, values: string[], checked?: boolean) => void };
+type Ask = { title: React.ReactNode; message: React.ReactNode; icon: IconName; tone: Tone; choices: Choice[]; fields?: Field[]; check?: React.ReactNode; git?: Git; resolve: (i: number, values: string[], checked?: boolean) => void };
 let asking: Ask | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
@@ -42,23 +44,23 @@ export function choose(title: React.ReactNode, message: React.ReactNode, choices
 }
 
 /** Asks for one or more lines of text; resolves the trimmed values, or null on Cancel or Esc. */
-export function prompt(title: React.ReactNode, message: React.ReactNode, fields: Field[], ok: string, icon: IconName = "branch") {
+export function prompt(title: React.ReactNode, message: React.ReactNode, fields: Field[], ok: string, icon: IconName = "branch", git?: Git) {
   asking?.resolve(-1, []);
   return new Promise<string[] | null>((resolve) => {
-    asking = { title, message, icon, tone: "accent", choices: [{ label: ok }], fields, resolve: (i, v) => resolve(i === 0 ? v : null) };
+    asking = { title, message, icon, tone: "accent", choices: [{ label: ok }], fields, git, resolve: (i, v) => resolve(i === 0 ? v : null) };
     emit();
   });
 }
 
 /** Resolves true on the OK button, false on Cancel or Esc. */
-export const confirm = (title: React.ReactNode, message: React.ReactNode, ok = "OK", tone: Tone = "warn") =>
-  choose(title, message, [{ label: ok, tone }], "warn", tone).then((i) => i === 0);
+export const confirm = (title: React.ReactNode, message: React.ReactNode, ok = "OK", tone: Tone = "warn", git?: string) =>
+  choose(title, message, [{ label: ok, tone, git }], "warn", tone).then((i) => i === 0);
 
 /** `confirm` with an unchecked checkbox labeled `check`: resolves its state on OK, null on Cancel or Esc. */
-export function confirmCheck(title: React.ReactNode, message: React.ReactNode, ok: string, check: React.ReactNode, tone: Tone = "warn") {
+export function confirmCheck(title: React.ReactNode, message: React.ReactNode, ok: string, check: React.ReactNode, tone: Tone = "warn", git?: Git) {
   asking?.resolve(-1, []);
   return new Promise<boolean | null>((resolve) => {
-    asking = { title, message, icon: "warn", tone, choices: [{ label: ok, tone }], check, resolve: (i, _, c) => resolve(i === 0 ? !!c : null) };
+    asking = { title, message, icon: "warn", tone, choices: [{ label: ok, tone }], check, git, resolve: (i, _, c) => resolve(i === 0 ? !!c : null) };
     emit();
   });
 }
@@ -80,6 +82,7 @@ export function ConfirmDialog() {
   const answer = (i: number) => { asking?.resolve(i, values.map((v) => v.trim()), checked); asking = null; emit(); };
   const a = last.current;
   const one = a?.choices.length === 1 ? a.choices[0] : null;
+  const git = typeof a?.git === "function" ? a.git(values, checked) : a?.git ?? one?.git;
   return (
     <dialog ref={dialog} className={`modal alert tone-${a?.tone ?? "warn"}`} role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text"
       onCancel={(e) => { e.preventDefault(); answer(-1); }}>
@@ -94,13 +97,14 @@ export function ConfirmDialog() {
             </label>
           ))}
           {a.check && <label className="check modal-check"><input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />{a.check}</label>}
+          {git && <code className="nb-cmd" title="What git-ai runs">{git}</code>}
           {!one && (
             <div className="choices">
               {a.choices.map((c, i) => (
                 <button key={i} type="button" className={`choice tone-${c.tone ?? "accent"}${c.suggested ? " suggested" : ""}`} onClick={() => answer(i)}>
                   {c.icon && <span className="choice-icon"><Icon name={c.icon} /></span>}
                   <span className="choice-body">
-                    <strong>{c.label}{c.suggested && <span className="choice-tag">Suggested</span>}</strong>{c.hint && <span className="muted">{c.hint}</span>}
+                    <strong>{c.label}{c.suggested && <span className="choice-tag">Suggested</span>}</strong>{c.hint && <span className="muted">{c.hint}</span>}{c.git && <code className="choice-git">{c.git}</code>}
                   </span>
                   <span className="choice-go"><Icon name="chevron" /></span>
                 </button>

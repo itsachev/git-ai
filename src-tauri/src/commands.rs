@@ -458,9 +458,9 @@ pub async fn push(path: String, force: bool, opts: Option<cli::PushOpts>) -> Res
 }
 
 #[tauri::command]
-pub async fn push_tag(path: String, name: String) -> Result<(), AppError> {
-    cli::push_tag(Path::new(&path), &name)?;
-    oplog::note(Path::new(&path), "push tag", &name);
+pub async fn push_tag(path: String, name: String, force: bool) -> Result<(), AppError> {
+    cli::push_tag(Path::new(&path), &name, force)?;
+    oplog::note(Path::new(&path), if force { "force push tag" } else { "push tag" }, &name);
     Ok(())
 }
 
