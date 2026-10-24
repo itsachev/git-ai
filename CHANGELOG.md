@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
 ### Added
 
 - Push now opens a dialog first: pick the remote and the branch name there, choose whether to track it, push all tags, or force push. Push after commit still pushes straight away.
@@ -156,6 +158,7 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
 - A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/itsachev/git-ai/releases/tag/v0.1.0
