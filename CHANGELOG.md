@@ -13,12 +13,15 @@ What's new in each git-ai release. Newest first.
 
 ### Changed
 
+- Undo history now keeps actions for two weeks instead of 30 days. Older ones leave the list and their backup copies are released so Git can free the space.
 - Right-click menus have a cleaner look: the item under the pointer gets a tinted highlight, and delete or reset actions sit apart in red below a single divider.
 - Dialogs have a calmer, more refined look: frosted glass over a lightly blurred page, soft depth, a diagonal colour gradient across the background, a gradient stripe along the top, a frosted header, a quiet tinted icon, settings-style switch rows grouped into one card, and a lighter button bar. Dialog buttons and switches have gradient fills and animated hover effects: a lift, a glow, and a light sweep across the main button.
 - While a merge or rebase is paused on conflicts, Undo is greyed out too (undo history, the Undo bar and the command palette), since undoing then would tangle with the paused operation.
 
 ### Fixed
 
+- Scrollbars no longer run into the rounded corners of panels, lists and cards: every scrollbar now stops short of the corners at both ends.
+- The Remove repository dialog keeps its three buttons on one row, and stacks them neatly on narrow windows instead of dropping "Delete from disk" onto a line of its own.
 - Pushing a tag that the remote already has on a different commit no longer says to pull first. It now asks whether to replace the remote's tag (force push). With no remote set up yet, it asks for one first, like Push does.
 - Right-click menus near the bottom or right edge of the window now open above or beside the pointer instead of covering it, and long branch or file names in them end in "…" instead of spilling out of the menu.
 - The button bar at the bottom of dialogs now reaches the dialog's right edge instead of stopping a little short.

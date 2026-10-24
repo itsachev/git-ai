@@ -117,7 +117,7 @@ pub fn record(repo: &Path, e: OpEntry) -> Result<(), AppError> {
 }
 
 /// How long ops stay undoable.
-const KEEP_MS: u128 = 30 * 24 * 60 * 60 * 1000;
+const KEEP_MS: u128 = 14 * 24 * 60 * 60 * 1000;
 
 /// Drops log entries older than `cutoff` (ms) and deletes their backup/kept refs so gc can free the content.
 /// Only reads the first line when nothing has expired.
