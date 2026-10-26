@@ -334,7 +334,7 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
               onMouseMove={(e) => hoverDot(e, i, r)} onMouseLeave={() => tip && setTip(null)}>
               <span />
               <span className="desc">
-                {r.refs.map((n) => <RefChip key={n} name={n} path={path} extra={[resetAction(r)]} />)}
+                {r.refs.map((n) => <RefChip key={n} name={n} cur={n === branch} path={path} extra={[resetAction(r)]} />)}
                 <span className="sum">{r.summary}</span>
               </span>
               <span className="c-date">{dateFmt.format(r.time * 1000)}</span>
@@ -355,12 +355,12 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
 }
 
 /** Branch/tag label on a commit; right-click for the same actions as the sidebar. */
-function RefChip({ name, path, extra }: { name: string; path: string; extra: Action[] }) {
+function RefChip({ name, cur, path, extra }: { name: string; cur: boolean; path: string; extra: Action[] }) {
   const pop = useRef<HTMLDivElement>(null);
   const actions = blockPaused([...useRefActions(path)(name), ...extra], usePaused(path));
   return (
     <>
-      <span className="ref" title={`${name} (right-click for actions)`} onContextMenu={(e) => { e.stopPropagation(); showMenu(pop.current, e); }}>{name}</span>
+      <span className={cur ? "ref cur" : "ref"} title={`${name} (right-click for actions)`} onContextMenu={(e) => { e.stopPropagation(); showMenu(pop.current, e); }}>{name}</span>
       {actions.length > 0 && <RefMenu pop={pop} label={name} actions={actions} />}
     </>
   );

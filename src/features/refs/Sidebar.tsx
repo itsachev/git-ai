@@ -189,7 +189,7 @@ export function useRefActions(path: string) {
         const to = i < candidates.length ? candidates[i] : null;
         run(() => setUpstream(path, name, to), to ? <>{me} now tracks <Remote name={to} /></> : <>{me} no longer tracks <Remote name={up.upstream!} /></>);
       }, candidates.length || up.upstream ? undefined : "No remote branches yet. Fetch or push first."];
-      if (name === head) return [...sync, branchOff, ...compare, pr, explain, rename, track];
+      if (name === head) return [["Switch / Checkout", () => {}, `Already on ${name}`], ...sync, branchOff, ...compare, pr, explain, rename, track];
       // The remote copy to offer deleting too: its upstream, else a same-named remote branch.
       const remote = up.upstream ?? data.remote.find((r) => short(r.name) === name)?.name;
       // Switch / Checkout (and double-click) just switches; being behind is Pull's job. The sync item offers the choices.

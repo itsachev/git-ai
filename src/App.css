@@ -1122,12 +1122,12 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
 .desc { display: flex; align-items: center; gap: 0.35rem; }
 .sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ref {
-  flex-shrink: 0; font: 600 0.7rem/1.5 var(--mono); padding: 0 0.4rem; border-radius: 5px;
+  flex-shrink: 0; font: 600 0.7rem/1.5 var(--mono); padding: 0.1rem 0.4rem; border-radius: 5px;
   color: var(--accent-fg); background: color-mix(in srgb, var(--accent-fg) 11%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent-fg) 28%, transparent);
 }
-.grow.head .ref:first-child { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
-.grow.sel.head .ref:first-child { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); }
+.ref.cur { font-weight: 800; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.grow.sel .ref.cur { background: var(--accent-ink); color: var(--accent); border-color: var(--accent-ink); }
 .c-date, .c-author, .c-oid { color: var(--muted); font-size: 0.82rem; }
 .c-oid { font-family: var(--mono); }
 .c-author { display: flex; align-items: center; gap: 0.45rem; }
@@ -1630,7 +1630,6 @@ dialog.modal h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -0.015em
     0 0 0 1px color-mix(in srgb, var(--fill) 75%, black), 0 12px 26px -10px color-mix(in srgb, var(--fill) 75%, transparent);
 }
 .modal .dialog-actions > button:is(.primary, .danger):hover:not(:disabled)::after { translate: 120% 0; transition: translate 750ms var(--ease); }
-dialog.modal[open] .dialog-actions > button { animation: rise 420ms var(--ease) 140ms backwards; }
 @media (max-width: 30rem) { .modal .dialog-actions button { flex: 1; } }
 /* Near the top, full width minus a gutter on phones. Backdrop clicks close it via the global handler in main.tsx. */
 dialog.palette {
