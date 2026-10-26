@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-26
+
 ### Added
 
 - Right-click a changed file to stage it or discard its changes, or a staged file to unstage it. With several files selected, it acts on all of them.
@@ -173,7 +175,8 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
 - A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/itsachev/git-ai/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/itsachev/git-ai/releases/tag/v0.1.0
