@@ -10,6 +10,7 @@ What's new in each git-ai release. Newest first.
 
 ### Changed
 
+- The selected repo tab is now filled with the app's accent colour, so it's easy to tell which repo you're in.
 - Commit with Push ticked on a branch that isn't on the remote yet now opens the Push dialog first, like the Push button, so you can pick the remote, the branch name there and whether to track it. The commit happens when you click Push; Cancel commits nothing. Branches already on the remote still commit and push straight away.
 
 ## [0.3.0] - 2026-10-24
