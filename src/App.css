@@ -257,10 +257,10 @@ kbd { font: 0.78rem var(--sans); color: var(--muted); padding: 0.05rem 0.35rem; 
     var(--accent-fg) 0%, color-mix(in oklab, #14b8a6 80%, var(--fg)) 30%, color-mix(in oklab, #d4a017 80%, var(--fg)) 58%,
     color-mix(in oklab, #e0703a 78%, var(--fg)) 78%, var(--accent-fg) 100%) 0 0 / 220% 100%;
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
-  animation: brand-drift 9s ease-in-out infinite alternate;
 }
 @keyframes brand-drift { to { background-position: 100% 0; } }
-.brand .brand-name { font-size: 1.6rem; }
+/* background-position repaints every frame, so only the home wordmark drifts; inline mentions stay still. */
+.brand .brand-name { font-size: 1.6rem; animation: brand-drift 9s ease-in-out infinite alternate; }
 .brand .mark { width: 1.75rem; height: auto; aspect-ratio: 1; }
 .lede { max-width: 32rem; margin: 1.25rem 0 2.25rem; font-size: clamp(1rem, 0.4vw + 0.9rem, 1.15rem); color: var(--muted); text-wrap: pretty; }
 /* Actions, bento: the primary action spans the row (icon beside the text), Clone and Create are glass tiles below it,
@@ -921,13 +921,18 @@ button.ghost .icon { width: 1.05em; height: 1.05em; }
   font: 0.82rem/1.7 var(--mono); tab-size: 4; animation: fade 240ms var(--ease);
   --hunk-gap: 1.4rem; /* rem: Lines (src/lib/Lines.tsx) reads it to place rows */
 }
-.diff pre > div { padding: 0 0.9rem 0 0; white-space: pre; min-width: max-content; }
+/* Long lines wrap, indented past the gutter (--g: its width). Virtualized diffs (Lines past 1500 rows) need fixed row
+   heights, so they keep one line per row and scroll sideways. Blame keeps its own layout. */
+.diff pre > div { padding: 0 0.9rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff pre > div:has(> .ln) { --g: calc(9ch + 0.75rem); padding-left: var(--g); text-indent: calc(-1 * var(--g)); }
+.diff pre.rows > div, .diff pre.fh-blame > div { padding-left: 0; text-indent: 0; white-space: pre; overflow-wrap: normal; min-width: max-content; }
 /* Top-aligned: an empty number span would otherwise set the baseline and make the row taller. */
 .diff .ln { display: inline-flex; vertical-align: top; position: sticky; left: 0; margin-right: 0.75rem; background: inherit; user-select: none; }
 .diff pre > div:not(.add, .del, .split) .ln { background: var(--panel); }
-/* Side by side: old | new, each half cut at the pane's middle (no sideways scroll; the line is in its tooltip). */
-.diff pre > div.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; padding: 0; }
-.diff .split > span { overflow: hidden; text-overflow: ellipsis; padding-right: 0.5rem; }
+/* Side by side: old | new, each half wraps at the pane's middle (cut with an ellipsis when virtualized; the line is in its tooltip). */
+.diff pre > div.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; padding: 0; text-indent: 0; }
+.diff .split > span { --g: calc(4.5ch + 0.5rem); padding: 0 0.5rem 0 var(--g); text-indent: calc(-1 * var(--g)); }
+.diff pre.rows .split > span { overflow: hidden; text-overflow: ellipsis; padding-left: 0; text-indent: 0; }
 .diff .split > span + span { box-shadow: inset 1px 0 var(--line); }
 .diff .split > span + span.pick:hover { box-shadow: inset 1px 0 var(--line), inset 4px 0 var(--faint); }
 .diff .split > span + span.pick.on { box-shadow: inset 1px 0 var(--line), inset 4px 0 var(--accent); }

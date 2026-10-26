@@ -89,7 +89,7 @@ export function Lines({ n, row, hunk, width, at, className, label }: Props) {
   if (big) out.push(<div key="end" aria-hidden="true" style={{ height: tops ? tops[n] - tops[last] : 0, width: `calc(${width + 10}ch + 1.7rem)`, minWidth: 0 }} />);
 
   return (
-    <pre ref={pre} className={className} aria-label={label} onScroll={big ? (e) => setView({ top: e.currentTarget.scrollTop, height: e.currentTarget.clientHeight }) : undefined}>
+    <pre ref={pre} className={big ? `rows ${className ?? ""}` : className} aria-label={label} onScroll={big ? (e) => setView({ top: e.currentTarget.scrollTop, height: e.currentTarget.clientHeight }) : undefined}>
       {out}
     </pre>
   );

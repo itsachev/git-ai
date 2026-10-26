@@ -180,13 +180,13 @@ function App() {
     if (repo) return;
     gsap.matchMedia().add(MOTION, () => {
       const words = SplitText.create("h1", { type: "words", wordsClass: "w", mask: "words", aria: "auto" }).words;
-      const tl = gsap.timeline({ paused: true, defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
-        .from(".brand", { opacity: 0, y: 8, duration: 0.6 })
-        .from(words, { yPercent: 110, stagger: 0.06, duration: 0.9 }, 0.05)
-        .from(".lede", { opacity: 0, y: 12 }, 0.2)
-        .from(".tile", { opacity: 0, y: 16, stagger: 0.06 }, 0.25)
-        .from(".home-recent > :not(.recent)", { opacity: 0, x: 16, stagger: 0.05 }, 0.25)
-        .from(".corner > *", { opacity: 0, y: 8, stagger: 0.05, duration: 0.6 }, 0.4);
+      const tl = gsap.timeline({ paused: true, defaults: { clearProps: CLEAN } })
+        .from(".brand", { opacity: 0, y: 8 })
+        .from(words, { yPercent: 110, stagger: 0.045, duration: 0.6 }, 0.04)
+        .from(".lede", { opacity: 0, y: 12 }, 0.15)
+        .from(".tile", { opacity: 0, y: 16, stagger: 0.04 }, 0.18)
+        .from(".home-recent > :not(.recent)", { opacity: 0, x: 16, stagger: 0.035 }, 0.18)
+        .from(".corner > *", { opacity: 0, y: 8, stagger: 0.035 }, 0.28);
       return playSettled(tl);
     });
   }, { scope: home, dependencies: [!!repo], revertOnUpdate: true });
@@ -197,7 +197,7 @@ function App() {
     gsap.matchMedia().add(MOTION, () => {
       // Delay: on first load they follow the Recent header in the intro.
       return playSettled(gsap.timeline({ paused: true }).from(gsap.utils.toArray<HTMLElement>(".recent li").slice(0, 14),
-        { opacity: 0, x: 16, stagger: 0.035, duration: 0.7, ease: "expo.out", clearProps: CLEAN }, 0.3));
+        { opacity: 0, x: 16, stagger: 0.025, clearProps: CLEAN }, 0.2));
     });
   }, { scope: home, dependencies: [!!repo, hasRecent], revertOnUpdate: true });
 
@@ -468,9 +468,9 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   // when its refs arrive). The branch chips keep their own CSS pop.
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => {
-      gsap.timeline({ defaults: { ease: "expo.out", duration: 0.8, clearProps: CLEAN } })
-        .from(".rail-head > *, .views button", { opacity: 0, x: -14, stagger: 0.04 })
-        .from(".toolbar > :not(.branch-chip)", { opacity: 0, y: -8, stagger: 0.03 }, 0.05);
+      gsap.timeline({ defaults: { duration: 0.4, clearProps: CLEAN } })
+        .from(".rail-head > *, .views button", { opacity: 0, x: -14, stagger: 0.03 })
+        .from(".toolbar > :not(.branch-chip)", { opacity: 0, y: -8, stagger: 0.02 }, 0.04);
     });
   }, { scope: shell, dependencies: [path], revertOnUpdate: true });
 

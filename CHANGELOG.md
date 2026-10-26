@@ -12,6 +12,9 @@ What's new in each git-ai release. Newest first.
 
 - The selected repo tab is now filled with the app's accent colour, so it's easy to tell which repo you're in.
 - Commit with Push ticked on a branch that isn't on the remote yet now opens the Push dialog first, like the Push button, so you can pick the remote, the branch name there and whether to track it. The commit happens when you click Push; Cancel commits nothing. Branches already on the remote still commit and push straight away.
+- Entrance animations are quicker: opening a repo, the home screen and the shortcuts page settle in about half the time.
+- The shifting colours on the git-ai name now play only on the home screen, so the app does less work while it sits idle.
+- Long lines in diffs now wrap inside the pane instead of scrolling sideways, in both unified and side-by-side views. Wrapped text lines up after the line numbers. Very large diffs (over 1,500 lines) still scroll sideways.
 
 ## [0.3.0] - 2026-10-24
 
