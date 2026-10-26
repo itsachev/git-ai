@@ -4,6 +4,14 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a changed file to stage it or discard its changes, or a staged file to unstage it. With several files selected, it acts on all of them.
+
+### Changed
+
+- Commit with Push ticked on a branch that isn't on the remote yet now opens the Push dialog first, like the Push button, so you can pick the remote, the branch name there and whether to track it. The commit happens when you click Push; Cancel commits nothing. Branches already on the remote still commit and push straight away.
+
 ## [0.3.0] - 2026-10-24
 
 ### Added

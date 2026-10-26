@@ -21,7 +21,7 @@ import { FileHistoryDialog } from "./features/graph/FileHistory";
 import { CompareDialog, openCompare } from "./features/graph/Compare";
 import { ReflogDialog, openReflog } from "./features/refs/Reflog";
 import { StashDialog, StashSaveDialog, openStashSave } from "./features/refs/Stash";
-import { AskpassDialog, CloneDialog, SYNC_KEYS, SyncButtons, useSync } from "./features/remote/Remote";
+import { AskpassDialog, CloneDialog, PushDialog, SYNC_KEYS, SyncButtons, useSync } from "./features/remote/Remote";
 import { GitHubAccount, GitLabAccount } from "./features/github/GitHub";
 import { Backdrop } from "./features/home/Backdrop";
 import { AboutButton } from "./features/about/About";
@@ -404,6 +404,7 @@ function App() {
     <>
       {body}
       <AskpassDialog />
+      <PushDialog />
       <SettingsDialog />
       <SetupWizard theme={theme} setTheme={setTheme} />
       <ConfirmDialog />
@@ -583,7 +584,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <StashDialog path={path} />
         <StashSaveDialog path={path} />
         <LfsDialog path={path} />
-        <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} push={sync.pushNow} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
+        <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} planPush={sync.planPush} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
         {/* No shortcuts or palette commands while busy; mid-merge/rebase, none that move HEAD or switch branches. */}
         <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : paused ? commands.filter((c) => !PAUSE_BLOCKED.test(c.label)) : commands} path={busy ? undefined : path} /></footer>
         </fieldset>

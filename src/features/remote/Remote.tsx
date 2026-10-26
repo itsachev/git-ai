@@ -120,32 +120,36 @@ export function useSync(path: string, run: Run) {
     : !cur.upstream ? `${cur.name} doesn't track a remote branch yet. Push publishes it, or pick one with Track remote branch… in its menu`
     : "";
   // No remote yet: the first push asks where to, adds it as origin, then pushes (and sets the upstream).
-  const firstPush = async () => {
-    const v = await prompt("Push to a new remote", <>{cur ? <Local name={cur.name} /> : "This branch"} has nowhere to go yet. Paste the URL of the repository to push to, for example an empty one you just made on GitHub.</>,
-      [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote",
-      (v) => `git remote add ${v[0] || "<name>"} ${v[1] || "<url>"} && git push -u ${v[0] || "<name>"} ${cur?.name ?? "HEAD"}`);
-    if (v && await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`)) await pushOp.go();
-  };
+  // Asking and pushing are separate steps so Push after commit can ask before it commits.
+  const askRemote = () => prompt("Push to a new remote", <>{cur ? <Local name={cur.name} /> : "This branch"} has nowhere to go yet. Paste the URL of the repository to push to, for example an empty one you just made on GitHub.</>,
+    [{ label: "Name", value: "origin", placeholder: "origin" }, { label: "URL", placeholder: "https://github.com/owner/repo.git" }], "Add and push", "remote",
+    (v) => `git remote add ${v[0] || "<name>"} ${v[1] || "<url>"} && git push -u ${v[0] || "<name>"} ${cur?.name ?? "HEAD"}`);
+  const addRemoteAndPush = async (v: string[]) => { if (await run(() => remoteSet(path, v[0], v[1], false), `Added remote ${v[0]}`)) await pushOp.go(); };
+  const firstPush = async () => { const v = await askRemote(); if (v) await addRemoteAndPush(v); };
   // The Push button: the dialog first, then a force push, the pull / force push choice (behind only, to the
   // upstream), or a plain push with the picked options.
   const upRemote = cur?.upstream && remoteList?.map((r) => r.name).filter((r) => cur.upstream!.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0];
-  const pushDialog = async () => {
-    if (!cur || !remoteList?.length) return;
-    const a = await askPush({
-      branch: cur.name, remotes: remoteList.map((r) => r.name), ahead: cur.ahead, behind: cur.behind, upstream: cur.upstream ?? null,
-      remote: upRemote || pushTo!, to: upRemote ? cur.upstream!.slice(upRemote.length + 1) : cur.name,
-    });
-    if (!a) return;
-    const { force, ...opts } = a;
+  const askDialog = async () => !cur || !remoteList?.length ? null : askPush({
+    branch: cur.name, remotes: remoteList.map((r) => r.name), ahead: cur.ahead, behind: cur.behind, upstream: cur.upstream ?? null,
+    remote: upRemote || pushTo!, to: upRemote ? cur.upstream!.slice(upRemote.length + 1) : cur.name,
+  });
+  const pushAnswer = ({ force, ...opts }: PushAnswer) => {
     const to = <>{head} to <RemoteName name={`${opts.remote}/${opts.branch}`} /></>;
     if (force) return op("Push", "Pushing…", <>Force pushing {to}…</>, () => <>Force pushed {to}</>, () => push(path, true, opts)).go();
-    if (behindOnly && `${opts.remote}/${opts.branch}` === cur.upstream && !opts.tags) return rewindOp.go();
+    if (behindOnly && `${opts.remote}/${opts.branch}` === cur?.upstream && !opts.tags) return rewindOp.go();
     return pushWith(opts).go();
   };
+  const pushDialog = async () => { const a = await askDialog(); if (a) await pushAnswer(a); };
   return {
     busy, rebase, pickPull,
-    // For "Push after commit": skips `pushOff`, whose refs predate the commit just made.
-    pushNow: () => remoteList?.length === 0 ? firstPush() : pushOp.go(),
+    /** For "Push after commit", before it commits: asks first where a push needs asking (no remote yet, or the
+     *  Push dialog for a branch not on the remote yet), so Cancel commits nothing either. Resolves the push to
+     *  run once the commit lands, or null on Cancel. Skips `pushOff`, whose refs predate the commit. */
+    planPush: async (): Promise<(() => Promise<unknown>) | null> => {
+      if (remoteList?.length === 0) { const v = await askRemote(); return v && (() => addRemoteAndPush(v)); }
+      if (cur && !cur.upstream) { const a = await askDialog(); return a && (() => pushAnswer(a)); }
+      return pushOp.go;
+    },
     pullMerge: pullMerge.go,
     pullRebase: pullRebase.go,
     ops: [
@@ -217,8 +221,6 @@ export function SyncButtons({ sync, children }: { sync: Sync; children?: React.R
         ]} />
         {children}
       </span>
-      {/* Outside .sync, whose toolbar button styles would restyle the dialog buttons. */}
-      <PushDialog />
     </>
   );
 }
@@ -235,7 +237,9 @@ function askPush(ask: PushAsk) {
   return new Promise<PushAnswer | null>((resolve) => { pushAsk = { ...ask, resolve }; pushSubs.forEach((f) => f()); });
 }
 
-function PushDialog() {
+/** Mounted at the app root, outside the toolbar and the repo view's `.lock` fieldset: opened in the same frame the
+ *  fieldset re-enables (Commit & push), a dialog inside it left the whole stage unlaid-out (blank) in WebView2. */
+export function PushDialog() {
   const cur = useSyncExternalStore((f) => { pushSubs.add(f); return () => { pushSubs.delete(f); }; }, () => pushAsk);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {

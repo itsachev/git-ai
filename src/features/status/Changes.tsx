@@ -15,7 +15,7 @@ import { Lines, widest } from "../../lib/Lines";
 import { Local, ModalHead, Remote, choose, confirm } from "../../lib/modal";
 import { aiKeyQuery, openSettings } from "../settings/Settings";
 import { lfsPatternFor, openLfs } from "../lfs/Lfs";
-import { RefMenu, menuKeys, showMenu } from "../refs/Sidebar";
+import { RefMenu, menuKeys, showMenu, type Action } from "../refs/Sidebar";
 import { openFileHistory } from "../graph/FileHistory";
 import { openStashSave } from "../refs/Stash";
 
@@ -49,6 +49,9 @@ const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.d
 // `run(op, done, doing)`: `doing` shows in `Notice` while the op runs, then `done` ("Pushed main") for a few seconds.
 // `pending`: when the op started. `waited`: this success follows a pending notice.
 let notice: { text: React.ReactNode; gen: number; pending?: number; waited?: boolean } | null = null;
+
+/** Drops the success line, e.g. the commit's when Push after commit takes over. */
+const clearNotice = () => { notice = null; opSubs.forEach((f) => f()); };
 
 /** True while an op started with a `doing` label runs (Commit, Fetch, Pull, Push): the repo window locks. */
 export const useOpBusy = () => useSyncExternalStore(subscribeOps, () => !!notice?.pending);
@@ -176,7 +179,7 @@ export function Notice() {
   );
 }
 
-export function Changes({ path, push }: { path: string; push: () => Promise<unknown> }) {
+export function Changes({ path, planPush }: { path: string; planPush: () => Promise<(() => Promise<unknown>) | null> }) {
   const { data, error } = useQuery(statusQuery(path));
   const [sel, setSel] = useState<Selection | null>(null);
   const run = useRun();
@@ -237,7 +240,7 @@ export function Changes({ path, push }: { path: string; push: () => Promise<unkn
           </>
         )}
         </div>
-        <CommitBox path={path} branch={data.branch} staged={data.staged.length} finishing={data.operation} conflicts={data.conflicted.length} run={run} push={push}
+        <CommitBox path={path} branch={data.branch} staged={data.staged.length} finishing={data.operation} conflicts={data.conflicted.length} run={run} planPush={planPush}
           onCommit={(msg, amend) => {
             // Committing during a merge/rebase may finish it; say so once nothing is left in progress.
             const op = amend ? null : data.operation;
@@ -262,14 +265,14 @@ export function Changes({ path, push }: { path: string; push: () => Promise<unkn
 
 /** `finishing`: the merge/rebase/... in progress; committing finishes (or continues) it, an empty message uses git's.
  *  `conflicts`: unresolved files, which block that. */
-type CommitProps = { path: string; branch: string | null; staged: number; finishing: string | null; conflicts: number; run: Run; push: () => Promise<unknown>; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
+type CommitProps = { path: string; branch: string | null; staged: number; finishing: string | null; conflicts: number; run: Run; planPush: () => Promise<(() => Promise<unknown>) | null>; onCommit: (msg: string, amend: boolean) => Promise<boolean> };
 const PUSH_KEY = "push-after-commit";
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 /** What the Commit button does while `op` is in progress. */
 const finishLabel = (op: string) => op === "rebase" ? "continue the rebase" : `finish the ${op}`;
 
-function CommitBox({ path, branch, staged, finishing, conflicts, run, push, onCommit }: CommitProps) {
+function CommitBox({ path, branch, staged, finishing, conflicts, run, planPush, onCommit }: CommitProps) {
   const canCommit = staged > 0;
   const [msg, setMsg] = useState("");
   const [amend, setAmend] = useState(false);
@@ -314,6 +317,9 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, push, onCo
   }
   async function submit() {
     if (!ok) return;
+    // Where to push is asked before committing (Push dialog), so Cancel leaves the files as they were.
+    const pushNext = pushAfter && !pushOff ? await planPush() : undefined;
+    if (pushNext === null) return;
     setBusy(true);
     const done = await onCommit(msg, amend);
     if (done) {
@@ -321,7 +327,8 @@ function CommitBox({ path, branch, staged, finishing, conflicts, run, push, onCo
       setAmend(false);
     }
     setBusy(false);
-    if (done && pushAfter && !pushOff) await push();
+    // The push's own notice follows; "Committed …" would sit under it.
+    if (done && pushNext) { clearNotice(); await pushNext(); }
   }
   return (
     <form className="commit" onSubmit={(e) => { e.preventDefault(); submit(); }}>
@@ -453,6 +460,8 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
         })}
       </ul>
       <RefMenu pop={menu} label={`Actions for ${ctx?.path ?? "file"}`} actions={ctx ? [
+        [ctxFiles.length > 1 ? `${action} ${ctxFiles.length} files` : action, () => onAction(ctxFiles)],
+        ...(onDiscard ? [[ctxFiles.length > 1 ? `Discard ${ctxFiles.length} files` : "Discard changes", () => onDiscard(ctxFiles)] as Action] : []),
         ["Compare with a branch", () => openFileHistory("HEAD", ctx.path, "compare")],
         ["History and blame", () => openFileHistory("HEAD", ctx.path), ctx.kind === "?" || ctx.kind === "A" ? "New file: no history yet" : undefined],
         [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files` : "Stash this file", () => openStashSave(pathsOf(ctxFiles)), paused],
