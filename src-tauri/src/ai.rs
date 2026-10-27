@@ -395,7 +395,7 @@ mod tests {
         crate::git::cli::write_resolved(&dir, "app.js", &out).unwrap();
         assert_eq!(std::fs::read_to_string(dir.join("app.js")).unwrap(), out);
         let status = git(&["status", "--porcelain"]).unwrap();
-        assert!(status.contains("M  app.js"), "staged, no longer conflicted: {status}");
+        assert!(status.contains("UU app.js"), "still conflicted until marked resolved: {status}");
         let backups = git(&["for-each-ref", "refs/git-ai/backup/"]).unwrap();
         assert!(!backups.trim().is_empty(), "backup ref made");
         let entry = crate::oplog::entries(&dir, 20).unwrap().remove(0);

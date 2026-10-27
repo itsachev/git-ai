@@ -86,9 +86,9 @@ const FEATURES: [IconName, string, Feature[]][] = [
   ]],
   ["warn", "Conflicts", [
     ["Paused operations", "Shown automatically", "When a merge, rebase or cherry-pick stops on conflicts, the app switches to File Status and shows a banner. Abort to go back to how things were, or commit to finish once every file is resolved."],
-    ["Resolve a file", "Click a conflicted file", "Keep mine, Keep theirs, or keep both in either order. The app explains which side is which (it flips during a rebase) and backs the file up first."],
+    ["Resolve a file", "Click a conflicted file", "Keep mine, Keep theirs, or keep both in either order. The app explains which side is which (it flips during a rebase) and backs the file up first. The file stays open with the result; click Mark resolved when it looks right. Resolved files move to their own list (= means unchanged); Reopen puts one back in conflict."],
     ["Resolve with AI", "Conflicted file → Resolve with AI", "The AI proposes a merge of both sides. You review it, then Apply (backed up first, undoable) or Discard. The file is sent to your AI provider."],
-    ["Fix by hand", "Conflicted file → Open in…", "Opens the file in your editor of choice; once you fix and save it, it is marked resolved."],
+    ["Fix by hand", "Conflicted file → Open in…", "Opens the file in your editor of choice; once you fix and save it, check the result and click Mark resolved."],
   ]],
   ["undo", "Undo", [
     ["Undo history", "Sidebar → Undo history, or Ctrl+K → Undo", "Discards, branch and tag deletes, merges, rebases, pulls, amends and conflict picks are recorded. Undo puts your branches back exactly where they were. Merge, rebase, force push and undo ask first. Right-click an entry to undo it or delete it from the history."],

@@ -61,6 +61,7 @@ const FAILED: Record<string, (a: Args) => string> = {
   push_tag: (a) => `Failed to push tag ${a.name}`,
   delete_remote_branch: (a) => `Failed to delete ${a.name} on the remote`,
   resolve: () => "Failed to resolve the conflict",
+  reopen: () => "Failed to reopen the conflict",
   write_resolved: (a) => `Failed to apply the resolution to ${a.file}`,
   ai_resolve_conflict: (a) => `Failed to resolve ${a.file} with AI`,
   open_file: (a) => `Failed to open ${a.file}`,
@@ -221,9 +222,11 @@ export const pushTag = (path: string, name: string, force = false) => invoke<voi
 export const deleteRemoteBranch = (path: string, name: string) => invoke<void>("delete_remote_branch", { path, name });
 /** Clones `url` into `dest` (missing or empty folder) and opens it. Progress comes as "clone-progress" events (git's lines). */
 export const cloneRepo = (url: string, dest: string) => invoke<RepoInfo>("clone_repo", { url, dest });
-/** Takes one side of each conflicted file whole (backed up first, undoable) and marks it resolved. */
+/** Takes one side of each conflicted file whole (backed up first, undoable). It stays conflicted until `stage` marks it resolved. */
 export const resolve = (path: string, paths: string[], side: Side) => invoke<void>("resolve", { path, paths, side });
-/** Writes `text` over a conflicted file (backed up first, undoable) and marks it resolved. */
+/** Puts resolved files back in conflict, markers and all (backed up first, undoable). */
+export const reopen = (path: string, paths: string[]) => invoke<void>("reopen", { path, paths });
+/** Writes `text` over a conflicted file (backed up first, undoable). It stays conflicted until `stage` marks it resolved. */
 export const writeResolved = (path: string, file: string, text: string) => invoke<void>("write_resolved", { path, file, text });
 /** Working-tree text of a file; null = binary or over 1 MB. */
 export const workFile = (path: string, file: string) => invoke<string | null>("work_file", { path, file });

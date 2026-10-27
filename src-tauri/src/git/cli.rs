@@ -76,6 +76,8 @@ pub struct Status {
     /// Unstaged changes plus untracked files (kind "?").
     pub unstaged: Vec<FileChange>,
     pub conflicted: Vec<FileChange>,
+    /// Files that were in conflict during the current operation and are marked resolved (git's resolve-undo record).
+    pub resolved: Vec<String>,
     /// Merge/cherry-pick/... waiting for commit or abort, see `read::operation`.
     pub operation: Option<String>,
     /// What that operation is applying right now, see `read::op_step`.
@@ -98,6 +100,15 @@ pub fn status(repo: &Path) -> Result<Status, AppError> {
     let mut s = parse_status(&out);
     s.operation = crate::git::read::operation(repo)?;
     s.step = s.operation.as_deref().and_then(|op| crate::git::read::op_step(repo, op));
+    if s.operation.is_some() {
+        // "<mode> <oid> <stage>\t<path>", one record per stage of each resolved path.
+        let out = git(repo, &["ls-files", "--resolve-undo", "-z"])?;
+        for path in out.split('\0').filter_map(|r| r.split_once('\t')).map(|(_, p)| p) {
+            if !s.resolved.iter().any(|r| r == path) && !s.conflicted.iter().any(|f| f.path == path) {
+                s.resolved.push(path.into());
+            }
+        }
+    }
     Ok(s)
 }
 
@@ -790,9 +801,9 @@ fn union(text: &str, ours_first: bool) -> Option<String> {
     (found && state == 0).then_some(out)
 }
 
-/// Resolves conflicted files by taking one side whole (a side that deleted the file deletes it),
-/// or both sides of each block in order, then marks them resolved. The working-tree content
-/// (conflict markers, edits) is backed up first.
+/// Resolves conflicted files in the working tree by taking one side whole (a side that deleted the
+/// file deletes it), or both sides of each block in order. They stay conflicted so the result can be
+/// checked; `stage` marks them resolved. The working-tree content (conflict markers, edits) is backed up first.
 pub fn resolve(repo: &Path, paths: &[String], side: Side) -> Result<(), AppError> {
     // The undo label speaks the UI's "mine"/"theirs": during a rebase git's "theirs" is your commit.
     let rebasing = crate::git::read::operation(repo)?.as_deref() == Some("rebase");
@@ -812,27 +823,46 @@ pub fn resolve(repo: &Path, paths: &[String], side: Side) -> Result<(), AppError
             let merged = union(&text, matches!(side, Side::OursThenTheirs))
                 .ok_or_else(|| AppError::new("no_markers", format!("{p} has no conflict markers to combine; take one side or edit it.")))?;
             std::fs::write(&file, merged).map_err(|e| AppError::new("io", e.to_string()))?;
-            git(repo, &["add", "--", p])?;
         }
         return Ok(());
     }
     for p in paths {
         match git(repo, &["checkout", flag, "--", p]) {
-            Ok(_) => git(repo, &["add", "--", p])?,
+            Ok(_) => {}
             // "path 'x' does not have our version": that side deleted it.
-            Err(e) if e.message.contains("does not have") => git(repo, &["rm", "-q", "--", p])?,
+            Err(e) if e.message.contains("does not have") => match std::fs::remove_file(repo.join(p)) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(AppError::new("io", e.to_string())),
+                _ => {}
+            },
             Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+/// Puts resolved files back in conflict, markers and all, from git's resolve-undo record.
+/// The working-tree content is backed up first, so undo brings back the resolved file.
+pub fn reopen(repo: &Path, paths: &[String]) -> Result<(), AppError> {
+    crate::oplog::backup(repo, "reopen conflict", paths)?;
+    git(repo, &with_paths(&["update-index", "--unresolve", "--"], paths))?;
+    for p in paths {
+        // A modify/delete conflict has no markers to rebuild: put back the side that kept the file.
+        match git(repo, &["checkout", "-m", "--", p]) {
+            Err(e) if e.message.contains("necessary versions") => {
+                git(repo, &["checkout", "--ours", "--", p]).or_else(|_| git(repo, &["checkout", "--theirs", "--", p]))?
+            }
+            r => r?,
         };
     }
     Ok(())
 }
 
-/// Writes `text` as the resolved content of the conflicted `path` (backed up first) and marks it resolved.
+/// Writes `text` as the resolved content of the conflicted `path` (backed up first). Like `resolve`, it stays
+/// conflicted until `stage` marks it resolved.
 pub fn write_resolved(repo: &Path, path: &str, text: &str) -> Result<(), AppError> {
     // "take …" so undo also brings back the conflict state, not just the markers.
     crate::oplog::backup(repo, "take AI resolution", &[path.to_string()])?;
-    std::fs::write(repo.join(path), text).map_err(|e| AppError::new("io", e.to_string()))?;
-    git(repo, &["add", "--", path]).map(drop)
+    std::fs::write(repo.join(path), text).map_err(|e| AppError::new("io", e.to_string()))
 }
 
 /// Tag at `target` (a commit oid or ref): annotated when `message` isn't empty, else lightweight. Logged so undo can delete it.

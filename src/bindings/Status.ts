@@ -11,6 +11,10 @@ branch: string | null, staged: Array<FileChange>,
  */
 unstaged: Array<FileChange>, conflicted: Array<FileChange>, 
 /**
+ * Files that were in conflict during the current operation and are marked resolved (git's resolve-undo record).
+ */
+resolved: Array<string>, 
+/**
  * Merge/cherry-pick/... waiting for commit or abort, see `read::operation`.
  */
 operation: string | null, 

@@ -640,6 +640,17 @@ On main: one
         cli::resolve(s, &["a.txt".into()], cli::Side::Theirs).unwrap();
         cli::resolve(s, &["b.txt".into()], cli::Side::Theirs).unwrap(); // theirs deleted it
         assert!(!src.join("b.txt").exists());
+        assert_eq!(crate::git::read::work_file(s, "b.txt").unwrap_err().code, "missing");
+        assert_eq!(cli::status(s).unwrap().conflicted.len(), 2, "still conflicted until marked resolved");
+        cli::stage(s, &["a.txt".into(), "b.txt".into()]).unwrap();
+        assert_eq!(cli::status(s).unwrap().resolved, ["a.txt", "b.txt"]);
+        // Reopen brings both conflicts back (b.txt too, though it was deleted); resolving again works.
+        cli::reopen(s, &["a.txt".into(), "b.txt".into()]).unwrap();
+        let st = cli::status(s).unwrap();
+        assert_eq!((st.conflicted.len(), st.resolved.len()), (2, 0));
+        assert!(fs::read_to_string(src.join("a.txt")).unwrap().contains("<<<<<<<"));
+        cli::resolve(s, &["a.txt".into(), "b.txt".into()], cli::Side::Theirs).unwrap();
+        cli::stage(s, &["a.txt".into(), "b.txt".into()]).unwrap();
         let st = cli::status(s).unwrap();
         assert!(st.conflicted.is_empty());
         cli::commit(s, "", false).unwrap();
@@ -931,6 +942,8 @@ mine
         cli::resolve(p, &["a.txt".into()], cli::Side::Theirs).unwrap();
         assert_eq!(fs::read_to_string(dir.join("a.txt")).unwrap().trim_end(), "x1");
         assert_eq!(super::entries(p, 1).unwrap()[0].op, "take mine");
+        cli::stage(p, &["a.txt".into()]).unwrap();
+        assert_eq!(cli::status(p).unwrap().resolved, ["a.txt"]);
         cli::commit(p, "", false).unwrap();
         assert_eq!(cli::status(p).unwrap().operation, None);
         assert_eq!(git(p, &["log", "-2", "--format=%s"]).unwrap(), "x1 again\nx2\n");

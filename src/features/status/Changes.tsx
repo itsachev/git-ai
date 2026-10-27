@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fetchAll, fileDiff, headMessage, ignore, openFile, opLog, push, repoStatus, resolve, stage, stashSave, unstage, workFile, writeResolved } from "../../lib/ipc";
+import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fetchAll, fileDiff, headMessage, ignore, openFile, opLog, push, reopen, repoStatus, resolve, stage, stashSave, unstage, workFile, writeResolved } from "../../lib/ipc";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Side } from "../../bindings/Side";
 import type { FileChange } from "../../bindings/FileChange";
@@ -183,8 +183,6 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
   const { data, error } = useQuery(statusQuery(path));
   const [sel, setSel] = useState<Selection | null>(null);
   const run = useRun();
-  // Files that were in conflict during the current merge/rebase, so a resolved one keeps its view.
-  const hadConflict = useRef(new Set<string>());
 
   async function discardFiles(files: FileChange[]) {
     if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`, discardGit(files))) run(() => discard(path, pathsOf(files)));
@@ -192,14 +190,15 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
 
   if (error) return <p className="error" role="alert">{errorText(error)}</p>;
   if (!data) return null;
-  const empty = !data.staged.length && !data.unstaged.length && !data.conflicted.length;
-  if (!data.operation) hadConflict.current.clear();
-  for (const f of data.conflicted) hadConflict.current.add(f.path);
+  // Resolved files get their own list (part of the commit like Staged); "=" = resolved to what HEAD has, so no change.
+  const resolvedFiles = data.resolved.map((p) => data.staged.find((f) => f.path === p) ?? { path: p, orig_path: null, kind: "=" });
+  const stagedOnly = data.staged.filter((f) => !data.resolved.includes(f.path));
+  const empty = !data.staged.length && !data.unstaged.length && !data.conflicted.length && !resolvedFiles.length;
   // Follow the file when it moves to the other list (staged, unstaged, resolved); drop it once it's gone.
-  const inList = (file: string, staged: boolean) => (staged ? data.staged : [...data.unstaged, ...data.conflicted]).some((f) => f.path === file);
+  const inList = (file: string, staged: boolean) => (staged ? [...data.staged, ...resolvedFiles] : [...data.unstaged, ...data.conflicted]).some((f) => f.path === file);
   const cur = sel && (inList(sel.file, sel.staged) ? sel : inList(sel.file, !sel.staged) ? { file: sel.file, staged: !sel.staged } : null);
   const conflicted = !!cur && !cur.staged && data.conflicted.some((f) => f.path === cur.file);
-  const resolved = !!cur && cur.staged && hadConflict.current.has(cur.file);
+  const resolved = !!cur && cur.staged && data.resolved.includes(cur.file);
 
   const list = { sel: cur, onSelect: setSel, paused: data.operation ? `Finish or abort the ${data.operation} first` : undefined };
   async function ignoreFile(file: string) {
@@ -233,7 +232,9 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
           <>
             <FileList {...list} title="Conflicts" files={data.conflicted} staged={false}
               action="Mark resolved" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} />
-            <FileList {...list} title="Staged" files={data.staged} staged
+            <FileList {...list} title="Resolved" files={resolvedFiles} staged
+              action="Reopen" onAction={(fs) => run(() => reopen(path, pathsOf(fs)), `Reopened ${fs.length === 1 ? fs[0].path : `${fs.length} conflicts`}`)} />
+            <FileList {...list} title="Staged" files={stagedOnly} staged
               action="Unstage" onAction={(fs) => run(() => unstage(path, pathsOf(fs)))} />
             <FileList {...list} title="Changes" files={data.unstaged} staged={false}
               action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} onIgnore={ignoreFile} />
@@ -256,7 +257,7 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
           }} />
       </div>
       <Splitter name="side-w" axis="x" label="Resize file list" />
-      {conflicted || resolved ? <Conflict key={cur.file} path={path} file={cur.file} op={data.operation} resolved={resolved} run={run} />
+      {conflicted || resolved ? <Conflict key={cur.file} path={path} file={cur.file} op={data.operation} resolved={resolved} unchanged={resolvedFiles.some((f) => f.path === cur.file && f.kind === "=")} run={run} onDone={() => setSel(null)} />
         : empty && !data.operation ? <Clean branch={data.branch} />
         : <Diff path={path} sel={cur} kind={cur?.file && (cur.staged ? data.staged : data.unstaged).find((f) => f.path === cur.file)?.kind} run={run} />}
     </div>
@@ -471,36 +472,23 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
 }
 
 /** A conflicted file with its markers, plus whole-file resolutions. Edits in between happen in an editor.
- *  `resolved`: resolved and staged; shows the file as it will be committed. */
-function Conflict({ path, file, op, resolved, run }: { path: string; file: string; op: string | null; resolved: boolean; run: Run }) {
+ *  A resolution only rewrites the file, which stays here to be checked; "Mark resolved" stages it and calls `onDone`.
+ *  `resolved`: resolved and staged; shows the file as it will be committed. `unchanged`: resolved to what HEAD has. */
+function Conflict({ path, file, op, resolved, unchanged, run, onDone }: { path: string; file: string; op: string | null; resolved: boolean; unchanged: boolean; run: Run; onDone: () => void }) {
   // "Mine" = your work. During a rebase git swaps the sides: its "ours" is the branch rebased so far
   // and its "theirs" is your commit being replayed.
   const rebasing = op === "rebase";
   const mine: Side = rebasing ? "Theirs" : "Ours";
   const theirs: Side = rebasing ? "Ours" : "Theirs";
-  const { data, error } = useQuery({ queryKey: ["work", path, file], queryFn: () => workFile(path, file) });
+  const { data, error } = useQuery({ queryKey: ["work", path, file], queryFn: () => workFile(path, file), retry: false });
   const eds = useQuery({ queryKey: ["editors"], queryFn: editors, staleTime: Infinity });
   const [editor, setEditor] = useState<string | null>(null);
   const chosen = editor ?? eds.data?.chosen ?? "";
   const menu = useRef<HTMLDivElement>(null);
-  // Edited in an editor: once the markers seen here are all gone, mark the file resolved.
-  // Never on first sight (a delete/modify conflict has no markers at all).
-  const hadMarkers = useRef(false);
-  useEffect(() => {
-    if (resolved) hadMarkers.current = false;
-    if (typeof data !== "string" || resolved) return;
-    if (/^(<{7}|>{7})( |\r?$)/m.test(data)) hadMarkers.current = true;
-    else if (hadMarkers.current) {
-      hadMarkers.current = false;
-      // The markers may be gone because the merge/rebase was just aborted (status not refetched yet): stage only a live conflict.
-      let staged = false;
-      run(async () => {
-        if (!(await repoStatus(path)).conflicted.some((f) => f.path === file)) return;
-        await stage(path, [file]);
-        staged = true;
-      }, () => staged && `Resolved ${file}`);
-    }
-  }, [data, resolved]);
+  // Markers left = not done yet. A deleted file (a side that deleted it) has nothing left to check.
+  const markers = typeof data === "string" && /^(<{7}|>{7})( |\r?$)/m.test(data);
+  const missing = (error as AppError | null)?.code === "missing";
+  const ready = !markers && (data !== undefined || missing);
   const open = (n: string) => run(() => openFile(path, file, n || null).then(() => void eds.refetch()));
   // AI proposal: shown for review; nothing is written until Apply.
   const hasKey = useQuery(aiKeyQuery).data;
@@ -524,8 +512,8 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
       <div className="diff-bar">
         <span className="conflict-file">AI proposal for <strong>{file}</strong></span>
         <span className="conflict-actions">
-          <button className="small primary" onClick={async () => { if (await run(() => writeResolved(path, file, proposal), `Resolved ${file}`)) setProposal(null); }}
-            title="Write this to the file (backed up first) and mark it resolved">Apply</button>
+          <button className="small primary" onClick={async () => { if (await run(() => writeResolved(path, file, proposal))) setProposal(null); }}
+            title="Write this to the file (backed up first); you check it before marking it resolved">Apply</button>
           <button className="small" onClick={() => setProposal(null)}>Discard</button>
         </span>
       </div>
@@ -542,6 +530,10 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
         <span className="conflict-file">{resolved ? "Resolved" : "Conflict in"} <strong>{file}</strong></span>
         <span className="conflict-actions">
           {!resolved && <>
+          <button className={`small${ready ? " primary" : ""}`} disabled={!ready}
+            title={ready ? "Stage the file as it is now and close it" : "Conflict markers are left: take a side or edit the file first"}
+            onClick={async () => { if (await run(() => stage(path, [file]), `Resolved ${file}`)) onDone(); }}>
+            <Icon name="check" />Mark resolved</button>
           <button className="small" disabled={asking || typeof data !== "string"} onClick={askAi}
             title={hasKey ? "Propose a merge of both sides (file sent to your AI provider); you review it before it's applied" : "Set up AI in Settings first"}>
             <Icon name="sparkle" />{asking ? "Resolving…" : "Resolve with AI"}</button>
@@ -549,9 +541,9 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
             title={`Keep ${rebasing ? "your commit's" : "your branch's"} version (backed up first)`}>Keep mine</button>
           <button className="small" onClick={() => run(() => resolve(path, [file], theirs))}
             title={`Keep the ${rebasing ? "branch you're rebasing onto" : "incoming"} version (backed up first)`}>Keep theirs</button>
-          <button className="small" onClick={() => run(() => resolve(path, [file], rebasing ? "TheirsThenOurs" : "OursThenTheirs"))}
+          <button className="small" disabled={!markers} onClick={() => run(() => resolve(path, [file], rebasing ? "TheirsThenOurs" : "OursThenTheirs"))}
             title="Keep both sides of every conflict, mine first (backed up first)">Mine, then theirs</button>
-          <button className="small" onClick={() => run(() => resolve(path, [file], rebasing ? "OursThenTheirs" : "TheirsThenOurs"))}
+          <button className="small" disabled={!markers} onClick={() => run(() => resolve(path, [file], rebasing ? "OursThenTheirs" : "TheirsThenOurs"))}
             title="Keep both sides of every conflict, theirs first (backed up first)">Theirs, then mine</button>
           </>}
           {/* Split button: the main part opens in the remembered editor, the chevron picks another (and opens in it). */}
@@ -578,14 +570,17 @@ function Conflict({ path, file, op, resolved, run }: { path: string; file: strin
         </span>
       </div>
       <p className="muted legend">
-        {resolved ? <>Staged. This is the file as it will be committed{op ? ` when you ${finishLabel(op)}` : ""}.</> : <>
+        {resolved ? <>Resolved. {missing ? "The file is deleted" : unchanged ? "It matches the current version, so the commit leaves it as is" : "This is the file as it will be committed"}{op ? ` when you ${finishLabel(op)}` : ""}. Reopen it from the list to resolve it again.</>
+        : missing ? <>The file is deleted. Mark it resolved to keep it deleted, or take the other side.</>
+        : ready && data !== null ? <>No conflict markers left. Check the result below, then mark it resolved.</> : <>
         {rebasing
           ? <><span className="theirs">Mine</span> = your commit being replayed, <span className="ours">theirs</span> = the branch you're rebasing onto.</>
           : <><span className="ours">Mine</span> = your branch, <span className="theirs">theirs</span> = incoming.</>}{" "}
-        Edit the file to combine them; once no markers are left and it is saved, it is marked resolved.
+        Take a side, or edit the file to combine them, then mark it resolved.
         </>}
       </p>
-      {error ? <p className="error" role="alert">{errorText(error)}</p>
+      {missing ? null
+        : error ? <p className="error" role="alert">{errorText(error)}</p>
         : data === null ? <p className="muted">Binary file or larger than 1 MB, take a side or open it.</p>
         : data !== undefined && (
           <pre aria-label={resolved ? `Resolved ${file}` : `Conflicts in ${file}`}>

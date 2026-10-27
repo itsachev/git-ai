@@ -4,6 +4,14 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Added
+
+- During a merge, rebase, pull or cherry-pick, files you've resolved get their own Resolved list, so you can see what goes into the commit. Click one to see the file as it will be committed. A file marked = matches your current version, so the commit leaves it unchanged. Reopen puts a file back in conflict, markers and all, if you want to resolve it again.
+
+### Changed
+
+- Resolving a conflict (Keep mine, Keep theirs, both sides, an AI proposal or your own edit) no longer closes the file. It stays open showing the result, so you can check it, and you click Mark resolved when you're happy. Before, the file vanished as soon as you picked a side, and right away if the result matched your branch.
+
 ### Fixed
 
 - The main view no longer goes blank after an action finishes (Undo, Commit, Push, Pull, Fetch, Switch or Checkout). Before, the commit list or file list could vanish until you switched tabs.

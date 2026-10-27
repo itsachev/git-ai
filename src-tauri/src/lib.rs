@@ -84,6 +84,7 @@ pub fn run() {
             commands::askpass_reply,
             commands::clone_repo,
             commands::resolve,
+            commands::reopen,
             commands::write_resolved,
             commands::work_file,
             commands::open_file,

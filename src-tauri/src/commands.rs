@@ -485,6 +485,12 @@ pub fn resolve(path: String, paths: Vec<String>, side: cli::Side) -> Result<(), 
 }
 
 #[tauri::command(async)]
+pub fn reopen(path: String, paths: Vec<String>) -> Result<(), AppError> {
+    let _op = serial();
+    cli::reopen(Path::new(&path), &paths)
+}
+
+#[tauri::command(async)]
 pub fn write_resolved(path: String, file: String, text: String) -> Result<(), AppError> {
     let _op = serial();
     cli::write_resolved(Path::new(&path), &file, &text)

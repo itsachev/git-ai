@@ -375,8 +375,10 @@ pub fn recent_subjects(repo: &Path, n: usize) -> Result<Vec<String>, AppError> {
 }
 
 /// Working-tree text of `file` (shows a conflicted file with its markers). None when binary or over 1 MB.
+/// Code "missing" when the file is gone (a resolution that took the deleting side).
 pub fn work_file(repo: &Path, file: &str) -> Result<Option<String>, AppError> {
-    let bytes = std::fs::read(repo.join(file)).map_err(|e| AppError::new("io", e.to_string()))?;
+    let bytes = std::fs::read(repo.join(file))
+        .map_err(|e| AppError::new(if e.kind() == std::io::ErrorKind::NotFound { "missing" } else { "io" }, e.to_string()))?;
     Ok((bytes.len() <= 1 << 20 && !bytes.contains(&0)).then(|| String::from_utf8_lossy(&bytes).into_owned()))
 }
 

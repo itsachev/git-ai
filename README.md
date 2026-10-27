@@ -86,6 +86,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ### ⚔️ Conflicts
 - Keep mine, theirs or both; open in your editor
+- Check the result, then **Mark resolved**; resolved files stay listed, and **Reopen** puts one back in conflict
 - **AI resolve**: review the proposed file before applying it
 
 ### ⌨️ Everywhere
