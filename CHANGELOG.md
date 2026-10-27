@@ -4,6 +4,8 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-27
+
 ### Added
 
 - During a merge, rebase, pull or cherry-pick, files you've resolved get their own Resolved list, so you can see what goes into the commit. Click one to see the file as it will be committed. A file marked = matches your current version, so the commit leaves it unchanged. Reopen puts a file back in conflict, markers and all, if you want to resolve it again.
@@ -192,7 +194,8 @@ First release. Windows only for now: macOS and Linux installers will follow once
 - Error messages from Git hooks (such as lefthook or commitlint) no longer show garbled symbols like `[38;2;56;56;56m` where the hook used terminal colours.
 - A finished notice like "Fetched all remotes" no longer pops up again each time you switch between open repositories.
 
-[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/itsachev/git-ai/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/itsachev/git-ai/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/itsachev/git-ai/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/itsachev/git-ai/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/itsachev/git-ai/compare/v0.1.0...v0.2.0
