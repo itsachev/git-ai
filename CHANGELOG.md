@@ -4,6 +4,10 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Fixed
+
+- The main view no longer goes blank after an action finishes (Undo, Commit, Push, Pull, Fetch, Switch or Checkout). Before, the commit list or file list could vanish until you switched tabs.
+
 ## [0.4.0] - 2026-10-26
 
 ### Added

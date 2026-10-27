@@ -237,8 +237,7 @@ function askPush(ask: PushAsk) {
   return new Promise<PushAnswer | null>((resolve) => { pushAsk = { ...ask, resolve }; pushSubs.forEach((f) => f()); });
 }
 
-/** Mounted at the app root, outside the toolbar and the repo view's `.lock` fieldset: opened in the same frame the
- *  fieldset re-enables (Commit & push), a dialog inside it left the whole stage unlaid-out (blank) in WebView2. */
+/** Mounted at the app root, outside the toolbar and the repo view's `.lock`, so it stays usable while the lock is on. */
 export function PushDialog() {
   const cur = useSyncExternalStore((f) => { pushSubs.add(f); return () => { pushSubs.delete(f); }; }, () => pushAsk);
   const dialog = useRef<HTMLDialogElement>(null);

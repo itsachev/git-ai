@@ -1784,14 +1784,15 @@ dialog.palette[open]::backdrop { background: rgb(24 18 10 / 0.12); -webkit-backd
 .notice-text { min-width: 0; }
 .toast .elapsed { flex: none; white-space: nowrap; margin-left: auto; padding-left: 0.5rem; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); animation: fade 300ms var(--ease); }
 .notice .toast.settled { animation: settle 420ms var(--spring), fade 400ms var(--ease) 3.6s reverse forwards; }
-/* Repo window lock during Commit/Fetch/Pull/Push: a <fieldset disabled> that fills the rail/stage as their flex column.
-   Not display: contents: Chromium (WebView2) then drops its grandchildren's layout boxes after some updates, blanking the toolbar and body. */
-.lock { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; }
-.lock:disabled, .lock:disabled button:disabled { cursor: progress; }
+/* Repo window lock during Commit/Fetch/Pull/Push/Undo/Switch: an `inert` div that fills the rail/stage as their flex column.
+   Not a <fieldset disabled>: toggling it made Chromium (WebView2) drop the stage's layout boxes, blanking the body until a reload. */
+.lock { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+/* Inert content takes no pointer, so the shell under it shows the cursor. */
+.shell:has(.lock[inert]) { cursor: progress; }
 /* Dims only after 250 ms (unlocking is instant), so a quick commit doesn't flash the whole window. */
-.lock:disabled button:disabled { transition: opacity 160ms var(--ease) 250ms; }
+.lock[inert] :is(button, input, textarea, select) { opacity: 0.45; transition: opacity 160ms var(--ease) 250ms; }
 /* The running op stays at full strength so its spinner reads among the dimmed buttons. */
-.sync button[aria-busy="true"]:disabled { opacity: 1; }
+.lock[inert] .sync button[aria-busy="true"] { opacity: 1; }
 /* Busy toolbar button: the same sweep under its label. */
 .sync button[aria-busy="true"] { position: relative; overflow: hidden; }
 .sync button[aria-busy="true"]::after {

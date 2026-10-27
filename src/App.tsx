@@ -523,10 +523,10 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
 
   return (
     <div ref={shell} className={`shell${side ? " show-side" : ""}`}>
-      {/* While Commit/Fetch/Pull/Push runs, every control in the rail and the stage is disabled (`.lock`). Askpass and the
+      {/* While Commit/Fetch/Pull/Push runs, the rail and the stage are inert (`.lock`). Askpass and the
           push-rejected choice mount outside RepoView, so they stay usable. */}
       <aside className="rail" aria-label="Repository">
-        <fieldset className="lock" disabled={busy}>
+        <div className="lock" inert={busy}>
         <div className="rail-head">
           {/* Arrow and repo name are one target: either goes back to the repository list. */}
           <button className="back" onClick={onHome} title={`Back to repositories\n${path}`} aria-label={`${repo.name}: back to repositories`}>
@@ -545,12 +545,12 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           ))}
         </nav>
         <Sidebar path={path} />
-        </fieldset>
+        </div>
       </aside>
       <Splitter name="rail-w" axis="x" label="Resize sidebar" />
       <div className="scrim" aria-hidden="true" onClick={() => setSide(false)} />
       <main className="stage">
-        <fieldset className="lock" disabled={busy}>
+        <div className="lock" inert={busy}>
         <header className="toolbar">
           <button className="icon-btn menu" aria-label="Branches and views" title="Branches and views (Ctrl+B)" aria-expanded={side} onClick={() => setSide((v) => !v)}><Icon name="menu" /></button>
           <div className="toolbar-title">
@@ -587,7 +587,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         <div className="stage-body" key={tab}>{tab === "status" ? <Changes path={path} planPush={sync.planPush} /> : tab === "history" ? <History path={path} /> : <Shortcuts commands={commands} />}</div>
         {/* No shortcuts or palette commands while busy; mid-merge/rebase, none that move HEAD or switch branches. */}
         <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : paused ? commands.filter((c) => !PAUSE_BLOCKED.test(c.label)) : commands} path={busy ? undefined : path} /></footer>
-        </fieldset>
+        </div>
       </main>
     </div>
   );
