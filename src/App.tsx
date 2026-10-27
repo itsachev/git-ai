@@ -573,8 +573,6 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
           <SettingsButton />
         </header>
         {log?.[0] && canUndo(log[0]) && <UndoRibbon key={log[0].id} entry={log[0]} onUndo={undoLast(log[0])} off={paused} />}
-        <Notice />
-        <OpErrorDialog path={repo.path} />
         <NewBranchDialog path={path} />
         <WriteUpDialog path={path} />
         <RebaseDialog path={path} />
@@ -588,6 +586,9 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
         {/* No shortcuts or palette commands while busy; mid-merge/rebase, none that move HEAD or switch branches. */}
         <footer className="statusbar"><Versions path={path} /><Palette commands={busy ? [] : paused ? commands.filter((c) => !PAUSE_BLOCKED.test(c.label)) : commands} path={busy ? undefined : path} /></footer>
         </div>
+        {/* Outside the lock: an op's error callout must be clickable the moment the op ends. */}
+        <Notice />
+        <OpErrorDialog path={repo.path} />
       </main>
     </div>
   );

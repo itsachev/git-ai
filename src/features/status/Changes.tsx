@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fetchAll, fileDiff, headMessage, ignore, openFile, opLog, push, reopen, repoStatus, resolve, stage, stashSave, unstage, workFile, writeResolved } from "../../lib/ipc";
+import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fetchAll, fileDiff, headMessage, ignore, openFile, opLog, push, reopen, repoStatus, resolve, stage, stashSave, undo, unstage, workFile, writeResolved } from "../../lib/ipc";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Side } from "../../bindings/Side";
 import type { FileChange } from "../../bindings/FileChange";
@@ -24,31 +25,57 @@ export const opLogQuery = (path: string) => ({ queryKey: ["oplog", path], queryF
 
 type Selection = { file: string; staged: boolean };
 /** `done`: the success notice, or a function called after success (undefined = no notice).
- *  `doing`: shown in the notice while the op runs ("Pushing main…"). */
-export type Run = (op: () => Promise<unknown>, done?: React.ReactNode | (() => React.ReactNode), doing?: React.ReactNode) => Promise<boolean>;
+ *  `doing`: shown in the notice while the op runs ("Pushing main…").
+ *  `at`: the button the op started from; its notice and error sit under it. Default: the focused button. */
+export type Run = (op: () => Promise<unknown>, done?: React.ReactNode | (() => React.ReactNode), doing?: React.ReactNode, at?: HTMLElement | null) => Promise<boolean>;
 
 export const errorText = (e: unknown) => (e as AppError).message ?? String(e);
 // A staged rename also needs its old path to be unstaged.
 export const pathsOf = (files: FileChange[]) => files.flatMap((f) => (f.orig_path ? [f.path, f.orig_path] : [f.path]));
+// Picked diff lines still ask first: they get no crossed-out row to undo from.
 const confirmDiscard = (what: string, git: string) =>
   confirm("Discard changes", `Discard changes to ${what}? A backup is kept, use Undo history to restore it.`, "Discard", "danger", git);
-/** What discarding `files` runs: restore for tracked files, clean for untracked ones. */
-const discardGit = (files: FileChange[]) => {
-  const q = (fs: FileChange[]) => pathsOf(fs).map((p) => (/\s/.test(p) ? `"${p}"` : p)).join(" ");
-  const tracked = files.filter((f) => f.kind !== "?"), untracked = files.filter((f) => f.kind === "?");
-  return [tracked.length && `git restore --worktree -- ${q(tracked)}`, untracked.length && `git clean -f -- ${q(untracked)}`].filter(Boolean).join(" && ");
-};
+/** How long a discarded file's crossed-out row offers Undo. */
+const TOMB_MS = 6000;
+
+/** The button that has focus (the one just clicked), as the default place for an op's notice. */
+const focusedButton = () => (document.activeElement as HTMLElement | null)?.closest<HTMLElement>("button") ?? null;
+/** `at` while it is still on screen (not removed, not inside a closed menu or dialog). */
+const onScreen = (at?: HTMLElement | null) => (at?.isConnected && at.getClientRects().length ? at : null);
+/** Puts popover `el` under `at` (above it when there's no room below), with its tail (`--tail`) under `at`'s center. */
+function placeAt(el: HTMLElement, at: HTMLElement) {
+  const a = at.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, gap = 10;
+  const cx = a.left + a.width / 2, x = Math.max(8, Math.min(cx - w / 2, innerWidth - w - 8));
+  const below = a.bottom + gap + h <= innerHeight - 8;
+  el.style.left = `${x}px`;
+  el.style.top = `${below ? a.bottom + gap : Math.max(8, a.top - gap - h)}px`;
+  el.style.setProperty("--tail", `${cx - x}px`);
+  el.classList.toggle("above", !below);
+}
+/** Keeps `ref` placed at `at` (see `placeAt`), also when the window resizes. `key` re-places when the content changes size. */
+function usePlaceAt(ref: React.RefObject<HTMLElement | null>, at: HTMLElement | null, key: unknown) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !at) return;
+    const place = () => placeAt(el, at);
+    place();
+    addEventListener("resize", place);
+    // Back to its CSS position (the notice's bottom center) once it has no button.
+    return () => { removeEventListener("resize", place); el.style.left = el.style.top = ""; el.classList.remove("above"); };
+  }, [ref, at, key]);
+}
 
 /** `run(op)` runs a git op, refreshes right away (the watcher would too, 300 ms later).
  * A failure shows in `OpErrorDialog` until OK. */
 let opGen = 0;
-let opError: { title: string; text: string; warn?: boolean; code?: string; retry?: (extra?: string) => void } | null = null;
+let opError: { title: string; text: string; warn?: boolean; code?: string; retry?: (extra?: string) => void; at?: HTMLElement | null } | null = null;
 const opSubs = new Set<() => void>();
 const subscribeOps = (f: () => void) => { opSubs.add(f); return () => { opSubs.delete(f); }; };
 
 // `run(op, done, doing)`: `doing` shows in `Notice` while the op runs, then `done` ("Pushed main") for a few seconds.
 // `pending`: when the op started. `waited`: this success follows a pending notice.
-let notice: { text: React.ReactNode; gen: number; pending?: number; waited?: boolean } | null = null;
+// `at`: the button it started from (see `Run`).
+let notice: { text: React.ReactNode; gen: number; pending?: number; waited?: boolean; at?: HTMLElement | null } | null = null;
 
 /** Drops the success line, e.g. the commit's when Push after commit takes over. */
 const clearNotice = () => { notice = null; opSubs.forEach((f) => f()); };
@@ -58,17 +85,22 @@ export const useOpBusy = () => useSyncExternalStore(subscribeOps, () => !!notice
 
 export function useRun() {
   const qc = useQueryClient();
-  async function run(op: () => Promise<unknown>, done?: React.ReactNode | (() => React.ReactNode), doing?: React.ReactNode) {
+  async function run(op: () => Promise<unknown>, done?: React.ReactNode | (() => React.ReactNode), doing?: React.ReactNode, at = focusedButton()) {
     const mine = ++opGen;
-    notice = doing ? { text: doing, gen: mine, pending: Date.now() } : null;
+    // A new op replaces the last error, which otherwise waits under its button.
+    opError = null;
+    notice = doing ? { text: doing, gen: mine, pending: Date.now(), at } : null;
     opSubs.forEach((f) => f());
     try {
       await op();
       const text = typeof done === "function" ? done() : done;
       if (mine === opGen) {
-        notice = text ? { text, gen: mine, waited: !!doing } : null;
+        notice = text ? { text, gen: mine, waited: !!doing, at } : null;
         opSubs.forEach((f) => f());
       }
+      // The button that showed the progress shows the result too: green for a moment.
+      const btn = doing ? onScreen(at) : null;
+      if (btn) { btn.dataset.done = ""; setTimeout(() => delete btn.dataset.done, 2400); }
       return true;
     } catch (e) {
       if (mine === opGen) notice = null;
@@ -78,7 +110,8 @@ export function useRun() {
         ? { title: "Paused: resolve the conflicts", text: errorText(e), warn: true }
         : { title: code === "clash" ? "Nothing was switched" : (e as { title?: string }).title ?? "Something went wrong", text: errorText(e), code,
             // `extra` is appended to the success notice ("… Your changes are in the stash.").
-            retry: (extra?: string) => { run(op, extra ? () => <>{(typeof done === "function" ? done() : done) ?? "Done"}. {extra}</> : done, doing); } };
+            retry: (extra?: string) => { run(op, extra ? () => <>{(typeof done === "function" ? done() : done) ?? "Done"}. {extra}</> : done, doing, at); } };
+      opError.at = at;
       opSubs.forEach((f) => f());
       return false;
     } finally {
@@ -100,37 +133,61 @@ const FIXES: Record<string, (path: string, run: Run, retry: (extra?: string) => 
   git_missing: () => [["Get Git", () => openUrl("https://git-scm.com/downloads")]],
 };
 
-/** Modal for the last failed op, with a fix button when one is known; OK (or Esc) dismisses it. */
+/** The last failed op, with a fix button when one is known; OK (or Esc) dismisses it. It waits under the button
+ *  the op started from, with no timer; with no such button on screen (palette, shortcut) it's a modal. */
 export function OpErrorDialog({ path }: { path: string }) {
   const err = useSyncExternalStore(subscribeOps, () => opError);
   const run = useRun();
   const dialog = useRef<HTMLDialogElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
   // Keep the last text through the close transition so the dialog doesn't empty while fading.
-  const last = useRef(err);
-  if (err) last.current = err;
-  useEffect(() => {
-    if (err) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [err]);
+  // `pinned`: its button, picked once per error so it doesn't jump between callout and modal.
+  const last = useRef<{ err: NonNullable<typeof err>; pinned: HTMLElement | null } | null>(null);
+  if (err && last.current?.err !== err) last.current = { err, pinned: onScreen(err.at) };
+  const e = last.current?.err;
+  const pinned = last.current?.pinned ?? null;
+  useLayoutEffect(() => {
+    if (err && pinned) {
+      pop.current?.showPopover();
+      pop.current?.querySelector<HTMLElement>(".dialog-actions button:last-child")?.focus();
+    } else if (err) dialog.current?.showModal();
+    else {
+      dialog.current?.close();
+      if (pop.current?.matches(":popover-open")) pop.current.hidePopover();
+    }
+  }, [err, pinned]);
+  usePlaceAt(pop, err ? pinned : null, err);
   const close = () => { opError = null; opSubs.forEach((f) => f()); };
-  const e = last.current;
-  const fixes = (e?.code && e.retry && FIXES[e.code]?.(path, run, e.retry)) || [];
+  // Fixes keep the error's button, so their notice shows there too.
+  const runAt: Run = (op, done, doing) => run(op, done, doing, e?.at);
+  const fixes = (e?.code && e.retry && FIXES[e.code]?.(path, runAt, e.retry)) || [];
+  const tone = e?.warn ? "warn" : "danger";
+  const body = (
+    <form method="dialog" onSubmit={(ev) => { ev.preventDefault(); close(); }}>
+      <ModalHead id="op-error-title" icon="warn" tone={tone} title={e?.title} />
+      <p id="op-error-text" className="modal-text">{e?.text}</p>
+      <div className="dialog-actions">
+        {fixes.map(([label, fix]) => <button key={label} type="button" className="primary" onClick={() => { close(); fix(); }}>{label}</button>)}
+        <button className={fixes.length ? undefined : "primary"} autoFocus={!pinned}>{fixes.length ? "Close" : "OK"}</button>
+      </div>
+    </form>
+  );
   return (
-    <dialog ref={dialog} className={`modal alert tone-${last.current?.warn ? "warn" : "danger"}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
-      onCancel={(e) => { e.preventDefault(); close(); }}>
-      <form method="dialog" onSubmit={(e) => { e.preventDefault(); close(); }}>
-        <ModalHead id="op-error-title" icon="warn" tone={last.current?.warn ? "warn" : "danger"} title={last.current?.title} />
-        <p id="op-error-text" className="modal-text">{last.current?.text}</p>
-        <div className="dialog-actions">
-          {fixes.map(([label, fix]) => <button key={label} type="button" className="primary" onClick={() => { close(); fix(); }}>{label}</button>)}
-          <button className={fixes.length ? undefined : "primary"} autoFocus>{fixes.length ? "Close" : "OK"}</button>
-        </div>
-      </form>
-    </dialog>
+    <>
+      <dialog ref={dialog} className={`modal alert tone-${tone}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
+        onCancel={(ev) => { ev.preventDefault(); close(); }}>
+        {!pinned && body}
+      </dialog>
+      <div ref={pop} popover="manual" className={`op-callout alert tone-${tone}`} role="alertdialog" aria-labelledby="op-error-title" aria-describedby="op-error-text"
+        onKeyDown={(ev) => { if (ev.key === "Escape") { ev.preventDefault(); close(); } }}>
+        {pinned && body}
+      </div>
+    </>
   );
 }
 
 /** The running op ("Pushing main…", with elapsed seconds), then its short success line, which fades out after 4 s.
+ *  Sits under the button the op started from (see `Run`), else at the bottom center.
  *  A running op shows only after 250 ms, so quick ones (stage, commit) don't flash it. */
 export function Notice() {
   // The snapshot must be `notice` itself: a success changes it but not `opGen`.
@@ -146,7 +203,9 @@ export function Notice() {
   const cur = shown && (!shown.pending || now - shown.pending >= 250) ? shown : null;
   const ref = useRef<HTMLParagraphElement>(null);
   const visible = !!cur;
-  useEffect(() => {
+  // Under the button the op started from; bottom center when it has none on screen.
+  const at = onScreen(cur?.at);
+  useLayoutEffect(() => {
     if (!visible) return;
     // A popover shown after an open <dialog> stacks above it (and its backdrop blur) in the top layer.
     const p = ref.current;
@@ -165,8 +224,15 @@ export function Notice() {
     return () => clearTimeout(t);
   }, [cur]);
   const secs = cur?.pending ? Math.floor((now - cur.pending) / 1000) : 0;
+  usePlaceAt(ref, at, `${cur?.gen}${cur?.pending}${secs >= 2}`);
+  // Rim light: a comet circles the window edge while the op runs, then the edge flashes green, or red for an error.
+  const err = useSyncExternalStore(subscribeOps, () => opError);
+  const rim = err ? (err.warn ? "warn" : "danger") : cur?.pending ? "work" : cur?.waited ? "ok" : "";
   return (
-    <p ref={ref} popover="manual" className="notice" role="status">
+    <>
+    {/* In <body>: the stage contains its layout, which would make `fixed` cover only the stage, not the window. */}
+    {createPortal(<i key={`${rim}${cur?.gen}`} className="rimfx" data-s={rim} aria-hidden="true" />, document.body)}
+    <p ref={ref} popover="manual" className={at ? `notice at tone-${cur?.pending ? "accent" : "ok"}` : "notice"} role="status">
       {cur && (cur.pending
         ? <span key={cur.gen} className="toast tone-accent pending">
             <span className="modal-badge tone-accent"><span className="ring" aria-hidden="true" /></span>
@@ -176,6 +242,7 @@ export function Notice() {
             <span className="modal-badge tone-ok"><Icon name="check" /></span><span className="notice-text">{cur.text}</span>
           </span>)}
     </p>
+    </>
   );
 }
 
@@ -183,9 +250,35 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
   const { data, error } = useQuery(statusQuery(path));
   const [sel, setSel] = useState<Selection | null>(null);
   const run = useRun();
+  // Just-discarded files: a crossed-out row where they were, with Undo for `TOMB_MS` (and Ctrl+Z). `id`: the op log entry.
+  const [tomb, setTomb] = useState<{ files: FileChange[]; id: string; at: number } | null>(null);
+  const undoTomb = () => {
+    if (!tomb) return;
+    setTomb(null);
+    run(() => undo(path, tomb.id), `Restored ${tomb.files.length === 1 ? tomb.files[0].path : `${tomb.files.length} files`}`);
+  };
+  const undoRef = useRef(undoTomb);
+  undoRef.current = undoTomb;
+  useEffect(() => {
+    if (!tomb) return;
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      // Text fields keep their own undo; an open dialog owns the keyboard.
+      if ((e.target as HTMLElement).closest?.("input, textarea, [contenteditable]") || document.querySelector("dialog[open]")) return;
+      e.preventDefault();
+      undoRef.current();
+    };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [tomb]);
 
+  // No confirm: the files are backed up first, and Undo stays on their row for a few seconds (then in Undo history).
   async function discardFiles(files: FileChange[]) {
-    if (await confirmDiscard(files.length === 1 ? files[0].path : `${files.length} files`, discardGit(files))) run(() => discard(path, pathsOf(files)));
+    const at = Math.max(0, data?.unstaged.findIndex((f) => files.includes(f)) ?? 0);
+    if (!(await run(() => discard(path, pathsOf(files))))) return;
+    // Newest discard in the op log; an auto-fetch may have logged after it.
+    const id = (await opLog(path).catch(() => [])).find((e) => e.op === "discard")?.id;
+    if (id) setTomb({ files, id, at });
   }
 
   if (error) return <p className="error" role="alert">{errorText(error)}</p>;
@@ -193,7 +286,7 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
   // Resolved files get their own list (part of the commit like Staged); "=" = resolved to what HEAD has, so no change.
   const resolvedFiles = data.resolved.map((p) => data.staged.find((f) => f.path === p) ?? { path: p, orig_path: null, kind: "=" });
   const stagedOnly = data.staged.filter((f) => !data.resolved.includes(f.path));
-  const empty = !data.staged.length && !data.unstaged.length && !data.conflicted.length && !resolvedFiles.length;
+  const empty = !data.staged.length && !data.unstaged.length && !data.conflicted.length && !resolvedFiles.length && !tomb;
   // Follow the file when it moves to the other list (staged, unstaged, resolved); drop it once it's gone.
   const inList = (file: string, staged: boolean) => (staged ? [...data.staged, ...resolvedFiles] : [...data.unstaged, ...data.conflicted]).some((f) => f.path === file);
   const cur = sel && (inList(sel.file, sel.staged) ? sel : inList(sel.file, !sel.staged) ? { file: sel.file, staged: !sel.staged } : null);
@@ -237,7 +330,8 @@ export function Changes({ path, planPush }: { path: string; planPush: () => Prom
             <FileList {...list} title="Staged" files={stagedOnly} staged
               action="Unstage" onAction={(fs) => run(() => unstage(path, pathsOf(fs)))} />
             <FileList {...list} title="Changes" files={data.unstaged} staged={false}
-              action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} onIgnore={ignoreFile} />
+              action="Stage" onAction={(fs) => run(() => stage(path, pathsOf(fs)))} onDiscard={discardFiles} onIgnore={ignoreFile}
+              tomb={tomb && { ...tomb, onUndo: undoTomb, onEnd: () => setTomb((t) => (t === tomb ? null : t)) }} />
           </>
         )}
         </div>
@@ -394,16 +488,18 @@ type ListProps = {
   onSelect: (s: Selection) => void;
   /** Why Stash is off: a merge/rebase/... is paused. */
   paused?: string;
+  /** Just-discarded files, shown crossed out at index `at` with Undo until `onEnd`. */
+  tomb?: { files: FileChange[]; at: number; onUndo: () => void; onEnd: () => void } | null;
 };
 
-function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore, sel, onSelect, paused }: ListProps) {
+function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore, sel, onSelect, paused, tomb }: ListProps) {
   // Multi-selection: Ctrl/Shift+click, Ctrl+A, or drag over rows. Only shown while the diff's file is in this list.
   const [marked, setMarked] = useState<Set<string>>(new Set());
   const anchor = useRef(0);
   const drag = useRef<number | null>(null);
   const menu = useRef<HTMLDivElement>(null);
   const [ctx, setCtx] = useState<FileChange | null>(null);
-  if (!files.length) return null;
+  if (!files.length && !tomb) return null;
   const active = sel?.staged === staged && files.some((f) => f.path === sel.file);
   const isMarked = (f: FileChange) => active && (marked.has(f.path) || f.path === sel?.file);
   const picked = files.filter(isMarked);
@@ -423,12 +519,38 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
     } else { setMarked(new Set([p])); anchor.current = i; }
     onSelect({ file: p, staged });
   }
+  const rows: React.ReactNode[] = files.map((f, i) => {
+    const selected = isMarked(f);
+    // Row buttons act on the whole selection when their row is part of it.
+    const targets = selected && picked.length > 1 ? picked : [f];
+    return (
+      <li key={f.path} className={selected ? "sel" : undefined}
+        onContextMenu={(e) => { setCtx(f); showMenu(menu.current, e); }}
+        onMouseEnter={(e) => {
+          if (drag.current === null || !(e.buttons & 1)) return void (drag.current = null);
+          setMarked(range(drag.current, i));
+        }}>
+        <button className="row" aria-pressed={selected} onClick={(e) => click(e, i)}
+          onMouseDown={(e) => { if (e.button === 0 && !e.shiftKey && !e.ctrlKey && !e.metaKey) { drag.current = i; click(e, i); } }}
+          title={f.orig_path ? `${f.orig_path} → ${f.path}` : f.path}>
+          <FileLabel f={f} />
+        </button>
+        {onIgnore && f.kind === "?" && f.path !== ".gitignore" && <button className="small ghost" onClick={() => onIgnore(f.path)}>Ignore</button>}
+        {onDiscard && <button className="small ghost" onClick={() => onDiscard(targets)}>Discard{targets.length > 1 ? ` ${targets.length}` : ""}</button>}
+        <button className="small ghost" onClick={() => onAction(targets)}>{action}{targets.length > 1 ? ` ${targets.length}` : ""}</button>
+      </li>
+    );
+  });
+  // One keyed array, so the crossed-out row keeps its timer when the list around it refreshes.
+  if (tomb) rows.splice(Math.min(tomb.at, rows.length), 0, <TombRow key="tomb" tomb={tomb} />);
   return (
     <section>
       <div className="list-head">
         <h2>{title} <span className="count">{files.length}</span></h2>
-        {onDiscard && <button className="small ghost" onClick={() => onDiscard(files)}>Discard all</button>}
-        <button className="small ghost" onClick={() => onAction(files)} title={action === "Stage" ? "Stage all (Ctrl+Shift+S)" : undefined}>{action} all</button>
+        {files.length > 0 && <>
+          {onDiscard && <button className="small ghost" onClick={() => onDiscard(files)}>Discard all</button>}
+          <button className="small ghost" onClick={() => onAction(files)} title={action === "Stage" ? "Stage all (Ctrl+Shift+S)" : undefined}>{action} all</button>
+        </>}
       </div>
       <ul className="files" aria-multiselectable
         onKeyDown={(e) => {
@@ -437,28 +559,7 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
           setMarked(new Set(files.map((f) => f.path)));
           if (!active) onSelect({ file: files[0].path, staged });
         }}>
-        {files.map((f, i) => {
-          const selected = isMarked(f);
-          // Row buttons act on the whole selection when their row is part of it.
-          const targets = selected && picked.length > 1 ? picked : [f];
-          return (
-            <li key={f.path} className={selected ? "sel" : undefined}
-              onContextMenu={(e) => { setCtx(f); showMenu(menu.current, e); }}
-              onMouseEnter={(e) => {
-                if (drag.current === null || !(e.buttons & 1)) return void (drag.current = null);
-                setMarked(range(drag.current, i));
-              }}>
-              <button className="row" aria-pressed={selected} onClick={(e) => click(e, i)}
-                onMouseDown={(e) => { if (e.button === 0 && !e.shiftKey && !e.ctrlKey && !e.metaKey) { drag.current = i; click(e, i); } }}
-                title={f.orig_path ? `${f.orig_path} → ${f.path}` : f.path}>
-                <FileLabel f={f} />
-              </button>
-              {onIgnore && f.kind === "?" && f.path !== ".gitignore" && <button className="small ghost" onClick={() => onIgnore(f.path)}>Ignore</button>}
-              {onDiscard && <button className="small ghost" onClick={() => onDiscard(targets)}>Discard{targets.length > 1 ? ` ${targets.length}` : ""}</button>}
-              <button className="small ghost" onClick={() => onAction(targets)}>{action}{targets.length > 1 ? ` ${targets.length}` : ""}</button>
-            </li>
-          );
-        })}
+        {rows}
       </ul>
       <RefMenu pop={menu} label={`Actions for ${ctx?.path ?? "file"}`} actions={ctx ? [
         [ctxFiles.length > 1 ? `${action} ${ctxFiles.length} files` : action, () => onAction(ctxFiles)],
@@ -468,6 +569,18 @@ function FileList({ title, files, staged, action, onAction, onDiscard, onIgnore,
         [ctxFiles.length > 1 ? `Stash ${ctxFiles.length} files` : "Stash this file", () => openStashSave(pathsOf(ctxFiles)), paused],
       ] : []} />
     </section>
+  );
+}
+
+/** Discarded files, crossed out where they were, with Undo. A bar drains over `TOMB_MS` (paused on hover and focus), then it goes. */
+function TombRow({ tomb }: { tomb: NonNullable<ListProps["tomb"]> }) {
+  return (
+    <li className="tomb" role="status">
+      <Icon name="undo" />
+      <span className="tomb-text"><b>Discarded</b> {tomb.files.map((f) => <s key={f.path}>{f.path}</s>)}</span>
+      <button className="small" onClick={tomb.onUndo} title="Put the changes back (Ctrl+Z)">Undo <kbd>Ctrl+Z</kbd></button>
+      <i className="drain" style={{ animationDuration: `${TOMB_MS}ms` }} onAnimationEnd={tomb.onEnd} aria-hidden="true" />
+    </li>
   );
 }
 

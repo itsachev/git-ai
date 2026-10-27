@@ -10,10 +10,15 @@ What's new in each git-ai release. Newest first.
 
 ### Changed
 
+- Fetch, Pull, Push and Commit now report right where you clicked. The button shows the progress and turns green when it worked, and a short note appears under it instead of a toast at the bottom of the window. Started from the command palette or a shortcut, the note still sits under the toolbar button.
+- While Fetch, Pull, Push or Commit runs, a light circles the edge of the window. When it finishes, the edge flashes green, or red if it failed, so you notice even when looking elsewhere.
+- When an action fails, the explanation and its fix now wait under the button you clicked until you close them, instead of covering the window.
+- Discarding files no longer asks first. The files are backed up, and a crossed-out row stays where they were with Undo (or Ctrl+Z) for a few seconds. After that, Undo history still has them. Discarding picked lines in a diff still asks.
 - Resolving a conflict (Keep mine, Keep theirs, both sides, an AI proposal or your own edit) no longer closes the file. It stays open showing the result, so you can check it, and you click Mark resolved when you're happy. Before, the file vanished as soon as you picked a side, and right away if the result matched your branch.
 
 ### Fixed
 
+- Long git commands shown in dialogs (for example when undoing a push) now wrap onto the next line instead of needing a sideways scroll.
 - The main view no longer goes blank after an action finishes (Undo, Commit, Push, Pull, Fetch, Switch or Checkout). Before, the commit list or file list could vanish until you switched tabs.
 
 ## [0.4.0] - 2026-10-26
