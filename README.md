@@ -49,6 +49,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 
 ### ✏️ File Status
 - Stage, unstage and discard **files, hunks or single lines**
+- Discard without a prompt: a crossed-out row offers **Undo** (or Ctrl+Z) for a few seconds
 - Commit and amend, with an **AI-generated commit message**
 - Ignore files by name, extension or folder
 - **Git LFS**: track or untrack patterns, download LFS files
@@ -81,6 +82,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 ### ☁️ Remotes & hosting
 - Fetch, pull (merge or rebase) and push, with ahead/behind counts. Push and Commit grey out when they can't run, and say why on hover
 - Rejected-push dialog that offers pull-then-push or force push with lease
+- Results and errors appear **under the button you clicked**; a light around the window edge shows an action running, then flashes green or red
 - GitHub and GitLab sign-in; open **PRs / MRs with AI-written descriptions**
 - AI changelogs
 
