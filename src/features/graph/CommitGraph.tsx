@@ -270,14 +270,24 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
     onSelect({ i, oid: r.oid });
   }
 
-  // Keep the picked row in view (keys, search jumps).
+  // Fewer rows (other options, reset, rebase) clamp scrollTop, and not every webview fires `scroll` for that:
+  // re-read it, or the stale offset renders rows below the visible area and the list looks empty.
+  useLayoutEffect(() => {
+    const el = scroller.current!;
+    if (el.scrollTop !== view.top) setView({ top: el.scrollTop, height: el.clientHeight });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total]);
+
+  // Keep the picked row in view (keys, search jumps). Also once rows arrive: a pick made before
+  // (the branch tip on open) scrolled an empty list, so it landed at the top.
   const selI = sel?.i;
+  const loaded = total > 0;
   useEffect(() => {
     const el = scroller.current;
     if (!el || selI === undefined) return;
     if (selI * ROW < el.scrollTop) el.scrollTop = selI * ROW;
     else if ((selI + 1) * ROW > el.scrollTop + el.clientHeight) el.scrollTop = (selI + 1) * ROW - el.clientHeight;
-  }, [selI]);
+  }, [selI, loaded]);
 
   /** Branches a dot sits on: every branch label on the line up from it to a tip; local branches first. */
   function branchesOf(i: number, c: number): string[] {
@@ -315,7 +325,8 @@ export function CommitGraph({ path, opts, sel, onSelect, onCompare, hits }: Prop
         <span>{gw >= 56 ? "Graph" : ""}</span><span>Description</span><span className="c-date">Date</span><span className="c-author">Author</span><span className="c-oid">Commit</span>
       </div>
       {err ? <p className="error" role="alert">{errorText(err)}</p> : null}
-      {head && !total && <p className="muted">No commits yet.</p>}
+      {!head && !err && <p className="muted" role="status">Loading commits…</p>}
+      {head && !total && <p className="muted">{opts.all ? "No commits yet." : opts.own ? "No commits of its own: everything here is also on the main branch." : "No commits on the current branch yet."}</p>}
       <div
         className="graph-body" ref={scroller} tabIndex={0} role="listbox" aria-label="Commits"
         aria-activedescendant={sel ? `c-${sel.oid}` : undefined}

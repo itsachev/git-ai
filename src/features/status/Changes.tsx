@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { aiCommitMessage, aiResolveConflict, abortOp, applyLines, commit, discard, editors, fetchAll, fileDiff, headMessage, ignore, openFile, opLog, push, reopen, repoStatus, resolve, stage, stashSave, undo, unstage, workFile, writeResolved } from "../../lib/ipc";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -225,13 +224,7 @@ export function Notice() {
   }, [cur]);
   const secs = cur?.pending ? Math.floor((now - cur.pending) / 1000) : 0;
   usePlaceAt(ref, at, `${cur?.gen}${cur?.pending}${secs >= 2}`);
-  // Rim light: a comet circles the window edge while the op runs, then the edge flashes green, or red for an error.
-  const err = useSyncExternalStore(subscribeOps, () => opError);
-  const rim = err ? (err.warn ? "warn" : "danger") : cur?.pending ? "work" : cur?.waited ? "ok" : "";
   return (
-    <>
-    {/* In <body>: the stage contains its layout, which would make `fixed` cover only the stage, not the window. */}
-    {createPortal(<i key={`${rim}${cur?.gen}`} className="rimfx" data-s={rim} aria-hidden="true" />, document.body)}
     <p ref={ref} popover="manual" className={at ? `notice at tone-${cur?.pending ? "accent" : "ok"}` : "notice"} role="status">
       {cur && (cur.pending
         ? <span key={cur.gen} className="toast tone-accent pending">
@@ -242,7 +235,6 @@ export function Notice() {
             <span className="modal-badge tone-ok"><Icon name="check" /></span><span className="notice-text">{cur.text}</span>
           </span>)}
     </p>
-    </>
   );
 }
 

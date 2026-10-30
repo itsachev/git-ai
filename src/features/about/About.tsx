@@ -101,7 +101,7 @@ const FEATURES: [IconName, string, Feature[]][] = [
     ["App color", "Settings → App color", "Pick the color of buttons, the selection and the current branch from seven presets."],
     ["Settings", "Gear button", "A status overview shows what is set up and what still needs doing; click one to jump to it. Your git name and email, saving HTTPS sign-ins, your SSH key and your AI provider (Gemini, Claude, OpenAI or a local model) with its key. Stored on this computer only."],
     ["First-run setup", "On first launch, or Settings → Run setup again", "A short walkthrough of the settings above."],
-    ["Notes where you clicked", "Automatic", "Fetch, Pull, Push and Commit report right under their button, which turns green when it worked. While one runs, a light circles the window edge, then flashes green on success or red on failure."],
+    ["Notes where you clicked", "Automatic", "Fetch, Pull, Push and Commit report right under their button, which turns green when it worked."],
     ["Plain-language errors", "Automatic", "When git fails, you get what went wrong and what to do next, not just git's raw message, under the button you clicked until you close it. Common fixes are one button: stash and retry, try again, fetch now, push this branch."],
     ["Updates", "Notice in the bottom-right corner", "When a new version is out, install it and restart with one click, or later."],
     ["Resizable panes", "Drag the dividers", "Resize the commit list, details and diff. Sizes are remembered."],

@@ -462,17 +462,6 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   const changed = status ? status.staged.length + status.unstaged.length + status.conflicted.length : 0;
   const paused = usePaused(path);
   const views = [["status", "File Status", "changes", "Ctrl+1"], ["history", "History", "history", "Ctrl+2"]] as const;
-  const shell = useRef<HTMLDivElement>(null);
-
-  // Opening a repo: the rail head and views cascade in from the left, the toolbar drops in (the Sidebar reveals itself
-  // when its refs arrive). The branch chips keep their own CSS pop.
-  useGSAP(() => {
-    gsap.matchMedia().add(MOTION, () => {
-      gsap.timeline({ defaults: { duration: 0.4, clearProps: CLEAN } })
-        .from(".rail-head > *, .views button", { opacity: 0, x: -14, stagger: 0.03 })
-        .from(".toolbar > :not(.branch-chip)", { opacity: 0, y: -8, stagger: 0.02 }, 0.04);
-    });
-  }, { scope: shell, dependencies: [path], revertOnUpdate: true });
 
   const show = (t: typeof tab) => { setTab(t); setSide(false); };
   useEffect(() => onOpenShortcuts(() => show("shortcuts")), []);
@@ -522,7 +511,7 @@ function RepoView({ repo, onHome, tabCommands, theme, setTheme }: RepoProps) {
   commands.push(...themeCommands(theme, setTheme), { label: "Settings", run: openSettings }, { label: "Run first-time setup", run: openSetup }, ...tabCommands);
 
   return (
-    <div ref={shell} className={`shell${side ? " show-side" : ""}`}>
+    <div className={`shell${side ? " show-side" : ""}`}>
       {/* While Commit/Fetch/Pull/Push runs, the rail and the stage are inert (`.lock`). Askpass and the
           push-rejected choice mount outside RepoView, so they stay usable. */}
       <aside className="rail" aria-label="Repository">

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { CLEAN, MOTION, SplitText, gsap, useGSAP } from "../../lib/motion";
 import { Icon, type IconName } from "../../lib/icons";
 import { OPEN, type Command } from "../palette/Palette";
 
@@ -91,19 +90,6 @@ export function Shortcuts({ commands }: { commands: Command[] }) {
     addEventListener("blur", clear);
     return () => { removeEventListener("keydown", sync); removeEventListener("keyup", sync); removeEventListener("blur", clear); };
   }, []);
-
-  // Intro: headline out of its word masks, the hero caps drop in like struck keys, then the bands rise.
-  useGSAP(() => {
-    gsap.matchMedia().add(MOTION, () => {
-      const words = SplitText.create(".sc-title", { type: "words", wordsClass: "w", mask: "words", aria: "auto" }).words;
-      gsap.timeline({ defaults: { clearProps: CLEAN } })
-        .from(".sc-eyebrow", { opacity: 0, y: 8, duration: 0.4 })
-        .from(words, { yPercent: 110, stagger: 0.04, duration: 0.6 }, 0.04)
-        .from(".sc-lede, .sc-tools", { opacity: 0, y: 12, stagger: 0.05 }, 0.15)
-        .from(".sc-hero-keys .sc-cap, .sc-hero-keys .sc-plus", { opacity: 0, y: -18, stagger: 0.05, ease: "back.out(2)", duration: 0.4 }, 0.12)
-        .from(".sc-area", { opacity: 0, y: 18, stagger: 0.04 }, 0.22);
-    });
-  }, { scope: root });
 
   return (
     <div className="shortcuts" ref={root}>

@@ -4,6 +4,18 @@ What's new in each git-ai release. Newest first.
 
 ## [Unreleased]
 
+### Removed
+
+- The light that circled the window edge while Fetch, Pull, Push or Commit ran, and the green or red flash after it. Progress and results still show under the button you clicked.
+- The entrance and pulse animations inside a repository: views, sidebar, commit details, file lists, diffs and the HEAD dot now appear at once. The home screen keeps its animations; buttons, hover effects, dialogs, menus, notes and progress spinners are unchanged.
+
+### Fixed
+
+- History could show an empty commit list after switching to fewer commits (another branch filter, a reset or rebase) while scrolled down. It now snaps back to the rows that are there.
+- Opening History now scrolls to the current branch's newest commit even when other branches have newer ones. Before, it was picked but out of view.
+- History shows "Loading commits…" while a big repository's graph is being built, instead of an empty list.
+- "Own commits" with nothing to show now says everything is already on the main branch, instead of "No commits yet".
+
 ## [0.5.0] - 2026-10-27
 
 ### Added

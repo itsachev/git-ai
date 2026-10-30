@@ -82,7 +82,7 @@ The repository graph, staging and conflict handling you'd expect from a Sourcetr
 ### ☁️ Remotes & hosting
 - Fetch, pull (merge or rebase) and push, with ahead/behind counts. Push and Commit grey out when they can't run, and say why on hover
 - Rejected-push dialog that offers pull-then-push or force push with lease
-- Results and errors appear **under the button you clicked**; a light around the window edge shows an action running, then flashes green or red
+- Results and errors appear **under the button you clicked**
 - GitHub and GitLab sign-in; open **PRs / MRs with AI-written descriptions**
 - AI changelogs
 

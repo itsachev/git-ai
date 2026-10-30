@@ -15,7 +15,6 @@ import { openReflog } from "./Reflog";
 /** Opens `dir` (a repo) in a new tab; App listens. */
 export const openRepoTab = (dir: string) => dispatchEvent(new CustomEvent("gitai-open-repo", { detail: dir }));
 import { Local, Remote, choose, confirm, confirmCheck, prompt } from "../../lib/modal";
-import { CLEAN, MOTION, gsap, useGSAP } from "../../lib/motion";
 
 /** Switch that, when there are uncommitted changes, offers to bring them along, or stash them, instead of just failing. */
 export async function switchTo(path: string, name: string, track: boolean) {
@@ -290,15 +289,6 @@ export function Sidebar({ path }: { path: string }) {
   const [dropActions, setDropActions] = useState<Action[]>([]);
   const dropPop = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLElement>(null);
-  // Refs load after the rail mounts: when they arrive, sections slide in from the left and the first rows cascade after.
-  useGSAP(() => {
-    if (!root.current) return;
-    gsap.matchMedia().add(MOTION, () => {
-      gsap.timeline({ defaults: { duration: 0.4, clearProps: CLEAN } })
-        .from(root.current!.children, { opacity: 0, x: -14, stagger: 0.035 }, 0.05)
-        .from(gsap.utils.toArray<HTMLElement>(".refs > li", root.current).slice(0, 16), { opacity: 0, x: -10, stagger: 0.015 }, 0.1);
-    });
-  }, { scope: root, dependencies: [!!data], revertOnUpdate: true });
   // Keep the current branch in view on open and after a switch.
   useEffect(() => { root.current?.querySelector(".refs > li.cur")?.scrollIntoView({ block: "nearest" }); }, [data?.head]);
   const other = (to: string) => (!dragging || dragging === to ? null : to === data?.head ? dragging : dragging === data?.head ? to : null);
